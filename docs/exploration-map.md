@@ -38,7 +38,8 @@ the relationship types involved.
 
 A database's domains are produced by the model: it groups the database's Terms
 into business domains and names them the way a manager would. After that a
-person can rename a domain or move Terms between domains.
+person can rename a domain in the interface. Moving Terms between domains is
+available through the API only (see Endpoints); the interface has no control for it yet.
 
 Regenerating the domains does not throw that work away: edited domains and
 Terms a person moved are kept, and only the unedited, model-generated parts are
