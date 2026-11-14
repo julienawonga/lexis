@@ -4046,6 +4046,162 @@
         "x-auto-ontology-proxied": true
       }
     },
+    "/api/exploration/semantic-domains": {
+      "get": {
+        "tags": ["exploration"],
+        "summary": "Database-scoped Term domains for Exploration's semantic map.",
+        "description": "Database-scoped Term domains for Exploration's semantic map.",
+        "operationId": "get_api_exploration_semantic_domains",
+        "responses": {
+          "200": {
+            "description": "Success. This handler has custom logic; its schema is not yet declared.",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "401": {
+            "description": "No authenticated caller could be resolved"
+          },
+          "403": {
+            "description": "The caller lacks the required permission"
+          }
+        },
+        "security": [
+          {
+            "ApiToken": []
+          }
+        ],
+        "x-auto-ontology-source": "frontend/app/api/exploration/semantic-domains/route.ts",
+        "x-auto-ontology-permissions": {
+          "catalog": ["read"]
+        },
+        "x-auto-ontology-proxied": true
+      }
+    },
+    "/api/exploration/semantic-domains/{domainId}": {
+      "patch": {
+        "tags": ["exploration"],
+        "summary": "Renames a business domain.",
+        "description": "Renames a business domain.",
+        "operationId": "patch_api_exploration_semantic_domains_domainId_",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "name": "domainId",
+            "in": "path",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success. This handler has custom logic; its schema is not yet declared.",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "401": {
+            "description": "No authenticated caller could be resolved"
+          },
+          "403": {
+            "description": "The caller lacks the required permission"
+          }
+        },
+        "security": [
+          {
+            "ApiToken": []
+          }
+        ],
+        "x-auto-ontology-source": "frontend/app/api/exploration/semantic-domains/[domainId]/route.ts",
+        "x-auto-ontology-permissions": {
+          "catalog": ["edit"]
+        },
+        "x-auto-ontology-proxied": true
+      }
+    },
+    "/api/exploration/semantic-domains/{domainId}/terms": {
+      "post": {
+        "tags": ["exploration"],
+        "summary": "Moves Terms into a business domain in Exploration's semantic map.",
+        "description": "Moves Terms into a business domain in Exploration's semantic map.",
+        "operationId": "post_api_exploration_semantic_domains_domainId_terms",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "name": "domainId",
+            "in": "path",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success. This handler has custom logic; its schema is not yet declared.",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "401": {
+            "description": "No authenticated caller could be resolved"
+          },
+          "403": {
+            "description": "The caller lacks the required permission"
+          }
+        },
+        "security": [
+          {
+            "ApiToken": []
+          }
+        ],
+        "x-auto-ontology-source": "frontend/app/api/exploration/semantic-domains/[domainId]/terms/route.ts",
+        "x-auto-ontology-permissions": {
+          "catalog": ["edit"]
+        },
+        "x-auto-ontology-proxied": true
+      }
+    },
+    "/api/exploration/semantic-domains/generate": {
+      "post": {
+        "tags": ["exploration"],
+        "summary": "Generates business domains for a database's terms.",
+        "description": "Generates business domains for a database's terms.",
+        "operationId": "post_api_exploration_semantic_domains_generate",
+        "responses": {
+          "200": {
+            "description": "Success. This handler has custom logic; its schema is not yet declared.",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "401": {
+            "description": "No authenticated caller could be resolved"
+          },
+          "403": {
+            "description": "The caller lacks the required permission"
+          }
+        },
+        "security": [
+          {
+            "ApiToken": []
+          }
+        ],
+        "x-auto-ontology-source": "frontend/app/api/exploration/semantic-domains/generate/route.ts",
+        "x-auto-ontology-permissions": {
+          "catalog": ["edit"]
+        },
+        "x-auto-ontology-proxied": true
+      }
+    },
     "/api/exploration/semantic-graph": {
       "get": {
         "description": "explorationApi.getSemanticExplorationGraph — full semantic-layer graph ({nodes, links}).",
