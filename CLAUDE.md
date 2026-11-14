@@ -8,6 +8,8 @@ SPDX-License-Identifier: Apache-2.0
 
 Full-stack repo: Next.js frontend (`/frontend`) + FastAPI backend (`/auto_ontology`).
 
+New to the project or taking over? Read [`HANDOFF.md`](./HANDOFF.md) first: current state, plan, how to run and test on the owner's machine.
+
 This file is for **Lexis maintainers**. User/partner agent skills live in
 `skills/` — start at [`AGENTS.md`](./AGENTS.md).
 
