@@ -20,6 +20,7 @@ import {
 import { ClarificationCard } from './ClarificationCard';
 import { DynamicTable } from './DynamicTable';
 import { FormattedContent } from './FormattedContent';
+import { KnowledgeTracePanel } from './KnowledgeTracePanel';
 import { glassFocus, glassSurface } from './glass';
 
 type SingleCellResult = { column: string; value: string };
@@ -182,6 +183,13 @@ export const MessageBubble = ({
 									: 'SQL'
 							}
 							className={showText ? 'mt-3' : undefined}
+						/>
+					)}
+
+					{message.knowledgeTrace && message.knowledgeTrace.length > 0 && (
+						<KnowledgeTracePanel
+							entries={message.knowledgeTrace}
+							className={showText || showSql ? 'mt-3' : undefined}
 						/>
 					)}
 				</div>

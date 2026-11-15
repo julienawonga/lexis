@@ -2,6 +2,17 @@
 // All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
+export type KnowledgeTraceEntry = {
+	kind: 'term' | 'sql_attribute' | 'column_attribute' | 'custom_analysis';
+	id: string;
+	name: string;
+	database: string | null;
+	certified: boolean | null;
+	reason: string;
+	used: boolean | null;
+	matched: string[];
+};
+
 export type ChatMessage = {
 	id: string;
 	role: 'user' | 'assistant';
@@ -9,6 +20,7 @@ export type ChatMessage = {
 	sql?: string;
 	sqlResponse?: string;
 	thoughts?: string;
+	knowledgeTrace?: KnowledgeTraceEntry[];
 	/** Set when this assistant turn is a clarification question rather than an answer. */
 	clarification?: ClarificationPart;
 	timestamp: number;
@@ -68,6 +80,7 @@ export type ResultEvent = {
 		sql_code?: string;
 		sql_response_from_db?: SqlResult;
 		thoughts?: string;
+		knowledge_trace?: KnowledgeTraceEntry[] | null;
 	};
 };
 
