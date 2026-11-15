@@ -641,6 +641,39 @@ to interpret the entries is repeated.
   still be moved into a domain of another database through the API.
   `FAKES` plus CI.
 
+### E26 - Repairing a filter that ignores a linked value, PR #58 (2026-11-13 and 2026-11-15)
+
+- **Question.** Does the value-anchor repair of PR #58 (a string literal equal to a
+  linked anchor's phrase whose stored value differs routes once to reconstruction;
+  a single row of 0 or NULL runs the literal check) raise accuracy on value
+  questions without regressing others?
+- **First measurement (2026-11-13, combined build of #57, #58 and #59, reports in
+  `HomeLab/lexis-evals/combo/`).** `chinook_values.json` 14x3: 83.3% to 95.2%
+  (+11.9%), 6 questions improved, 1 regressed ("Jazz tracks that are mpeg audio",
+  100% to 67%). `chinook.json` 20x3: 96.7% to 98.3%, 1 improved, 1 regressed.
+  Harness verdict `REJECT` because of the regressions. It was a combined build, so
+  the effect of #58 alone was not isolated, and the notebook did not record it.
+- **Second measurement (2026-11-15, `main` against `main` plus #58 alone, same
+  database, same frozen cases, same harness, 4 workers, runs alternated,
+  reports in `HomeLab/lexis-evals/cand58/`).** `chinook_values.json` 14x3: `main`
+  100.0%, candidate 97.6% (-2.4%; one question, the same "Jazz mpeg" one, went
+  from 3/3 to 2/3). `chinook.json` 20x3: both 98.3%; "playlist with the most
+  tracks" improved (2/3 to 3/3) and "five best-selling artists by revenue"
+  regressed (3/3 to 2/3). Verdict `REJECT` on both.
+- **Reading.** The problem #58 targets (three misspelling questions failing one
+  run in three) was **not reproduced**: `main` was already at 100% on this set
+  two days later. The cause of the difference from the 83.3% baseline of
+  2026-11-13 was **not investigated** (the value index state and the merged
+  changes in between are candidates). One question flipping in a set of 14 or 20,
+  in both directions on both sides, is the noise level of this bench; #58 shows no
+  effect above it.
+- **Decision.** Not merged, PR closed with the branch kept. It adds an engine
+  path with no measured benefit on current `main`.
+- **Limits.** Chinook is small and well known to the model, so a null result here
+  does not prove the repair is useless on messier data; there is no held-out
+  messy-value set. Three repeats per question; no confidence interval. One
+  machine. `REAL-E2E`, manual.
+
 ### Built but never run
 
 PR #44 (`bench split/run/score`) is tested with synthetic cases and fakes only;
@@ -725,13 +758,17 @@ held-out value cases (`chinook_values.json`) and the clarification flow (PRs #26
 | E22 | 11-12 | Chinook, one question x10 | `main` before #52 | 9/10 correct, 6 slow, 1 cut at 300 s | development | REAL-E2E |
 | E22 | 11-12 | same question x10 | with #52 | 10/10 correct, 0 slow (49-62 s) | development | REAL-E2E |
 | E22 | 11-12 | Chinook 20x3, Pagila 13x3 | with #52 | 60/60, 39/39 | held-out / development | REAL-E2E |
+| E26 | 11-13 | Chinook values 14x3 | `main` then combined build with #58 | 83.3% to 95.2%, 6 improved 1 regressed | held-out | REAL-E2E |
+| E26 | 11-15 | Chinook values 14x3 | `main` | 100.0% | held-out | REAL-E2E |
+| E26 | 11-15 | Chinook values 14x3 | `main` plus #58 | 97.6% (1 regressed); `REJECT` | held-out | REAL-E2E |
+| E26 | 11-15 | Chinook 20x3 | `main` and `main` plus #58 | 98.3% and 98.3% (1 improved, 1 regressed) | held-out | REAL-E2E |
 
 Engineering findings without a score: E02 (empty index), E04 (FK extraction), E05
 (value probes and privacy incident), E06 (VIP term), E07 (learned test question),
 E10 (connection exhaustion), E11 (host crash), E12 (429 storm), E17 (startup
 re-ingestion), E18 (trace), E19 (flaky test), E21 (Terms API), E23 (domain grouping, not scored),
 E24 (semantic contract review; the measurement was stopped twice and has no result),
-E25 (domain map review).
+E25 (domain map review), E26 (value-anchor repair, not merged).
 
 ## 5. What is NOT yet measured
 
@@ -757,8 +794,8 @@ E25 (domain map review).
   reference answers.
 - **The semantic contract's effect on accuracy** (E24): no result yet; the isolated
   environment must be rebuilt with the Chinook schema `public` first.
-- **Value-anchor literal repair (PR #58, draft):** not measured; it is an engine
-  change and needs an `ACCEPT` before merging.
+- **Value-anchor literal repair (PR #58):** measured (E26), no gain on current `main`,
+  not merged. No held-out set of messy values exists to test it harder.
 - **Domain names** (E23): not graded by anyone.
 - **Whether PR #52's evidence wording changes the 180 LiveSQLBench questions** (E22).
 - **Self-improving behaviour** (learned Terms, promotion, consolidation) is a
