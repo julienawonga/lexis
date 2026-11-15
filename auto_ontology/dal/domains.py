@@ -114,7 +114,10 @@ def rename_domain(domain_id: str, name: str, description: str | None = None) -> 
     """Rename a domain and mark it human-managed; return whether it existed.
 
     ``description`` is written only when given, so a rename carrying just a name
-    keeps the stored description.
+    keeps the stored description. The rename also marks the domain's own
+    assignments ``'human'`` in the same transaction: ``replace_auto_domains``
+    deletes every ``origin='auto'`` assignment, so leaving them auto would
+    empty the renamed domain at the next regeneration.
     """
     with write_transaction():
         existing = store().query_read(
@@ -127,6 +130,11 @@ def rename_domain(domain_id: str, name: str, description: str | None = None) -> 
             values["description"] = description
         store().query_write(
             update(s.domain).where(s.domain.c.id == domain_id).values(**values)
+        )
+        store().query_write(
+            update(s.term_domain)
+            .where(s.term_domain.c.domain_id == domain_id)
+            .values(origin="human")
         )
         return True
 

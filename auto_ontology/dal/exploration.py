@@ -1241,6 +1241,20 @@ def _table_ids_for_database(database_id: str) -> set[str]:
     return {row["id"] for row in rows}
 
 
+def _filter_pairs_for_database(
+    pairs: list[dict[str, Any]], table_ids: set[str]
+) -> list[dict[str, Any]]:
+    """Pairs whose table lives in the requested database, and only those.
+
+    A Term is global — the same Term can be linked to tables in two unrelated
+    databases — so callers counting per-database domain tables must drop every
+    pair whose table is not one of *table_ids* (as
+    :func:`_table_ids_for_database` returns them). Pure so tests can drive it
+    without a catalog.
+    """
+    return [row for row in pairs if row.get("table_id") in table_ids]
+
+
 def fetch_semantic_database_overview() -> list[dict[str, Any]]:
     """Return each catalog database and its distinct linked Term count."""
     linked_terms = (
@@ -1435,7 +1449,14 @@ def fetch_semantic_domains(
     for term_id, domain_id in term_domain.items():
         domain_rows[domain_id]["term_ids"].append(term_id)
 
-    pairs = fetch_term_table_pairs(zone_ids=zone_ids, term_ids=list(nodes))
+    # Same database scoping the graph above applies: without it, a Term
+    # linked to tables in two databases inflates every domain's
+    # ``table_count`` and every cross-domain link's ``shared_table_count``
+    # with tables the requested database does not contain.
+    pairs = _filter_pairs_for_database(
+        fetch_term_table_pairs(zone_ids=zone_ids, term_ids=list(nodes)),
+        _table_ids_for_database(database_id),
+    )
     term_tables, _ = build_term_table_maps(pairs)
     # One query for every Term's certification rather than one per Term.
     certification = {

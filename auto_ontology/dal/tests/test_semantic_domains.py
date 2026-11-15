@@ -63,6 +63,9 @@ def test_fetch_semantic_domains_aggregates_domains_and_links(monkeypatch):
         ],
     )
     monkeypatch.setattr(
+        exploration, "_table_ids_for_database", lambda database_id: {"t1", "t2"}
+    )
+    monkeypatch.setattr(
         exploration,
         "fetch_all_terms",
         lambda **kwargs: [
@@ -110,6 +113,9 @@ def test_fetch_semantic_domains_without_stored_domains(monkeypatch):
     )
     monkeypatch.setattr(exploration, "fetch_domains", lambda database_id: [])
     monkeypatch.setattr(exploration, "fetch_term_table_pairs", lambda **kwargs: [])
+    monkeypatch.setattr(
+        exploration, "_table_ids_for_database", lambda database_id: set()
+    )
     monkeypatch.setattr(exploration, "fetch_all_terms", lambda **kwargs: [])
 
     assert exploration.fetch_semantic_domains("db") == {

@@ -129,6 +129,63 @@ def test_group_terms_empty_input_returns_empty() -> None:
     assert group_terms([], "en", GarbageLLM()) == []
 
 
+def _disconnected_cliques() -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    """Thirty Terms in two 15-Term cliques with no links between the cliques."""
+    terms = [
+        {"id": f"c{i}-{n:02d}", "name": f"Term {i}{n:02d}"}
+        for i in (1, 2)
+        for n in range(15)
+    ]
+    links = [
+        {"source": f"c{i}-{a:02d}", "target": f"c{i}-{b:02d}"}
+        for i in (1, 2)
+        for a in range(15)
+        for b in range(a + 1, 15)
+    ]
+    return terms, links
+
+
+def test_fallback_with_links_clusters_disconnected_cliques() -> None:
+    # With links, the deterministic fallback separates the two cliques instead
+    # of pouring every Term into one "Other" domain.
+    terms, links = _disconnected_cliques()
+    result = group_terms(terms, "en", GarbageLLM(), links=links)
+    assert len(result) > 1
+    assert len(result) == 2
+    assert {t for group in result for t in group["term_ids"]} == {
+        term["id"] for term in terms
+    }
+    for group in result:
+        assert {term_id.split("-")[0] for term_id in group["term_ids"]} == {"c1"} or {
+            term_id.split("-")[0] for term_id in group["term_ids"]
+        } == {"c2"}
+
+
+def test_fallback_without_links_keeps_single_other_domain() -> None:
+    # Without links the behaviour is unchanged: one "Other" domain holds every Term.
+    terms, _ = _disconnected_cliques()
+    result = group_terms(terms, "en", GarbageLLM())
+    assert len(result) == 1
+    assert result[0]["name"] == "Other"
+    assert set(result[0]["term_ids"]) == {term["id"] for term in terms}
+
+
+def test_group_terms_without_llm_skips_model_and_falls_back(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # A missing client must go straight to the deterministic fallback without
+    # ever attempting a model call (no llm.bind AttributeError detour).
+    terms, links = _disconnected_cliques()
+    calls: list[Any] = []
+    monkeypatch.setattr(
+        "auto_ontology.retrieval.domains._invoke",
+        lambda *args, **kwargs: calls.append(args),
+    )
+    result = group_terms(terms, "en", None, links=links)
+    assert calls == []
+    assert len(result) == 2
+
+
 def test_parse_accepts_json_inside_a_code_fence_and_prose() -> None:
     body = json.dumps(
         {"domains": [{"name": "Finance", "description": "", "term_ids": ["a", "b"]}]}

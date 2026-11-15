@@ -86,6 +86,8 @@ def rename_semantic_domain(
         result = service.rename_semantic_domain(domain_id, body.name, body.description)
     except service.UnknownDomain as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except service.BlankDomainName as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
     except service.DuplicateDomainName as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
     logger.info(

@@ -247,6 +247,10 @@ export const ExplorationView = () => {
 	const [search, setSearch] = useState('');
 	/** One database id, or null for the unfiltered (500-node) graphs. */
 	const [selectedDatabaseId, setSelectedDatabaseId] = useState<string | null>(null);
+	const selectedDatabaseIdRef = useRef<string | null>(selectedDatabaseId);
+	useEffect(() => {
+		selectedDatabaseIdRef.current = selectedDatabaseId;
+	}, [selectedDatabaseId]);
 	const [activeNodeId, setActiveNodeId] = useState<string | null>(activeNodeIdFromUrl);
 
 	const activeNodeIdRef = useRef<string | null>(activeNodeId);
@@ -422,11 +426,17 @@ export const ExplorationView = () => {
 		}
 		let cancelled = false;
 		setDomains(null);
+		setGenerateError(null);
 		setSelectedDomainId(null);
 		setShowAllTerms(false);
 		const loadDomains = async () => {
 			const response = await explorationApi.getSemanticDomains(selectedDatabaseId);
-			if (cancelled || response.error) return;
+			if (cancelled) return;
+			if (response.error) {
+				setDomains({ generated: false, domains: [], links: [] });
+				setGenerateError(response.message ?? 'Failed to load business domains');
+				return;
+			}
 			setDomains(response.data ?? { generated: false, domains: [], links: [] });
 		};
 		void loadDomains();
@@ -2043,10 +2053,12 @@ export const ExplorationView = () => {
 
 	const handleGenerateDomains = useCallback(async () => {
 		if (selectedDatabaseId == null) return;
+		const requestDatabaseId = selectedDatabaseId;
 		setGeneratingDomains(true);
 		setGenerateError(null);
-		const response = await explorationApi.generateSemanticDomains(selectedDatabaseId);
+		const response = await explorationApi.generateSemanticDomains(requestDatabaseId);
 		setGeneratingDomains(false);
+		if (selectedDatabaseIdRef.current !== requestDatabaseId) return;
 		if (response.error) {
 			setGenerateError(response.message ?? 'Failed to generate business domains');
 			return;
