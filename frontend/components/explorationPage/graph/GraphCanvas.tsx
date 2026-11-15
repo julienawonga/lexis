@@ -1652,12 +1652,10 @@ export const GraphCanvas = ({
 					// Zoom in a bit further as the actual default starting view,
 					// rather than leaving the user at the (often zoomed-far-out)
 					// whole-graph fit.
-					void renderer
-						.getCamera()
-						.animatedZoom({
-							duration: 300,
-							factor: initialZoomFactor(graph.nodes.length),
-						});
+					void renderer.getCamera().animatedZoom({
+						duration: 300,
+						factor: initialZoomFactor(graph.nodes.length),
+					});
 				});
 			if (containerRef.current) {
 				containerRef.current.style.transition = 'opacity 300ms ease-out';
