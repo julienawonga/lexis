@@ -591,16 +591,55 @@ to interpret the entries is repeated.
   Windows: a DAL signature snapshot holding memory addresses, a public OpenAPI
   spec holding Windows paths and carriage returns, and an unformatted migration.
   Generated artefacts are now produced on Linux only.
-- **Measurement: no result.** The planned gate (Chinook 20x3, flag off then flag
-  on, same frozen cases) was started and **stopped at 22 of 60 questions of the
-  flag-off run**. Docker builds were running on the same machine and several
-  questions hit the 300 s limit, so those partial numbers were contaminated and
-  are not reported. The partial log is kept outside the repository. The run is to
-  be repeated on an idle machine; until it gives an `ACCEPT`, the flag stays off
-  and the branch stays a draft.
+- **Measurement: no result, twice.** The planned gate (Chinook 20x3, flag off
+  then flag on, same frozen cases) was started and stopped two times.
+  **First attempt:** stopped at 22 of 60 questions of the flag-off run. Docker
+  builds were running on the same machine and several questions hit the 300 s
+  limit. **Second attempt, on an idle machine:** stopped at 35 of 60. 7 questions
+  failed, all by the 300 s limit, none by a wrong answer, with a median of 112 s
+  for the questions that passed. The backend log gave the cause: the isolated
+  database's catalog had been ingested from the SQLite build of Chinook, so its
+  tables carry the schema `main`, while the data lives in the Postgres schema
+  `public`; the generated SQL failed with `relation "main.Invoice" does not
+  exist` (42 times) and the repair loop ran to the limit. The web app's own
+  tables were also missing in that database (hundreds of logged exceptions).
+  The environment, not the code under test, produced those failures, so
+  **no number from either attempt is reported.** The partial logs are kept
+  outside the repository with a note on how to repeat the run: re-ingest
+  Chinook from its Postgres copy so the schema is `public`, rebuild the index,
+  recreate the certified concept (catalog ids change), then run flag off and
+  flag on on an idle machine. Until an `ACCEPT`, the flag stays off and the
+  branch stays a draft.
 - **Limits.** The fixes to the transactional check and the error mapping are
   tested with fakes (`FAKES`); a real-Postgres run of the governance lifecycle was
   not repeated after them. Nothing is claimed about accuracy.
+
+### E25 - Independent review of the business-domain map (2026-11-15)
+
+- **Question.** Does the merged domain map (PR #63) hold up under a line-by-line
+  review?
+- **Finding.** Nine defects. Confirmed by reading the code: renaming a domain
+  left its Terms marked as generated, so the next regeneration emptied it; the
+  deterministic fallback was called with no links, so it could not cluster and a
+  database of 30 or more Terms became one "Other" domain; table counts included
+  tables of other databases; a whitespace-only name was stored; the error from
+  creating the model client was swallowed. A separate review of the screen code
+  found three more, each confirmed in the code: a generation result for a
+  database the user had already left overwrote the current one, a failed load
+  left a blank screen, and the rename form survived a change of domain.
+- **Fixes.** PR #65, each with a test that fails on the old code. Two things went
+  wrong on the way and are kept here on purpose: a performance regression
+  introduced by a delegated fix (an isolated group re-scanned every edge for
+  every candidate; rewritten to aggregate weights once per round, 2000 Terms in
+  under a second), and a stricter rule on moving Terms between domains that
+  passed its fake-database tests but failed the real-Postgres integration test
+  in CI, so it was removed rather than shipped unverified.
+- **Limits.** The data fixes are tested with fakes locally and by the Postgres
+  suite in CI; nobody has looked at the screen. Not fixed: no index on
+  `term_domain`, no uniqueness on a domain name per database (two simultaneous
+  renames can collide), queries repeated by the map builder, and a Term can
+  still be moved into a domain of another database through the API.
+  `FAKES` plus CI.
 
 ### Built but never run
 
@@ -691,7 +730,8 @@ Engineering findings without a score: E02 (empty index), E04 (FK extraction), E0
 (value probes and privacy incident), E06 (VIP term), E07 (learned test question),
 E10 (connection exhaustion), E11 (host crash), E12 (429 storm), E17 (startup
 re-ingestion), E18 (trace), E19 (flaky test), E21 (Terms API), E23 (domain grouping, not scored),
-E24 (semantic contract review; the measurement was stopped and has no result).
+E24 (semantic contract review; the measurement was stopped twice and has no result),
+E25 (domain map review).
 
 ## 5. What is NOT yet measured
 
@@ -715,7 +755,8 @@ E24 (semantic contract review; the measurement was stopped and has no result).
   re-measured end to end with the final code.
 - **Human review** of the 20 Chinook expected answers and of the Pagila
   reference answers.
-- **The semantic contract's effect on accuracy** (E24): no result yet.
+- **The semantic contract's effect on accuracy** (E24): no result yet; the isolated
+  environment must be rebuilt with the Chinook schema `public` first.
 - **Value-anchor literal repair (PR #58, draft):** not measured; it is an engine
   change and needs an `ACCEPT` before merging.
 - **Domain names** (E23): not graded by anyone.
