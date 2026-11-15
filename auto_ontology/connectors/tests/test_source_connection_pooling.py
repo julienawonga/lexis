@@ -56,7 +56,12 @@ class _Sources:
     def __init__(self) -> None:
         self.prefix = f"lexis_pool_{uuid.uuid4().hex[:8]}_"
         self.names = [f"{self.prefix}{i:02d}" for i in range(_DB_COUNT)]
-        self._admin = psycopg.connect(_url("postgres"), autocommit=True)
+        try:
+            self._admin = psycopg.connect(
+                _url("postgres"), autocommit=True, connect_timeout=5
+            )
+        except psycopg.OperationalError as exc:
+            pytest.skip(f"Postgres unreachable: {exc}")
         for name in self.names:
             self._admin.execute(f'CREATE DATABASE "{name}"')
 

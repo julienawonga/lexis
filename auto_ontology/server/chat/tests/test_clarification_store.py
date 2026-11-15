@@ -36,10 +36,22 @@ ORIGINAL = "How many VIP customers do we have?"
 ALICE, BOB = "alice", "bob"
 
 
+def _connect(*, autocommit: bool = False) -> psycopg.Connection:
+    """Connect with a bounded timeout; skip rather than hang if unreachable."""
+    try:
+        return psycopg.connect(
+            get_postgres_connection_string(),
+            autocommit=autocommit,
+            connect_timeout=5,
+        )
+    except psycopg.OperationalError as exc:
+        pytest.skip(f"Postgres unreachable: {exc}")
+
+
 @pytest.fixture(name="schema")
 def schema_fixture(monkeypatch: pytest.MonkeyPatch) -> Iterator[str]:
     name = f"cltest_{uuid.uuid4().hex[:8]}"
-    with psycopg.connect(get_postgres_connection_string(), autocommit=True) as conn:
+    with _connect(autocommit=True) as conn:
         conn.execute(f"CREATE SCHEMA {name}")
         conn.execute(
             f"""
@@ -60,7 +72,7 @@ def schema_fixture(monkeypatch: pytest.MonkeyPatch) -> Iterator[str]:
     try:
         yield name
     finally:
-        with psycopg.connect(get_postgres_connection_string(), autocommit=True) as conn:
+        with _connect(autocommit=True) as conn:
             conn.execute(f"DROP SCHEMA {name} CASCADE")
 
 
@@ -89,7 +101,7 @@ def _asked(conversation: uuid.UUID, user: str = ALICE) -> Clarification:
 
 
 def _messages(schema: str, conversation: uuid.UUID) -> list[tuple[str, str]]:
-    with psycopg.connect(get_postgres_connection_string()) as conn:
+    with _connect() as conn:
         return conn.execute(
             f"SELECT role, content FROM {schema}.messages "
             "WHERE conversation_id = %s ORDER BY created_at, id",
@@ -112,7 +124,7 @@ def test_the_question_is_stored_as_an_assistant_message(schema: str) -> None:
 def test_the_question_completes_its_analytics_row(schema: str) -> None:
     _asked(uuid.uuid4())
 
-    with psycopg.connect(get_postgres_connection_string()) as conn:
+    with _connect() as conn:
         (row,) = conn.execute(
             f"SELECT response, sql FROM {schema}.conversation_analytics"
         ).fetchall()

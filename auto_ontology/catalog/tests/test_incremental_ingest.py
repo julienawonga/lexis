@@ -44,6 +44,14 @@ def _pg_dsn(dbname: str) -> str:
     return f"postgresql://{user}:{password}@{host}:{port}/{dbname}"
 
 
+def _connect(dsn: str) -> psycopg.Connection:
+    """Connect with a bounded timeout; skip rather than hang if unreachable."""
+    try:
+        return psycopg.connect(dsn, autocommit=True, connect_timeout=5)
+    except psycopg.OperationalError as exc:
+        pytest.skip(f"Postgres unreachable: {exc}")
+
+
 @pytest.fixture(scope="module", autouse=True)
 def require_store():
     """Skip unless the *configured* store is actually reachable."""
@@ -62,13 +70,13 @@ def require_store():
 def source_db():
     """A throwaway source database this test may freely mutate."""
     name = f"difftest_{uuid.uuid4().hex[:12]}"
-    admin = psycopg.connect(_pg_dsn("postgres"), autocommit=True, connect_timeout=5)
+    admin = _connect(_pg_dsn("postgres"))
     try:
         admin.execute(f'CREATE DATABASE "{name}"')
     finally:
         admin.close()
 
-    with psycopg.connect(_pg_dsn(name), autocommit=True) as conn:
+    with _connect(_pg_dsn(name)) as conn:
         conn.execute("CREATE SCHEMA IF NOT EXISTS shop")
         conn.execute(
             "CREATE TABLE shop.customer ("
@@ -88,7 +96,7 @@ def source_db():
     yield name
 
     catalog.wipe(name)
-    admin = psycopg.connect(_pg_dsn("postgres"), autocommit=True, connect_timeout=5)
+    admin = _connect(_pg_dsn("postgres"))
     try:
         admin.execute(
             "SELECT pg_terminate_backend(pid) FROM pg_stat_activity "
@@ -116,7 +124,7 @@ def _ingest(database_name: str, *, deny: str | None = None) -> None:
 
 
 def _mutate(database_name: str, *statements: str) -> None:
-    with psycopg.connect(_pg_dsn(database_name), autocommit=True) as conn:
+    with _connect(_pg_dsn(database_name)) as conn:
         for statement in statements:
             conn.execute(statement)
 
