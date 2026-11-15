@@ -58,6 +58,11 @@ from auto_ontology.retrieval.text_to_sql.term_definitions import (
     build_term_definitions,
     merge_evidence,
 )
+from auto_ontology.retrieval.text_to_sql.semantic_contract import (
+    BLOCK_HEADER as SEMANTIC_BLOCK_HEADER,
+    SemanticContractSettings,
+    build_semantic_contract_block,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -775,8 +780,59 @@ class CandidateRetrievalAgent(BaseAgent):
             semantic_retriever, question, target_db, evidence, path_state=path_state
         )
         if merged_evidence is not None:
+            evidence = merged_evidence
+            result["evidence"] = merged_evidence
+        merged_evidence = self._with_semantic_contract(
+            evidence, target_db, path_state=path_state
+        )
+        if merged_evidence is not None:
             result["evidence"] = merged_evidence
         return result
+
+    def _with_semantic_contract(
+        self,
+        evidence: str,
+        target_db: str | None,
+        *,
+        path_state: dict | None = None,
+    ) -> str | None:
+        """Certified semantic-contract definitions, or None to leave evidence alone.
+
+        None means: the flag is off, the block is already there (a re-run of
+        this node on the same state), nothing certified applies, or the lookup
+        failed. Loaded through the same approved-overlay read path as
+        ``GET /api/semantic-model``, so only currently-true certified objects
+        can reach the prompt.
+        """
+        settings = SemanticContractSettings.from_env()
+        if not settings.enabled:
+            return None
+        if f"{SEMANTIC_BLOCK_HEADER}:\n" in evidence:
+            return None
+        try:
+            found = build_semantic_contract_block(target_db, settings)
+        except Exception:
+            self.logger.warning(
+                "Semantic-contract lookup failed; continuing without it",
+                exc_info=True,
+            )
+            return None
+        if found is None:
+            return None
+        self.logger.info(
+            "Semantic-contract block injected: %d object(s), %d chars (budget %d)",
+            len(found.objects),
+            found.chars,
+            settings.budget_chars,
+        )
+        if path_state is not None:
+            # Observational copy for the knowledge-use trace; nothing reads it
+            # during generation.
+            path_state["offered_semantic_objects"] = [
+                {"id": o.id, "kind": o.kind.value, "status": o.status.value}
+                for o in found.objects
+            ]
+        return merge_evidence(evidence, found.block)
 
     def _with_term_definitions(
         self,
