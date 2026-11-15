@@ -24,7 +24,6 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from auto_ontology.dal import schema as s
 from auto_ontology.dal.session import store, write_transaction
-from auto_ontology.dal.terms import fetch_term_table_pairs
 
 
 def fetch_domains(database_id: str) -> list[dict[str, Any]]:
@@ -111,31 +110,6 @@ def replace_auto_domains(database_id: str, groups: list[dict[str, Any]]) -> None
                 )
 
 
-def _term_ids_in_database(term_ids: set[str], database_id: str) -> set[str]:
-    """The subset of *term_ids* the database's semantic map actually shows.
-
-    The same membership rule ``fetch_semantic_domains`` applies when it joins
-    stored domains to the semantic Exploration graph: a Term belongs to a
-    database when it is linked -- REPRESENTS, or a column attribute by either
-    link -- to a table in it. A Term assigned without such a link would be
-    invisible in the map after the move, so it must be refused instead.
-    """
-    table_rows = store().query_read(
-        select(s.catalog_table.c.id)
-        .select_from(
-            s.catalog_table.join(
-                s.catalog_schema, s.catalog_schema.c.id == s.catalog_table.c.schema_id
-            )
-        )
-        .where(s.catalog_schema.c.database_id == database_id)
-    )
-    if not table_rows:
-        return set()
-    database_table_ids = {row["id"] for row in table_rows}
-    pairs = fetch_term_table_pairs(term_ids=sorted(term_ids))
-    return {row["term_id"] for row in pairs if row["table_id"] in database_table_ids}
-
-
 def rename_domain(domain_id: str, name: str, description: str | None = None) -> bool:
     """Rename a domain and mark it human-managed; return whether it existed.
 
@@ -169,10 +143,7 @@ def move_terms(domain_id: str, term_ids: list[str]) -> bool:
     """Move Terms into a domain and mark the result human-edited.
 
     Returns False when the domain does not exist; raises ValueError when any
-    Term id is unknown or does not belong to the domain's database, rolling
-    the whole move back. The database rule keeps the move honest: the domain
-    map shows only Terms linked to the domain's database, and an assignment
-    from elsewhere would never be visible there.
+    Term id is unknown, rolling the whole move back.
     """
     with write_transaction():
         domain_rows = store().query_read(
@@ -194,10 +165,6 @@ def move_terms(domain_id: str, term_ids: list[str]) -> bool:
         )
         valid_ids = {row["id"] for row in valid}
         if valid_ids != set(term_ids):
-            raise ValueError("Unknown Term ids")
-        if _term_ids_in_database(valid_ids, database_id) != valid_ids:
-            # Same message and same 422 path as unknown ids: from the caller's
-            # side a Term the map cannot show is a Term it does not have.
             raise ValueError("Unknown Term ids")
         # One domain per Term per database: drop this database's assignment for
         # each moved Term (whatever domain it named) before inserting the new one.
