@@ -154,6 +154,72 @@ event type plus a state that removes the proposal from default listing while
 keeping its events), designed and reviewed together with the audit
 requirements. Never weaken the event trigger to make deletion pass.
 
+## Planner-consumption milestone — state at the 2026-11-15 evening stop
+
+The milestone was started the same day and stopped mid-measurement. This
+section is the resume point.
+
+**Committed and pushed (PR #62):**
+
+- `50a3a53c` — semantic contract + proposal governance, verified and landed
+  (OpenAPI, DAL surface snapshot, `alembicRevision` pin all updated).
+- `091ed2df` — planner consumption behind `SEMANTIC_CONTRACT_BLOCK` (off by
+  default): certified concepts/attributes/relations from the same
+  approved-overlay read path as `GET /api/semantic-model` reach the candidate
+  retrieval evidence with ids, definitions, bindings and relation directions;
+  `needs_revalidation` objects never do. `dev_tools/e2e_semantic_planner.py`
+  proves the slice REAL-ENGINE (see `docs/verification-status.md`).
+
+**The measurement (ACCEPT/REJECT gate) is half-run, not concluded.** The
+frozen Chinook set (20 questions × 3 repeats, `docs/evaluation.md`) must be
+scored twice on identical conditions and compared:
+
+1. Start the isolated container: `docker start e2e-eval` (pgvector:pg17 on
+   port 5433; it still holds the migrated Chinook source database, the
+   ingested catalog, the 63/63 ontology index, the seeded admin users
+   `user-alice`/`user-bob`, and the certified `Invoice` concept
+   `c32c4d64-12a1-4165-85b9-27f82a063f2f` with a business definition —
+   domain knowledge, no gold answer in it).
+2. Run the backend with `POSTGRES_*` pointed at port 5433 on port 3005 (see
+   `dev_tools/e2e_semantic_planner.py`'s header for the env), flag off.
+3. Baseline: `python -m dev_tools.evals run --url http://localhost:3005
+   --cases dev_tools/evals/cases/chinook.json --target-db chinook
+   --workers 2 --repeats 3 --label flag-off --out flag-off.json`. The
+   interrupted attempt reached 14/60 (9 pass) and wrote no report; rerun
+   from scratch.
+4. Restart the backend with `SEMANTIC_CONTRACT_BLOCK=1`; rerun with
+   `--label flag-on`.
+5. `python -m dev_tools.evals compare flag-off.json flag-on.json --margin
+   0.02`. Flip the default flag only on ACCEPT; report the level reached in
+   `docs/verification-status.md` either way.
+
+Environment pitfalls hit while setting this up, likely to recur:
+
+- The eval `run` refuses to start unless the ontology index is complete for
+  the target database; reindex with
+  `POST /api/semantic-compilation/reindex?database_name=chinook` if needed.
+- The Chinook fixture (`dev_tools/fixtures/sql/chinook.sql`) is the SQLite
+  build; the planner's live connection factory does not support sqlite, so
+  the data was loaded into a Postgres database `chinook` inside the container
+  (`dev_tools/tmp_chinook_to_pg.py`, untracked one-off — delete or rerun it
+  if the container is rebuilt) and registered with `POST /api/connections`
+  as a postgresql connection.
+- A sqlite connection string with a Windows drive letter must use the bare
+  path form (`sqlite:C:/...`), not `sqlite:///C:/...`, through
+  `auto_ontology.connectors.registry`.
+- `dev_tools/local_ingest.py` does not call `load_env()`; run it through a
+  wrapper that does, or embeddings silently write 0 rows.
+- `uvicorn auto_ontology.server.__main__:app` fails — the module exposes
+  `create_app()`, not `app`.
+
+**Unrelated debts noted along the way (candidate hygiene PR):** three test
+fixtures hang forever instead of failing when their source Postgres is down
+(`test_incremental_ingest.py:71`, `test_source_connection_pooling.py:59`,
+`test_clarification_store.py:42` — add `connect_timeout` and a clean skip);
+the CRLF/cp1252 test failures on Windows checkouts; and the ops check that
+the deployed backend has `INTERNAL_API_TOKEN` set and is not exposed (Helm
+defaults are safe; Compose relies on `BIND_ADDRESS`).
+
 ## Recommended next steps
 
 1. Verify that the deployed backend has `INTERNAL_API_TOKEN` set and is not
