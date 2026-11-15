@@ -10,6 +10,7 @@ domain boundary for future Exploration-specific orchestration.
 
 from __future__ import annotations
 
+import logging
 from typing import Any
 
 from auto_ontology.dal import connections, domains, terms
@@ -41,8 +42,15 @@ class UnknownDomain(ValueError):
     """The requested business domain does not exist."""
 
 
+class BlankDomainName(ValueError):
+    """A business domain cannot be named with only whitespace."""
+
+
 class DuplicateDomainName(ValueError):
     """A business domain already uses the requested name in this database."""
+
+
+logger = logging.getLogger(__name__)
 
 
 def fetch_semantic_domains(database_id: str) -> dict[str, Any]:
@@ -68,11 +76,15 @@ def generate_semantic_domains(database_id: str) -> dict[str, Any]:
 
         llm = get_llm_client(temperature=0.0)
     except Exception:  # noqa: BLE001 - grouping has a deterministic fallback
-        pass
+        logger.warning(
+            "Could not create the LLM client; falling back to deterministic grouping",
+            exc_info=True,
+        )
     groups = group_terms(
         graph.get("nodes", []),
         connections.get_ontology_language(database["name"]),
         llm,
+        links=graph.get("links", []),
     )
     domains.replace_auto_domains(database["id"], groups)
     return fetch_semantic_domains(database["id"])
@@ -86,6 +98,8 @@ def rename_semantic_domain(
     if current is None:
         raise UnknownDomain(domain_id)
     clean_name = name.strip()
+    if not clean_name:
+        raise BlankDomainName("Domain name must not be blank")
     if any(
         row["id"] != domain_id
         and row["database_id"] == current["database_id"]

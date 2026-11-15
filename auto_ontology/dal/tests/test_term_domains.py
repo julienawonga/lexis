@@ -75,6 +75,40 @@ def test_domain_count_is_capped_at_twelve() -> None:
     assert len(cluster_terms(nodes, links, min_terms=1)["domains"]) == 12
 
 
+def test_an_isolate_does_not_stop_smaller_groups_merging() -> None:
+    """One unconnected Term must not freeze merge_smallest for everyone else.
+
+    The isolate is kept as its own Other domain; the connected 2-Term groups
+    still merge, because a skip means "try the next smallest", not "stop".
+    """
+    pairs = [(f"p{index}a", f"p{index}b") for index in range(4)]
+    nodes: list[dict[str, object]] = [
+        {"id": term_id, "name": term_id, "relationship_count": 1}
+        for pair in pairs
+        for term_id in pair
+    ]
+    nodes.append({"id": "solo", "name": "solo", "relationship_count": 0})
+    # Each pair is one tightly linked community; consecutive pairs share a
+    # single weak link, so the small groups are connected to each other but
+    # Louvain still keeps them apart.
+    links = [
+        {"source": left, "target": right}
+        for pair in pairs
+        for _ in range(10)
+        for left, right in [pair]
+    ] + [{"source": f"p{index}b", "target": f"p{index + 1}a"} for index in range(3)]
+    result = cluster_terms(nodes, links, min_terms=1)
+    domains = {frozenset(domain["term_ids"]) for domain in result["domains"]}
+    assert domains == {
+        frozenset(term_id for pair in pairs for term_id in pair),
+        frozenset({"solo"}),
+    }
+    other = next(
+        domain for domain in result["domains"] if domain["term_ids"] == ["solo"]
+    )
+    assert other["name"] == "Other"
+
+
 def test_domain_name_uses_highest_relationship_count_then_alphabetical() -> None:
     nodes = [
         {"id": "a", "name": "Zulu", "relationship_count": 3},

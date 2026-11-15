@@ -148,6 +148,14 @@ export const DomainOverview = ({
 	const [renameError, setRenameError] = useState<string | null>(null);
 	const [isSavingRename, setIsSavingRename] = useState(false);
 
+	useEffect(() => {
+		if (isEditing) {
+			setIsEditing(false);
+			setRenameError(null);
+		}
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [activeDomainId]);
+
 	const activeDomain =
 		domains.find((d) => d.id === (hoveredDomainId || activeDomainId)) ?? domains[0] ?? null;
 

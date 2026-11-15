@@ -219,9 +219,11 @@ def _invoke(llm: Any, prompt: str) -> str:
     return _content_text(getattr(reply, "content", ""))
 
 
-def _fallback(terms: list[dict[str, Any]]) -> list[dict[str, Any]]:
+def _fallback(
+    terms: list[dict[str, Any]], links: list[dict[str, Any]] | None = None
+) -> list[dict[str, Any]]:
     """Deterministic graph clustering; names stay the most connected Term."""
-    result = cluster_terms(terms, [])
+    result = cluster_terms(terms, links or [])
     return [
         {"name": domain["name"], "description": None, "term_ids": domain["term_ids"]}
         for domain in result["domains"]
@@ -229,15 +231,30 @@ def _fallback(terms: list[dict[str, Any]]) -> list[dict[str, Any]]:
 
 
 def group_terms(
-    terms: list[dict[str, Any]], language: str, llm: Any
+    terms: list[dict[str, Any]],
+    language: str,
+    llm: Any,
+    links: list[dict[str, Any]] | None = None,
 ) -> list[dict[str, Any]]:
-    """Group Terms with one retry, then the deterministic clustering fallback."""
+    """Group Terms with one retry, then the deterministic clustering fallback.
+
+    *links* are the Term-to-Term graph links (``{"source": id, "target": id}``)
+    used by the clustering fallback; without them the fallback cannot separate
+    connected groups and every Term lands in one domain.
+    """
     ordered = sorted(
         terms,
         key=lambda term: (str(term.get("name") or "").casefold(), str(term["id"])),
     )
     if not ordered:
         return []
+    if llm is None:
+        # No client at all: skip the model attempt and cluster deterministically.
+        logger.warning(
+            "Business-domain grouping fallback was used: no LLM client is "
+            "available, so deterministic clustering replaced the model grouping"
+        )
+        return _fallback(ordered, links)
     try:
         batch = ordered[:MAX_BATCH]
         prompt = build_prompt(batch, language)
@@ -320,4 +337,4 @@ def group_terms(
             "replaced the model grouping (output unusable twice)",
             exc_info=True,
         )
-        return _fallback(ordered)
+        return _fallback(ordered, links)

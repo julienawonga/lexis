@@ -130,33 +130,51 @@ def cluster_terms(
             (max_domains is not None and len(groups_to_merge) > max_domains)
             or (max_domains is None and min(map(len, groups_to_merge)) < 3)
         ):
-            source_group = min(
-                groups_to_merge, key=lambda group: (len(group), group[0])
-            )
-            candidates = [
-                group for group in groups_to_merge if group is not source_group
-            ]
-            weights = {
-                id(group): sum(
-                    weight
-                    for (left, right), weight in edge_weights.items()
-                    if (left in source_group and right in group)
-                    or (right in source_group and left in group)
-                )
-                for group in candidates
+            # Smallest group first, but a completely isolated tiny group is
+            # skipped rather than merged: it is retained as its own Other
+            # domain. Skipping means "try the next smallest", not "stop" --
+            # otherwise one stray isolate would freeze every remaining merge.
+            # The sorted order and smallest-id tie-break keep the merge
+            # sequence deterministic.
+            #
+            # Weights between groups are aggregated in one pass over the edges
+            # (instead of re-scanning every edge per candidate group), so a
+            # round costs O(edges + groups) however many groups are skipped.
+            owner = {
+                term_id: id(group) for group in groups_to_merge for term_id in group
             }
-            target_group = min(
-                candidates,
-                key=lambda group: (-weights[id(group)], group[0]),
-            )
-            source_is_isolated = not any(
-                (left in source_group and right in target_group)
-                or (right in source_group and left in target_group)
-                for left, right in edge_weights
-            )
-            # A completely isolated tiny group is retained as its own Other domain.
-            if source_is_isolated and max_domains is None:
+            between: dict[int, dict[int, float]] = defaultdict(dict)
+            for (left, right), weight in edge_weights.items():
+                left_group, right_group = owner.get(left), owner.get(right)
+                if left_group is None or right_group is None:
+                    continue
+                if left_group == right_group:
+                    continue
+                for one, other in (
+                    (left_group, right_group),
+                    (right_group, left_group),
+                ):
+                    between[one][other] = between[one].get(other, 0) + weight
+            chosen: tuple[list[str], list[str]] | None = None
+            for source_group in sorted(
+                groups_to_merge, key=lambda group: (len(group), group[0])
+            ):
+                linked = between.get(id(source_group), {})
+                candidates = [
+                    group for group in groups_to_merge if group is not source_group
+                ]
+                target_group = min(
+                    candidates,
+                    key=lambda group: (-linked.get(id(group), 0), group[0]),
+                )
+                source_is_isolated = id(target_group) not in linked
+                if not (source_is_isolated and max_domains is None):
+                    chosen = (source_group, target_group)
+                    break
+            if chosen is None:
+                # Every remaining group is isolated from every other.
                 break
+            source_group, target_group = chosen
             target_group.extend(source_group)
             target_group.sort()
             groups_to_merge.remove(source_group)
