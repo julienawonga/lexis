@@ -261,26 +261,30 @@ Ordered by priority. Each step either unlocks the next or needs it, so the order
 - [x] Business Terms created and deleted through the API, and the relevant Terms' definitions given to SQL generation
 - [x] Load guards: caps on concurrent chats and model calls, back-off on rate limits, over-long runs cancelled, no connection held for idle databases
 - [x] Row limit setting and semantic index status in Settings
+- [x] Exploration map by database: one bubble per database, then its Term graph
 
 **Built, being checked on a running instance**
 
 1. [ ] Matching question values to stored values ("USA" for "United States", "Indai" for "India"), from an opt-in value index. First brick of entity resolution.
 2. [ ] Clarification questions in chat: when a term is unknown the agent asks what it means, with 2 to 4 options and a free answer, instead of guessing. Behind a setting, off by default.
 3. [ ] Authentication on the API itself (an internal token between the web app and the API), so it no longer depends on network placement. Off until a token is set.
+4. [ ] Exploration map by business domain: database, then business domain, then Terms. The model groups a database's Terms into named domains; a person can rename them, and edits survive regeneration. Measured by hand on Chinook, Pagila and a 95-Term database, not scored yet. See [docs/exploration-map.md](./docs/exploration-map.md).
+5. [ ] Value-anchor literal repair in the SQL engine (draft pull request): merged only if the evaluation harness says `ACCEPT`.
 
 **Next, in this order**
 
-4. [ ] Business metrics as verified, reusable definitions ("revenue", "VIP customer"), used by the chat. This is the mechanism a learned term will be written into, so it is proven before anything writes to it.
-5. [ ] Measure on real questions: your own questions on your own databases, and each feature above as it lands.
-6. [ ] See what each answer used: under every answer in the chat, the definitions, columns and values it relied on, each marked certified or not, and a reliable record of which ones the SQL actually applied (decided when the SQL is written, not guessed afterwards). Every answer already carries this list through the API, but the "used" mark is a text heuristic that is often undecided. A definition's track record is what makes a learned term safe to promote.
-7. [ ] Learned terms: the answer to a clarification becomes a draft definition in the asker's own scope, reused by the chat, with who said it and when (provenance and review status).
-8. [ ] Review and promotion: an owner promotes a draft for everyone; proposed changes with a diff, history and rollback; a human edit is never overwritten.
-9. [ ] Enterprise review: zones and groups, an audit log, a button in the interface for the index rebuild, re-ingestion to apply the new key extraction.
-10. [ ] Database-enforced read-only on the engines still relying on the parse-time guard (Snowflake, Databricks, Kyuubi, HeavyDB).
-11. [ ] Recorded-model evaluation in CI, and a measure of key detection against a known schema.
+6. [ ] Business metrics as verified, reusable definitions ("revenue", "VIP customer"), used by the chat. This is the mechanism a learned term will be written into, so it is proven before anything writes to it.
+7. [ ] Measure on real questions: your own questions on your own databases, and each feature above as it lands.
+8. [ ] See what each answer used: under every answer in the chat, the definitions, columns and values it relied on, each marked certified or not, and a reliable record of which ones the SQL actually applied (decided when the SQL is written, not guessed afterwards). Every answer already carries this list through the API, but the "used" mark is a text heuristic that is often undecided. A definition's track record is what makes a learned term safe to promote.
+9. [ ] Learned terms: the answer to a clarification becomes a draft definition in the asker's own scope, reused by the chat, with who said it and when (provenance and review status).
+10. [ ] Review and promotion: an owner promotes a draft for everyone; proposed changes with a diff, history and rollback; a human edit is never overwritten.
+11. [ ] Enterprise review: zones and groups, an audit log, a button in the interface for the index rebuild, re-ingestion to apply the new key extraction.
+12. [ ] Database-enforced read-only on the engines still relying on the parse-time guard (Snowflake, Databricks, Kyuubi, HeavyDB).
+13. [ ] Recorded-model evaluation in CI, and a measure of key detection against a known schema.
 
 **Later, in this order**
 
+- [ ] Let a person move Terms between domains in the interface, and decide whether domains are also generated when the ontology is compiled
 - [ ] Data with mixed-language values
 - [ ] Verified queries: a certified question and its SQL, reused and parameterised, proposed from chat feedback and approved by a person
 - [ ] Suggestions mined from query history: candidate terms, metrics and joins for a person to accept

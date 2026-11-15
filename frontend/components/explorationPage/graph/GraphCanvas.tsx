@@ -365,7 +365,16 @@ const getEdgeColors = (isDark: boolean) => {
 // applied once, right after the initial fit/center, so the first thing a
 // user sees is already legibly zoomed in rather than the entire (often
 // sparse-looking) graph shrunk to fit the container.
-const INITIAL_ZOOM_IN_FACTOR = 1.5;
+const INITIAL_ZOOM_IN_FACTOR = 1;
+
+// Small graphs (a handful of Terms in a domain) fill the whole canvas once
+// fitted, so their nodes look huge. Zoom out a bit for them instead
+// (a factor below 1 zooms out in Sigma).
+const initialZoomFactor = (nodeCount: number): number => {
+	if (nodeCount <= 8) return 0.4;
+	if (nodeCount <= 25) return 0.65;
+	return INITIAL_ZOOM_IN_FACTOR;
+};
 
 // How close the camera is ever allowed to zoom in — the `minCameraRatio`
 // Sigma setting below.
@@ -1643,9 +1652,10 @@ export const GraphCanvas = ({
 					// Zoom in a bit further as the actual default starting view,
 					// rather than leaving the user at the (often zoomed-far-out)
 					// whole-graph fit.
-					void renderer
-						.getCamera()
-						.animatedZoom({ duration: 300, factor: INITIAL_ZOOM_IN_FACTOR });
+					void renderer.getCamera().animatedZoom({
+						duration: 300,
+						factor: initialZoomFactor(graph.nodes.length),
+					});
 				});
 			if (containerRef.current) {
 				containerRef.current.style.transition = 'opacity 300ms ease-out';

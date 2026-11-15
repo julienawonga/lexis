@@ -4046,6 +4046,254 @@
         "x-auto-ontology-proxied": true
       }
     },
+    "/api/exploration/semantic-domains": {
+      "get": {
+        "description": "Database-scoped Term domains for Exploration's semantic map.",
+        "operationId": "get_api_exploration_semantic_domains",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "database_id",
+            "required": true,
+            "schema": {
+              "title": "Database Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DataResponse_SemanticDomains_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "description": "No authenticated caller could be resolved"
+          },
+          "403": {
+            "description": "The caller lacks the required permission"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Semantic Domains",
+        "tags": ["exploration"],
+        "security": [
+          {
+            "ApiToken": []
+          }
+        ],
+        "x-auto-ontology-source": "frontend/app/api/exploration/semantic-domains/route.ts",
+        "x-auto-ontology-permissions": {
+          "catalog": ["read"]
+        },
+        "x-auto-ontology-proxied": true
+      }
+    },
+    "/api/exploration/semantic-domains/{domain_id}": {
+      "patch": {
+        "description": "Renames a business domain.",
+        "operationId": "patch_api_exploration_semantic_domains_domain_id_",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "domain_id",
+            "required": true,
+            "schema": {
+              "title": "Domain Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SemanticDomainRename"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DataResponse_SemanticDomains_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "description": "No authenticated caller could be resolved"
+          },
+          "403": {
+            "description": "The caller lacks the required permission"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Rename Semantic Domain",
+        "tags": ["exploration"],
+        "security": [
+          {
+            "ApiToken": []
+          }
+        ],
+        "x-auto-ontology-source": "frontend/app/api/exploration/semantic-domains/[domain_id]/route.ts",
+        "x-auto-ontology-permissions": {
+          "catalog": ["edit"]
+        },
+        "x-auto-ontology-proxied": true
+      }
+    },
+    "/api/exploration/semantic-domains/{domain_id}/terms": {
+      "post": {
+        "description": "Moves Terms into a business domain in Exploration's semantic map.",
+        "operationId": "post_api_exploration_semantic_domains_domain_id_terms",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "domain_id",
+            "required": true,
+            "schema": {
+              "title": "Domain Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SemanticDomainTerms"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DataResponse_SemanticDomains_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "description": "No authenticated caller could be resolved"
+          },
+          "403": {
+            "description": "The caller lacks the required permission"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Move Semantic Domain Terms",
+        "tags": ["exploration"],
+        "security": [
+          {
+            "ApiToken": []
+          }
+        ],
+        "x-auto-ontology-source": "frontend/app/api/exploration/semantic-domains/[domain_id]/terms/route.ts",
+        "x-auto-ontology-permissions": {
+          "catalog": ["edit"]
+        },
+        "x-auto-ontology-proxied": true
+      }
+    },
+    "/api/exploration/semantic-domains/generate": {
+      "post": {
+        "description": "Generates business domains for a database's terms.",
+        "operationId": "post_api_exploration_semantic_domains_generate",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "database_id",
+            "required": true,
+            "schema": {
+              "title": "Database Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DataResponse_SemanticDomains_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "description": "No authenticated caller could be resolved"
+          },
+          "403": {
+            "description": "The caller lacks the required permission"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Generate Semantic Domains",
+        "tags": ["exploration"],
+        "security": [
+          {
+            "ApiToken": []
+          }
+        ],
+        "x-auto-ontology-source": "frontend/app/api/exploration/semantic-domains/generate/route.ts",
+        "x-auto-ontology-permissions": {
+          "catalog": ["edit"]
+        },
+        "x-auto-ontology-proxied": true
+      }
+    },
     "/api/exploration/semantic-graph": {
       "get": {
         "description": "explorationApi.getSemanticExplorationGraph — full semantic-layer graph ({nodes, links}).",
@@ -10149,6 +10397,17 @@
         "title": "DataResponse[Rule]",
         "type": "object"
       },
+      "DataResponse_SemanticDomains_": {
+        "additionalProperties": true,
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/SemanticDomains"
+          }
+        },
+        "required": ["data"],
+        "title": "DataResponse[SemanticDomains]",
+        "type": "object"
+      },
       "DataResponse_SemanticExplorationGraph_": {
         "additionalProperties": true,
         "properties": {
@@ -12131,6 +12390,184 @@
         },
         "required": ["database_id", "database_name", "term_count"],
         "title": "SemanticDatabaseOverviewItem",
+        "type": "object"
+      },
+      "SemanticDomain": {
+        "additionalProperties": true,
+        "description": "One business domain and its Terms on the semantic exploration map.",
+        "properties": {
+          "certified_term_count": {
+            "title": "Certified Term Count",
+            "type": "integer"
+          },
+          "column_attribute_count": {
+            "title": "Column Attribute Count",
+            "type": "integer"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "internal_link_count": {
+            "title": "Internal Link Count",
+            "type": "integer"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "origin": {
+            "title": "Origin",
+            "type": "string"
+          },
+          "sql_attribute_count": {
+            "title": "Sql Attribute Count",
+            "type": "integer"
+          },
+          "table_count": {
+            "title": "Table Count",
+            "type": "integer"
+          },
+          "term_count": {
+            "title": "Term Count",
+            "type": "integer"
+          },
+          "term_ids": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Term Ids",
+            "type": "array"
+          },
+          "top_terms": {
+            "items": {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "type": "object"
+            },
+            "title": "Top Terms",
+            "type": "array"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "origin",
+          "term_count",
+          "table_count",
+          "certified_term_count",
+          "column_attribute_count",
+          "sql_attribute_count",
+          "internal_link_count"
+        ],
+        "title": "SemanticDomain",
+        "type": "object"
+      },
+      "SemanticDomainLink": {
+        "additionalProperties": true,
+        "properties": {
+          "relationship_types": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Relationship Types",
+            "type": "array"
+          },
+          "shared_table_count": {
+            "title": "Shared Table Count",
+            "type": "integer"
+          },
+          "source": {
+            "title": "Source",
+            "type": "string"
+          },
+          "target": {
+            "title": "Target",
+            "type": "string"
+          },
+          "weight": {
+            "title": "Weight",
+            "type": "integer"
+          }
+        },
+        "required": ["source", "target", "weight", "shared_table_count"],
+        "title": "SemanticDomainLink",
+        "type": "object"
+      },
+      "SemanticDomainRename": {
+        "properties": {
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "name": {
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": ["name"],
+        "title": "SemanticDomainRename",
+        "type": "object"
+      },
+      "SemanticDomains": {
+        "additionalProperties": true,
+        "description": "Stored business domains and the links between them.",
+        "properties": {
+          "domains": {
+            "items": {
+              "$ref": "#/components/schemas/SemanticDomain"
+            },
+            "title": "Domains",
+            "type": "array"
+          },
+          "generated": {
+            "title": "Generated",
+            "type": "boolean"
+          },
+          "links": {
+            "items": {
+              "$ref": "#/components/schemas/SemanticDomainLink"
+            },
+            "title": "Links",
+            "type": "array"
+          }
+        },
+        "required": ["generated"],
+        "title": "SemanticDomains",
+        "type": "object"
+      },
+      "SemanticDomainTerms": {
+        "properties": {
+          "term_ids": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Term Ids",
+            "type": "array"
+          }
+        },
+        "required": ["term_ids"],
+        "title": "SemanticDomainTerms",
         "type": "object"
       },
       "SemanticExplorationGraph": {
