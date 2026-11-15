@@ -116,6 +116,7 @@
     "UnknownDatabaseIdsError": "class(ModelInterchangeError)",
     "apply_import_model": "(document: 'AutoOntologyModelDocument', *, replace: 'bool', embed_buffer: 'ImportEmbedBuffer | None' = None) -> 'dict[str, Any]'",
     "assemble_export_document": "(rows: 'dict[str, Any]', *, dialect_by_db_name: 'dict[str, str]', sql_column_resolver: 'Any') -> 'AutoOntologyModelDocument'",
+    "fetch_database_id_by_name": "(database_name: 'str') -> 'str | None'",
     "fetch_export_rows": "(database_ids: 'list[str]') -> 'dict[str, Any]'",
     "make_cached_sql_column_resolver": "() -> 'Callable[[str, str | None], list[str]]'",
     "resolve_sql_column_ids": "(sql: 'str', database_name: 'str | None') -> 'list[str]'",
@@ -182,6 +183,15 @@
     "synonym_matches_tokens": "(synonym: 'str', tokens: 'list[str]') -> 'bool'",
     "synonym_word_tokens": "(search_term: 'str') -> 'list[str]'"
   },
+  "semantic_governance": {
+    "ProposalConflict": "class(ValueError)",
+    "create_proposal": "(*, model_id: 'str', object_id: 'str', object_kind: 'str', document: 'dict[str, Any]', base_fingerprint: 'str', proposed_by: 'str', comment: 'str', evidence: 'list[dict[str, Any]]') -> 'dict[str, Any]'",
+    "current_approved_objects": "(model_id: 'str') -> 'list[dict[str, Any]]'",
+    "fetch_proposal": "(proposal_id: 'str', model_id: 'str') -> 'dict[str, Any] | None'",
+    "latest_approved_version": "(model_id: 'str', object_id: 'str') -> 'int'",
+    "list_proposals": "(model_id: 'str', *, state: 'str | None' = None, limit: 'int' = 100) -> 'list[dict[str, Any]]'",
+    "review_proposal": "(*, proposal_id: 'str', model_id: 'str', decision: 'str', reviewed_by: 'str', document: 'dict[str, Any]', evidence: 'list[dict[str, Any]]', comment: 'str') -> 'dict[str, Any] | None'"
+  },
   "session": {
     "StoreConn": "class(object)",
     "dispose_engine": "() -> 'None'",
@@ -214,9 +224,9 @@
     "update_sql_attribute": "(attr_id: 'str', *, name: 'str | None' = None, description: 'str | None' = None, expression: 'str | None' = None, source: 'str | None' = None, certified: 'bool | None' = None, owner_id: 'str | None' = None, set_owner: 'bool' = False, modified_by: 'str | None' = None, touch: 'bool' = False) -> 'None'"
   },
   "sql_fragments": {
-    "column_description_expr": "(column=Table('catalog_column', MetaData(), Column('id', Text(), table=<catalog_column>, primary_key=True, nullable=False, server_default=DefaultClause(<sqlalchemy.sql.elements.TextClause object>, for_update=False)), Column('table_id', Text(), ForeignKey('catalog_table.id'), table=<catalog_column>, nullable=False), Column('name', Text(), table=<catalog_column>, nullable=False), Column('description', Text(), table=<catalog_column>), Column('description_certified', Boolean(), table=<catalog_column>, nullable=False, server_default=DefaultClause(<sqlalchemy.sql.elements.TextClause object>, for_update=False)), Column('data_type', Text(), table=<catalog_column>), Column('sample_values', Text(), table=<catalog_column>), Column('format', Text(), table=<catalog_column>), Column('is_unique', Boolean(), table=<catalog_column>), Column('is_nullable', Boolean(), table=<catalog_column>), Column('ordinal_position', Integer(), table=<catalog_column>), Column('pii_processed', Boolean(), table=<catalog_column>, nullable=False, server_default=DefaultClause(<sqlalchemy.sql.elements.TextClause object>, for_update=False)), Column('imported_id', Text(), table=<catalog_column>), schema=None)) -> 'ColumnElement'",
+    "column_description_expr": "(column=Table('catalog_column', MetaData(), Column('id', Text(), table=<catalog_column>, primary_key=True, nullable=False, server_default=DefaultClause(<sqlalchemy.sql.elements.TextClause objectB8DE5700>, for_update=False)), Column('table_id', Text(), ForeignKey('catalog_table.id'), table=<catalog_column>, nullable=False), Column('name', Text(), table=<catalog_column>, nullable=False), Column('description', Text(), table=<catalog_column>), Column('description_certified', Boolean(), table=<catalog_column>, nullable=False, server_default=DefaultClause(<sqlalchemy.sql.elements.TextClause objectB8DE7140>, for_update=False)), Column('data_type', Text(), table=<catalog_column>), Column('sample_values', Text(), table=<catalog_column>), Column('format', Text(), table=<catalog_column>), Column('is_unique', Boolean(), table=<catalog_column>), Column('is_nullable', Boolean(), table=<catalog_column>), Column('ordinal_position', Integer(), table=<catalog_column>), Column('pii_processed', Boolean(), table=<catalog_column>, nullable=False, server_default=DefaultClause(<sqlalchemy.sql.elements.TextClause objectB8DE7530>, for_update=False)), Column('imported_id', Text(), table=<catalog_column>), schema=None)) -> 'ColumnElement'",
     "name_contains": "(column: 'ColumnElement', search: 'str') -> 'ColumnElement'",
-    "table_description_expr": "(table=Table('catalog_table', MetaData(), Column('id', Text(), table=<catalog_table>, primary_key=True, nullable=False, server_default=DefaultClause(<sqlalchemy.sql.elements.TextClause object>, for_update=False)), Column('schema_id', Text(), ForeignKey('catalog_schema.id'), table=<catalog_table>, nullable=False), Column('name', Text(), table=<catalog_table>, nullable=False), Column('description', Text(), table=<catalog_table>), Column('description_certified', Boolean(), table=<catalog_table>, nullable=False, server_default=DefaultClause(<sqlalchemy.sql.elements.TextClause object>, for_update=False)), Column('owner_id', Text(), table=<catalog_table>), Column('pk', ARRAY(Text()), table=<catalog_table>), Column('table_type', Text(), table=<catalog_table>), Column('is_junction_table', Boolean(), table=<catalog_table>, nullable=False, server_default=DefaultClause(<sqlalchemy.sql.elements.TextClause object>, for_update=False)), Column('imported_id', Text(), table=<catalog_table>), schema=None)) -> 'ColumnElement'"
+    "table_description_expr": "(table=Table('catalog_table', MetaData(), Column('id', Text(), table=<catalog_table>, primary_key=True, nullable=False, server_default=DefaultClause(<sqlalchemy.sql.elements.TextClause objectB8DE5700>, for_update=False)), Column('schema_id', Text(), ForeignKey('catalog_schema.id'), table=<catalog_table>, nullable=False), Column('name', Text(), table=<catalog_table>, nullable=False), Column('description', Text(), table=<catalog_table>), Column('description_certified', Boolean(), table=<catalog_table>, nullable=False, server_default=DefaultClause(<sqlalchemy.sql.elements.TextClause objectB8DE6810>, for_update=False)), Column('owner_id', Text(), table=<catalog_table>), Column('pk', ARRAY(Text()), table=<catalog_table>), Column('table_type', Text(), table=<catalog_table>), Column('is_junction_table', Boolean(), table=<catalog_table>, nullable=False, server_default=DefaultClause(<sqlalchemy.sql.elements.TextClause objectB8DE6A50>, for_update=False)), Column('imported_id', Text(), table=<catalog_table>), schema=None)) -> 'ColumnElement'"
   },
   "tags": {
     "apply_labels_now_matched": "(*, rule_id: 'str', tag_ids: 'list[str]', targets: 'dict[str, Select]') -> 'int'",
@@ -255,8 +265,8 @@
     "fetch_column_attribute_embedding_contexts_by_column_id": "(column_id: 'str') -> 'list[tuple[dict[str, Any], list[dict[str, Any]]]]'",
     "fetch_column_attributes_by_term_id": "(term_id: 'str', zone_ids: 'list[str] | None' = None, *, skip: 'int' = 0, limit: 'int | None' = None) -> 'list[dict[str, Any]]'",
     "fetch_database_link_candidates": "(database_id: 'str') -> 'list[dict[str, Any]]'",
-    "fetch_database_term_definitions": "(database_name: 'str') -> 'list[dict[str, Any]]'",
     "fetch_database_name_for_term": "(term_id: 'str') -> 'str | None'",
+    "fetch_database_term_definitions": "(database_name: 'str') -> 'list[dict[str, Any]]'",
     "fetch_related_term_ids": "(term_id: 'str', zone_ids: 'list[str] | None' = None, data_ids_by_zone: 'dict[str, set[str]] | None' = None) -> 'list[str]'",
     "fetch_related_terms": "(term_id: 'str', zone_ids: 'list[str] | None' = None, data_ids_by_zone: 'dict[str, set[str]] | None' = None, *, skip: 'int' = 0, limit: 'int | None' = None) -> 'list[dict[str, Any]]'",
     "fetch_related_terms_counts": "(zone_ids: 'list[str] | None' = None, term_ids: 'list[str] | None' = None, data_ids_by_zone: 'dict[str, set[str]] | None' = None) -> 'list[dict[str, Any]]'",

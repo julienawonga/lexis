@@ -93,6 +93,12 @@ result, destination or definition ID, payload/artifact hash, exact before/after
 diff, row/key/hash verification, compilation identity, post-write SQL and rows,
 and rollback target. Never retain tokens, passwords, or connection strings.
 
-Current Lexis certification fields are not an atomic review/promotion system.
-Until that product lifecycle exists, describe the reviewed state accurately and
-do not claim atomic certification, promotion, supersession, or rollback.
+Direct legacy certification flags remain outside the review workflow. For
+agent-neutral semantic objects, use the proposal API: an authenticated editor
+submits a full snapshot, a different editor approves or rejects it with a
+human-review evidence reference, and Lexis stores immutable decision events.
+Approved snapshots are versioned in `GET /api/semantic-model`; a change to the
+legacy catalog source automatically demotes the snapshot to
+`needs_revalidation`. This workflow does not yet update legacy Term rows or the
+text-to-SQL planner. Verify the semantic-model readback and report that scope
+accurately; do not claim the classic query path now uses the approved snapshot.

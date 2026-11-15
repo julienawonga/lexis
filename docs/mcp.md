@@ -126,6 +126,7 @@ underlying databases.
 
 | Tool | What it is for |
 | --- | --- |
+| `get_semantic_model` | Read the typed semantic model as JSON, including scope and verification status. Legacy items without retained evidence are marked `unverified_legacy`. |
 | `ask_question` | **The primary tool.** Ask a question in plain language; get the answer, the SQL Lexis ran, and the rows. |
 | `check_answerable` | Grade whether the semantic layer covers a question. Cheap pre-flight before `ask_question`. |
 | `check_readiness` | Whether this deployment can answer anything at all. |

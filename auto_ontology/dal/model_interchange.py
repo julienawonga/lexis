@@ -150,6 +150,16 @@ def validate_database_ids(database_ids: list[str]) -> None:
         raise UnknownDatabaseIdsError(unknown)
 
 
+def fetch_database_id_by_name(database_name: str) -> str | None:
+    """Resolve a catalog database name to its opaque ID for scoped reads."""
+    row = store().query_read(
+        select(s.catalog_database.c.id).where(
+            s.catalog_database.c.name == database_name
+        )
+    )
+    return str(row[0]["id"]) if row else None
+
+
 def _export_catalog(database_ids: list[str]) -> list[dict[str, Any]]:
     return [
         dict(r)
@@ -157,6 +167,7 @@ def _export_catalog(database_ids: list[str]) -> list[dict[str, Any]]:
             select(
                 s.catalog_database.c.id.label("db_id"),
                 s.catalog_database.c.name.label("db_name"),
+                s.catalog_database.c.ontology_language,
                 s.catalog_schema.c.id.label("schema_id"),
                 s.catalog_schema.c.name.label("schema_name"),
                 s.catalog_table.c.id.label("table_id"),
@@ -277,7 +288,14 @@ def _export_terms(database_ids: list[str]) -> list[dict[str, Any]]:
         .distinct()
     )
     terms = store().query_read(
-        select(s.term.c.id, s.term.c.name, s.term.c.description)
+        select(
+            s.term.c.id,
+            s.term.c.name,
+            s.term.c.description,
+            s.term.c.synonyms,
+            s.term.c.name_certified,
+            s.term.c.description_certified,
+        )
         .where(s.term.c.id.in_(in_scope), s.term.c.source == SEMANTIC_SOURCE)
         .order_by(s.term.c.name)
     )
@@ -300,6 +318,7 @@ def _export_terms(database_ids: list[str]) -> list[dict[str, Any]]:
             s.column_attribute.c.id,
             s.column_attribute.c.name,
             s.column_attribute.c.description,
+            s.column_attribute.c.certified,
             s.column__has_attribute.c.column_id,
         )
         .select_from(
@@ -320,6 +339,7 @@ def _export_terms(database_ids: list[str]) -> list[dict[str, Any]]:
                 "id": row["id"],
                 "name": row["name"],
                 "description": row["description"] or "",
+                "certified": bool(row["certified"]),
                 "column_id": row["column_id"],
             }
         )
@@ -329,6 +349,9 @@ def _export_terms(database_ids: list[str]) -> list[dict[str, Any]]:
             "id": row["id"],
             "name": row["name"],
             "description": row["description"] or "",
+            "synonyms": row["synonyms"] or [],
+            "name_certified": bool(row["name_certified"]),
+            "description_certified": bool(row["description_certified"]),
             "represents": represents.get(row["id"], []),
             "columns_attributes": attributes.get(row["id"], []),
         }
@@ -397,6 +420,7 @@ def _export_sql_attributes(database_ids: list[str]) -> list[dict[str, Any]]:
         statement.add_columns(
             s.sql_attribute.c.expression,
             s.sql_attribute.c.source,
+            s.sql_attribute.c.certified,
             s.term.c.id.label("term_id"),
         )
         .join(
@@ -412,6 +436,7 @@ def _export_sql_attributes(database_ids: list[str]) -> list[dict[str, Any]]:
             "description": row["description"] or "",
             "expression": row["expression"] or "",
             "source": row["source"] or SQL_ATTR_SOURCE_MANUAL,
+            "certified": bool(row["certified"]),
         }
         for row in store().query_read(statement)
     ]
@@ -506,6 +531,9 @@ def assemble_export_document(
             id=str(row["id"]),
             name=row.get("name") or "",
             description=row.get("description") or "",
+            synonyms=row.get("synonyms") or [],
+            name_certified=bool(row.get("name_certified")),
+            description_certified=bool(row.get("description_certified")),
             represents=_scoped_ids(row.get("represents") or [], table_ids),
             columns_attributes=[
                 ModelColumnAttribute(
@@ -513,6 +541,7 @@ def assemble_export_document(
                     name=attr.get("name") or "",
                     description=attr.get("description") or "",
                     column_id=str(attr.get("column_id") or ""),
+                    certified=bool(attr.get("certified")),
                 )
                 for attr in (row.get("columns_attributes") or [])
                 if attr.get("id") and str(attr.get("column_id") or "") in column_ids
@@ -616,6 +645,7 @@ def _assemble_databases(
             {
                 "id": db_id,
                 "dialect": dialect_by_db_name.get(row.get("db_name") or "", ""),
+                "ontology_language": row.get("ontology_language") or "en",
                 "schemas": {},
             },
         )
@@ -673,7 +703,10 @@ def _assemble_databases(
         ]
         databases.append(
             ModelDatabase(
-                id=db_entry["id"], dialect=db_entry["dialect"], schemas=schemas
+                id=db_entry["id"],
+                dialect=db_entry["dialect"],
+                ontology_language=db_entry["ontology_language"],
+                schemas=schemas,
             )
         )
     databases.sort(key=lambda db: db.id)
@@ -708,6 +741,8 @@ def _assemble_sql_attributes(
                     column_ids,
                 ),
                 term_id=str(row.get("term_id") or ""),
+                source=row.get("source"),
+                certified=bool(row.get("certified")),
             ),
         )
     return ModelSqlAttributesBySource(**grouped)

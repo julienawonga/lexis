@@ -650,6 +650,106 @@ sql_attribute__term = Table(
     UniqueConstraint("attribute_id"),
 )
 
+# ---------------------------------------------------------------------------
+# Semantic governance — proposals and append-only decision history
+# ---------------------------------------------------------------------------
+
+semantic_proposal = Table(
+    "semantic_proposal",
+    METADATA,
+    _id(),
+    Column("model_id", Text, nullable=False),
+    Column("object_id", Text, nullable=False),
+    Column("object_kind", Text, nullable=False),
+    Column("proposed_document", JSONB, nullable=False),
+    Column("state", Text, nullable=False),
+    Column("base_version", Integer, nullable=False, server_default=text("0")),
+    Column("base_fingerprint", Text, nullable=False),
+    Column("proposed_by", Text, nullable=False),
+    Column("reviewed_by", Text, nullable=True),
+    Column("review_comment", Text, nullable=True),
+    Column(
+        "review_evidence",
+        JSONB,
+        nullable=False,
+        server_default=text("'[]'::jsonb"),
+    ),
+    Column("approved_version", Integer, nullable=True),
+    *_edited(),
+    CheckConstraint(
+        "object_kind IN ('concept', 'attribute', 'relation', 'sql_attribute', "
+        "'metric', 'dimension', 'verified_query')",
+        name="object_kind",
+    ),
+    CheckConstraint(
+        "state IN ('in_review', 'approved', 'rejected')",
+        name="state",
+    ),
+    CheckConstraint(
+        "(state = 'approved') = (approved_version IS NOT NULL)",
+        name="approved_version_state",
+    ),
+)
+Index(
+    "ix_semantic_proposal_model_object_state",
+    semantic_proposal.c.model_id,
+    semantic_proposal.c.object_id,
+    semantic_proposal.c.state,
+)
+Index(
+    "uq_semantic_proposal_in_review",
+    semantic_proposal.c.model_id,
+    semantic_proposal.c.object_id,
+    unique=True,
+    postgresql_where=semantic_proposal.c.state == "in_review",
+)
+Index(
+    "uq_semantic_proposal_approved_version",
+    semantic_proposal.c.model_id,
+    semantic_proposal.c.object_id,
+    semantic_proposal.c.approved_version,
+    unique=True,
+    postgresql_where=semantic_proposal.c.approved_version.is_not(None),
+)
+
+semantic_governance_event = Table(
+    "semantic_governance_event",
+    METADATA,
+    _id(),
+    Column(
+        "proposal_id",
+        Text,
+        ForeignKey(semantic_proposal.c.id, ondelete="CASCADE"),
+        nullable=False,
+    ),
+    Column("event_type", Text, nullable=False),
+    Column("actor_id", Text, nullable=False),
+    Column("from_state", Text, nullable=True),
+    Column("to_state", Text, nullable=False),
+    Column("document_snapshot", JSONB, nullable=False),
+    Column("evidence", JSONB, nullable=False, server_default=text("'[]'::jsonb")),
+    Column("comment", Text, nullable=True),
+    Column(
+        "created",
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=func.now(),
+    ),
+    CheckConstraint(
+        "event_type IN ('proposed', 'approved', 'rejected')",
+        name="event_type",
+    ),
+    CheckConstraint(
+        "to_state IN ('in_review', 'approved', 'rejected')",
+        name="to_state",
+    ),
+)
+Index(
+    "ix_semantic_governance_event_proposal_created",
+    semantic_governance_event.c.proposal_id,
+    semantic_governance_event.c.created,
+)
+
 # HAS_SQL: SqlAttribute -> Sql.
 sql_attribute__sql = Table(
     "sql_attribute__sql",

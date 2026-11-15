@@ -39,11 +39,12 @@ Choose the focused workflow before acting:
 - model promotion or reusable analytical results: use
   [publication.md](references/publication.md).
 
-MCP tools only **read**. Create, patch, import, and compile-reset go through
-the Next.js `/api/...` gateway. Governed result rows require an approved source
-writer; Lexis has no generic result-row writeback endpoint. Request bodies and
-field types live in `docs/openapi/auto-ontology-api.json`; this skill names operations and
-permissions only.
+MCP tools only **read**. Semantic proposals and review decisions go through the
+Next.js `/api/...` gateway. Term, attribute, SQL-attribute, import, and
+compile-reset writes also go through that gateway. Governed result rows require
+an approved source writer; Lexis has no generic result-row writeback endpoint.
+Request bodies and field types live in `docs/openapi/auto-ontology-api.json`;
+this skill names operations and permissions only.
 
 ## Prerequisites
 
@@ -52,9 +53,12 @@ the deployment or semantic layer is not ready.
 
 ## Limitations
 
-MCP is read-only, Lexis has no generic result-row writeback endpoint, and current
-model import and certification APIs do not prove atomic promotion. Follow the
-publication gates below and fail closed when exact readback is unavailable.
+MCP is read-only and Lexis has no generic result-row writeback endpoint. Direct
+legacy certification flags and model import are not review workflows. The
+semantic proposal workflow publishes reviewed snapshots to
+`GET /api/semantic-model`; it does not yet rewrite legacy Term rows or change
+the text-to-SQL planner. Follow the publication gates below and fail closed
+when exact readback is unavailable.
 
 ## Auth
 
@@ -76,8 +80,9 @@ lacks that permission, not that the path is wrong.
    binding, identity, population, relationship cardinality, measure expression,
    unit, grain, denominator, time, validity, and counterexamples; see
    [modeling.md](references/modeling.md).
-3. **State the proposed change** to the user (term rename, new SQL attribute,
-   import, and so on). Do not silently rewrite the glossary.
+3. **State the proposed change** to the user (semantic object proposal, term
+   rename, SQL attribute, import, and so on). Do not silently rewrite the
+   glossary.
 4. **Validate SQL** before create/update: `POST /api/sql-attributes/validate`.
    A parse failure is **HTTP 422**, not `valid: false`.
 5. **Apply** the smallest write that matches the request (see

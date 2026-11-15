@@ -63,6 +63,23 @@ through compilation, ingest, or model import.
 | POST | `/api/model/export` | `modelInterchange:export` | JSON body `ExportRequest`: catalog database **IDs** in `databases` (empty = all), `format` `auto_ontology` \| `ossie`. Response is YAML. |
 | POST | `/api/model/import` | `modelInterchange:import` | YAML import; request forms and query parameters are in the OpenAPI spec. Pitfall: `replace` defaults to true, so confirm with the user before importing over existing definitions. |
 
+## Semantic proposals and review
+
+All proposal reads require `catalog:read`; submission and review require
+`catalog:edit` and a forwarded authenticated user identity.
+
+| Method | Path | Permission | Notes |
+| --- | --- | --- | --- |
+| GET/POST | `/api/semantic-model/proposals` | `catalog:read` / `catalog:edit` | List proposals for one `database_name`, or submit one object snapshot for review. |
+| GET | `/api/semantic-model/proposals/{proposal_id}` | `catalog:read` | Proposal plus immutable event history. |
+| POST | `/api/semantic-model/proposals/{proposal_id}/review` | `catalog:edit` | Approve or reject. Approval requires a different reviewer and a `human_review` evidence reference. |
+
+An approval creates a versioned, certified snapshot in the agent-neutral
+semantic model. It does not update the legacy Term/attribute rows or the
+text-to-SQL planner. Catalog bindings are preserved for existing objects; a
+proposal cannot invent or change physical bindings. See
+[publication.md](publication.md) for readback and staleness handling.
+
 For mutation and publication safeguards, use
 [publication.md](publication.md). Request success is not persisted parity.
 

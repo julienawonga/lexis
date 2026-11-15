@@ -52,6 +52,9 @@ from auto_ontology.server.model_interchange.router import (  # noqa: E402
     router as model_interchange_router,
 )
 from auto_ontology.server.search.router import router as search_router  # noqa: E402
+from auto_ontology.server.semantic_governance.router import (  # noqa: E402
+    router as semantic_governance_router,
+)
 
 
 @asynccontextmanager
@@ -121,6 +124,9 @@ def create_app() -> FastAPI:
     app.include_router(terms_router, prefix="/api", tags=["terms"])
     app.include_router(
         model_interchange_router, prefix="/api", tags=["model-interchange"]
+    )
+    app.include_router(
+        semantic_governance_router, prefix="/api", tags=["semantic-governance"]
     )
     app.include_router(search_router, prefix="/api", tags=["search"])
 

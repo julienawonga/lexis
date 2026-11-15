@@ -26,6 +26,7 @@ from ossie_nvidia_auto_ontology import (
 )
 from pydantic import ValidationError
 
+from auto_ontology.dal import model_interchange as model_dal
 from auto_ontology.dal.model_interchange import (
     assemble_export_document,
     resolve_sql_column_ids,
@@ -210,6 +211,29 @@ def test_assemble_export_document_groups_sql_attributes_by_source() -> None:
     assert len(document.semantic_layer.sql_attributes.table) == 1
     assert len(document.semantic_layer.sql_attributes.sql) == 1
     assert len(document.semantic_layer.sql_attributes.bridge_table) == 1
+
+
+@patch("auto_ontology.dal.model_interchange.store")
+def test_export_sql_attribute_null_source_defaults_to_manual(
+    mock_store: MagicMock,
+) -> None:
+    mock_store.return_value.query_read.return_value = [
+        {
+            "id": "sql-attr-1",
+            "name": "manual attr",
+            "description": None,
+            "sql": "SELECT 1",
+            "database_name": "retail",
+            "expression": "SELECT 1",
+            "source": None,
+            "certified": False,
+            "term_id": "term-1",
+        }
+    ]
+
+    rows = model_dal._export_sql_attributes(["db-1"])
+
+    assert rows[0]["source"] == SQL_ATTR_SOURCE_MANUAL
 
 
 def test_semantic_fk_without_join_path_flag_defaults_to_enabled() -> None:

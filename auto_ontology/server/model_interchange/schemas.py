@@ -77,6 +77,7 @@ class ModelSchema(BaseModel):
 class ModelDatabase(BaseModel):
     id: str
     dialect: str = ""
+    ontology_language: str = Field(default="en", exclude=True)
     schemas: list[ModelSchema] = Field(default_factory=list)
 
 
@@ -102,12 +103,16 @@ class ModelColumnAttribute(BaseModel):
     name: str = ""
     description: str = ""
     column_id: str = ""
+    certified: bool = Field(default=False, exclude=True)
 
 
 class ModelTerm(BaseModel):
     id: str
     name: str = ""
     description: str = ""
+    synonyms: list[str] = Field(default_factory=list, exclude=True)
+    name_certified: bool = Field(default=False, exclude=True)
+    description_certified: bool = Field(default=False, exclude=True)
     represents: list[str] = Field(default_factory=list)
     columns_attributes: list[ModelColumnAttribute] = Field(default_factory=list)
 
@@ -125,6 +130,8 @@ class ModelSqlAttribute(BaseModel):
     sql: str = ""
     sql_column_is: list[str] = Field(default_factory=list)
     term_id: str = ""
+    source: str = Field(default="manual", exclude=True)
+    certified: bool = Field(default=False, exclude=True)
 
 
 class ModelSqlAttributesBySource(BaseModel):

@@ -60,6 +60,20 @@ class ToolSpec:
 CURATED: tuple[ToolSpec, ...] = (
     ToolSpec(
         method="GET",
+        path="/api/semantic-model",
+        name="get_semantic_model",
+        description=(
+            "Get the portable, typed semantic model for one catalog database "
+            "as JSON. Pass the database_name returned by check_readiness. Use "
+            "this to inspect concepts, attributes, relations and SQL attributes "
+            "with their scope and evidence status before reasoning about the data. "
+            "Legacy items are explicitly marked unverified. Their "
+            "legacy_certification flags report stored booleans only; they do "
+            "not prove the definition or its evidence is available."
+        ),
+    ),
+    ToolSpec(
+        method="GET",
         path="/api/terms",
         name="search_terms",
         description=(
@@ -95,10 +109,10 @@ CURATED: tuple[ToolSpec, ...] = (
         path="/api/terms/{term_id}/sql-attributes",
         name="get_term_sql_attributes",
         description=(
-            "List the SQL attributes defined under a glossary term — reviewed "
-            "SQL expressions such as a margin, a ratio, or a rolling total. "
-            "Prefer reusing one of these over inventing the arithmetic "
-            "yourself."
+            "List the SQL attributes defined under a glossary term — stored "
+            "SQL expressions such as a margin, a ratio, or a rolling total, "
+            "with their available certification status. Check the status and "
+            "definition before reusing one."
         ),
     ),
     ToolSpec(
@@ -107,7 +121,7 @@ CURATED: tuple[ToolSpec, ...] = (
         name="get_sql_attribute",
         description=(
             "Fetch one SQL attribute: its expression, the term it belongs to, "
-            "and what it is for."
+            "what it is for, and its available certification status."
         ),
     ),
     ToolSpec(

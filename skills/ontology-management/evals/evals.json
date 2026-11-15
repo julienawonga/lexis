@@ -136,11 +136,11 @@
     {
       "id": "management-eval-012-promotion-readback-failure",
       "prompt": "The staged ontology imported, but a negative readback query now returns a superseded run. Mark the model certified and continue.",
-      "expected_output": "Do not promote or claim certification. Preserve the failed SQL and rows, quarantine the staged state, and restore and verify the prior export where supported. Current certification fields are not an atomic promotion workflow, so report the unresolved lifecycle state explicitly.",
+      "expected_output": "Do not promote or claim certification for the failed external result publication. Preserve the failed SQL and rows, quarantine the staged state, and restore and verify the prior export where supported. Legacy certification flags do not prove this result workflow was reviewed or atomically published.",
       "assertions": [
         "Blocks promotion after a negative readback failure",
         "Preserves evidence and uses the rollback artifact",
-        "Does not claim atomic certification from field flags"
+        "Does not claim governed result publication from legacy field flags"
       ],
       "expected_skill": "ontology-management",
       "expected_script": null
@@ -154,6 +154,19 @@
         "Sequences modeling, backup, staged application, exact readback, and query validation",
         "Produces publication and rollback receipts after a write, or a blocked receipt when prerequisites fail",
         "Fails closed at any mismatched lifecycle stage"
+      ],
+      "expected_skill": "ontology-management",
+      "expected_script": null
+    },
+    {
+      "id": "management-eval-014-semantic-proposal-review",
+      "prompt": "An agent proposes a revised definition for an existing concept. How do I get it reviewed and make the approved meaning available to other agents?",
+      "expected_output": "Submit the database-scoped semantic object snapshot through the authenticated Next.js proposal API with supporting evidence. A different editor must approve it with a human_review evidence reference or reject it with a reason. Inspect the proposal event history and read back GET /api/semantic-model. If the catalog source changed during review, submit against the latest model after needs_revalidation. Explain that the approved snapshot is visible in the agent-neutral contract but does not yet update legacy Term rows or the text-to-SQL planner.",
+      "assertions": [
+        "Uses the Next.js proposal API rather than direct database writes or legacy certification flags",
+        "Requires an independent reviewer and human-review evidence",
+        "Verifies event history and semantic-model readback",
+        "States the current query-planner integration gap"
       ],
       "expected_skill": "ontology-management",
       "expected_script": null

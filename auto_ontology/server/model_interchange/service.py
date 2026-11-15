@@ -6,7 +6,9 @@
 
 from __future__ import annotations
 
+import hashlib
 import io
+import json
 import logging
 import zipfile
 from collections import Counter
@@ -20,9 +22,11 @@ from ossie_nvidia_auto_ontology import (
     convert_auto_ontology_to_ossie_ontology,
     convert_ossie_to_auto_ontology,
 )
+from pydantic import TypeAdapter, ValidationError
 
 from auto_ontology.connectors import get_connectors
 from auto_ontology.dal import model_interchange as dal
+from auto_ontology.dal import semantic_governance as governance_dal
 from auto_ontology.dal.connections import list_connections
 from auto_ontology.server.model_interchange.embed import (
     ImportEmbedBuffer,
@@ -33,6 +37,19 @@ from auto_ontology.server.model_interchange.schemas import (
     AutoOntologyModelDocument,
     ModelFormat,
 )
+from auto_ontology.semantic.contract import (
+    CatalogBinding,
+    KnowledgeProvenance,
+    KnowledgeScope,
+    KnowledgeStatus,
+    SemanticAttribute,
+    SemanticConcept,
+    SemanticLabel,
+    SemanticModelDocument,
+    SemanticObject,
+    SemanticRelation,
+    SemanticSqlAttribute,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -42,7 +59,7 @@ _AUTO_ONTOLOGY_ROOT_KEYS = frozenset(AutoOntologyModelDocument.model_fields)
 OSSIE_EXPORT_FILES = ("semantic_model.yaml", "ontology.yaml", "mapping.yaml")
 
 
-def _dialect_by_database_name() -> dict[str, str]:
+def _dialect_by_database_name(*, resolve_live: bool = True) -> dict[str, str]:
     """Resolve SQL dialect strings keyed by catalog database name.
 
     Live connectors give the most precise dialect, but building them connects
@@ -51,15 +68,16 @@ def _dialect_by_database_name() -> dict[str, str]:
     happens the saved connection settings are used for every database instead.
     """
     dialects: dict[str, str] = {}
-    try:
-        connectors = get_connectors()
-    except Exception as exc:
-        logger.warning(
-            "Could not connect to every configured database (%s); exporting "
-            "dialects from the saved connection settings instead",
-            exc,
-        )
-        connectors = []
+    connectors = []
+    if resolve_live:
+        try:
+            connectors = get_connectors()
+        except Exception as exc:
+            logger.warning(
+                "Could not connect to every configured database (%s); exporting "
+                "dialects from the saved connection settings instead",
+                exc,
+            )
     for connector in connectors:
         database_name = getattr(connector, "database_name", None)
         dialect = getattr(connector, "dialect", None)
@@ -177,16 +195,359 @@ def _validate_ossie_metric_names(document: AutoOntologyModelDocument) -> None:
         )
 
 
-def _export_document(request: ExportRequest) -> AutoOntologyModelDocument:
+def _export_document(
+    request: ExportRequest,
+    *,
+    resolve_live_dialects: bool = True,
+) -> AutoOntologyModelDocument:
     """Assemble the native model document for the databases *request* scopes."""
     database_ids = request.databases
     dal.validate_database_ids(database_ids)
     rows = dal.fetch_export_rows(database_ids)
     return dal.assemble_export_document(
         rows,
-        dialect_by_db_name=_dialect_by_database_name(),
+        dialect_by_db_name=_dialect_by_database_name(
+            resolve_live=resolve_live_dialects
+        ),
         sql_column_resolver=dal.make_cached_sql_column_resolver(),
     )
+
+
+def export_semantic_contract_base(request: ExportRequest) -> SemanticModelDocument:
+    """Project legacy catalog rows before applying governed assertions.
+
+    Existing interchange rows do not retain enough provenance to prove their
+    authorship, evidence, or certification. The projection therefore labels
+    them ``unverified_legacy`` and leaves assertion time/evidence empty.
+    """
+    # This endpoint reads the stored catalog only. In particular, it must not
+    # open connections to every external database just to recover a dialect.
+    document = _export_document(request, resolve_live_dialects=False)
+    tables: dict[str, tuple[str, str, str]] = {}
+    table_of_column: dict[str, str] = {}
+    columns: dict[str, str] = {}
+    for database in document.data_layer.databases:
+        for schema in database.schemas:
+            for table in schema.tables:
+                qualified_table = ".".join(
+                    part
+                    for part in (schema.database_name, schema.name, table.name)
+                    if part
+                )
+                tables[table.id] = (
+                    database.id,
+                    database.dialect,
+                    qualified_table,
+                )
+                table_of_column.update(
+                    {column.id: table.id for column in table.columns}
+                )
+                columns.update(
+                    {
+                        column.id: ".".join(
+                            part for part in (qualified_table, column.name) if part
+                        )
+                        for column in table.columns
+                    }
+                )
+
+    term_databases: dict[str, set[str]] = {}
+    database_languages = {
+        database.id: database.ontology_language or "und"
+        for database in document.data_layer.databases
+    }
+    term_languages: dict[str, str] = {}
+    table_terms: dict[str, set[str]] = {}
+    for term in document.semantic_layer.terms:
+        term_databases[term.id] = {
+            tables[table_id][0] for table_id in term.represents if table_id in tables
+        }
+        languages = {
+            database_languages[database_id]
+            for database_id in term_databases[term.id]
+            if database_languages.get(database_id)
+        }
+        term_languages[term.id] = (
+            next(iter(languages)) if len(languages) == 1 else "und"
+        )
+        for table_id in term.represents:
+            table_terms.setdefault(table_id, set()).add(term.id)
+
+    def _scope(database_ids: set[str]) -> KnowledgeScope:
+        if len(database_ids) == 1:
+            return KnowledgeScope(kind="database", database_id=next(iter(database_ids)))
+        return KnowledgeScope(kind="shared")
+
+    def _legacy_provenance() -> KnowledgeProvenance:
+        return KnowledgeProvenance(
+            actor_type="system",
+            actor_id="lexis",
+            activity="legacy_export",
+        )
+
+    objects: list[SemanticObject] = []
+    term_by_id = {term.id: term for term in document.semantic_layer.terms}
+    attribute_term: dict[str, str] = {}
+    attribute_column: dict[str, str] = {}
+
+    for term in document.semantic_layer.terms:
+        language = term_languages[term.id]
+        synonyms = tuple(
+            synonym.strip()
+            for synonym in term.synonyms
+            if synonym.strip() and synonym.strip().casefold() != term.name.casefold()
+        )
+        objects.append(
+            SemanticConcept(
+                id=term.id,
+                labels=(
+                    SemanticLabel(text=term.name or term.id, language=language),
+                    *(
+                        SemanticLabel(text=synonym, language=language, kind="alternate")
+                        for synonym in synonyms
+                    ),
+                ),
+                definition=term.description or "Legacy term; no definition recorded.",
+                status=KnowledgeStatus.UNVERIFIED_LEGACY,
+                scope=_scope(term_databases[term.id]),
+                provenance=_legacy_provenance(),
+                legacy_certification={
+                    "name_certified": term.name_certified,
+                    "description_certified": term.description_certified,
+                },
+                bindings=tuple(
+                    CatalogBinding(
+                        catalog_id=table_id,
+                        role="represents",
+                        object_kind="table",
+                        qualified_name=tables[table_id][2]
+                        if table_id in tables
+                        else None,
+                    )
+                    for table_id in term.represents
+                ),
+            )
+        )
+        for attribute in term.columns_attributes:
+            attribute_term[attribute.id] = term.id
+            attribute_column[attribute.id] = attribute.column_id
+            database_ids = {
+                tables[table_id][0]
+                for table_id in term.represents
+                if table_id in tables
+            }
+            objects.append(
+                SemanticAttribute(
+                    id=attribute.id,
+                    concept_id=term.id,
+                    labels=(
+                        SemanticLabel(
+                            text=attribute.name or attribute.id, language=language
+                        ),
+                    ),
+                    definition=(
+                        attribute.description
+                        or "Legacy attribute; no definition recorded."
+                    ),
+                    status=KnowledgeStatus.UNVERIFIED_LEGACY,
+                    scope=_scope(database_ids),
+                    provenance=_legacy_provenance(),
+                    legacy_certification={"certified": attribute.certified},
+                    bindings=(
+                        CatalogBinding(
+                            catalog_id=attribute.column_id,
+                            role="maps_to",
+                            object_kind="column",
+                            qualified_name=columns.get(attribute.column_id),
+                        ),
+                    )
+                    if attribute.column_id
+                    else (),
+                )
+            )
+
+    for semantic_fk in document.semantic_layer.semantic_fks:
+        target_term_id = attribute_term.get(semantic_fk.column_attribute_id)
+        if not target_term_id:
+            continue
+        source_table_id = table_of_column.get(semantic_fk.column_id)
+        source_terms = table_terms.get(source_table_id or "", set())
+        # A physical source table may represent multiple concepts. Do not guess
+        # which one the relationship belongs to in the portable projection.
+        if len(source_terms) != 1:
+            continue
+        source_term_id = next(iter(source_terms))
+        source_database_ids = term_databases.get(source_term_id, set())
+        target_database_ids = term_databases.get(target_term_id, set())
+        objects.append(
+            SemanticRelation(
+                id=f"semantic-fk:{semantic_fk.column_id}:{semantic_fk.column_attribute_id}",
+                subject_id=source_term_id,
+                predicate="references",
+                object_id=target_term_id,
+                labels=(
+                    SemanticLabel(text="references", language="und", kind="hidden"),
+                ),
+                definition="Legacy semantic foreign-key relationship; unverified.",
+                status=KnowledgeStatus.UNVERIFIED_LEGACY,
+                scope=_scope(source_database_ids | target_database_ids),
+                provenance=_legacy_provenance(),
+                join_bindings=(
+                    CatalogBinding(
+                        catalog_id=semantic_fk.column_id,
+                        role="source_column",
+                        object_kind="column",
+                        qualified_name=columns.get(semantic_fk.column_id),
+                    ),
+                    CatalogBinding(
+                        catalog_id=attribute_column.get(
+                            semantic_fk.column_attribute_id, ""
+                        ),
+                        role="target_column",
+                        object_kind="column",
+                        qualified_name=columns.get(
+                            attribute_column.get(semantic_fk.column_attribute_id, "")
+                        ),
+                    ),
+                )
+                if attribute_column.get(semantic_fk.column_attribute_id)
+                else (),
+            )
+        )
+
+    for source_group in (
+        document.semantic_layer.sql_attributes.manual,
+        document.semantic_layer.sql_attributes.table,
+        document.semantic_layer.sql_attributes.sql,
+        document.semantic_layer.sql_attributes.bridge_table,
+    ):
+        for attribute in source_group:
+            term = term_by_id.get(attribute.term_id)
+            if term is None:
+                continue
+            database_ids = term_databases.get(term.id, set())
+            dialects = {
+                dialect
+                for table_id in term.represents
+                if table_id in tables
+                if (dialect := tables[table_id][1])
+            }
+            objects.append(
+                SemanticSqlAttribute(
+                    id=attribute.id,
+                    concept_id=term.id,
+                    labels=(
+                        SemanticLabel(
+                            text=attribute.name or attribute.id,
+                            language=term_languages.get(term.id, "und"),
+                        ),
+                    ),
+                    definition=(
+                        attribute.description
+                        or "Legacy SQL attribute; no definition recorded."
+                    ),
+                    expression=attribute.sql or None,
+                    dialect=next(iter(dialects)) if len(dialects) == 1 else None,
+                    source=attribute.source,
+                    status=KnowledgeStatus.UNVERIFIED_LEGACY,
+                    scope=_scope(database_ids),
+                    provenance=_legacy_provenance(),
+                    legacy_certification={"certified": attribute.certified},
+                )
+            )
+
+    return SemanticModelDocument(
+        model_id=(
+            f"lexis:{request.databases[0]}" if len(request.databases) == 1 else "lexis"
+        ),
+        objects=tuple(objects),
+    )
+
+
+def semantic_object_fingerprint(obj: SemanticObject) -> str:
+    """Hash a canonical contract object for stale-proposal detection."""
+    payload = json.dumps(
+        obj.model_dump(mode="json"),
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+    ).encode("utf-8")
+    return hashlib.sha256(payload).hexdigest()
+
+
+def export_semantic_contract(request: ExportRequest) -> SemanticModelDocument:
+    """Project catalog meaning, then overlay the latest reviewed assertions.
+
+    Governed objects retain their exact reviewed snapshot. If the legacy
+    catalog row used as their source changes afterward, the object remains
+    visible but its status drops to ``needs_revalidation``.
+    """
+    base = export_semantic_contract_base(request)
+    legacy_by_id = {obj.id: obj for obj in base.objects}
+    current = list(base.objects)
+    adapter = TypeAdapter(SemanticObject)
+    pending: list[tuple[dict[str, Any], SemanticObject]] = []
+
+    for row in governance_dal.current_approved_objects(base.model_id):
+        try:
+            obj = adapter.validate_python(row["proposed_document"])
+        except (ValidationError, TypeError):
+            logger.warning(
+                "Skipping invalid approved semantic object %s", row.get("object_id")
+            )
+            continue
+        legacy = legacy_by_id.get(obj.id)
+        expected_fingerprint = (
+            semantic_object_fingerprint(legacy) if legacy is not None else "new"
+        )
+        if row["base_fingerprint"] != expected_fingerprint:
+            payload = obj.model_dump(mode="json")
+            payload["status"] = KnowledgeStatus.NEEDS_REVALIDATION.value
+            try:
+                obj = adapter.validate_python(payload)
+            except ValidationError:
+                logger.warning(
+                    "Could not mark stale semantic object %s for revalidation",
+                    obj.id,
+                    exc_info=True,
+                )
+                continue
+        pending.append((row, obj))
+
+    # New objects can depend on other approved objects. Resolve in repeated
+    # passes, so row order never decides whether a valid model can be exported.
+    while pending:
+        deferred: list[tuple[dict[str, Any], SemanticObject]] = []
+        progressed = False
+        for row, obj in pending:
+            replaced = False
+            candidate = list(current)
+            for index, existing in enumerate(candidate):
+                if existing.id == obj.id:
+                    candidate[index] = obj
+                    replaced = True
+                    break
+            if not replaced:
+                candidate.append(obj)
+            try:
+                SemanticModelDocument(model_id=base.model_id, objects=tuple(candidate))
+            except ValidationError:
+                deferred.append((row, obj))
+                continue
+            current = candidate
+            progressed = True
+        if not progressed:
+            for row, obj in deferred:
+                logger.warning(
+                    "Skipping approved semantic object %s because its references "
+                    "are not present in model %s",
+                    obj.id,
+                    base.model_id,
+                )
+            break
+        pending = deferred
+
+    return SemanticModelDocument(model_id=base.model_id, objects=tuple(current))
 
 
 def _ossie_source(document: AutoOntologyModelDocument) -> str:

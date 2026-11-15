@@ -11,6 +11,7 @@ from fastapi.responses import Response
 from ossie_nvidia_auto_ontology import AutoOntologyConversionError
 from pydantic import ValidationError
 
+from auto_ontology.dal import model_interchange as model_dal
 from auto_ontology.dal.model_interchange import (
     ModelImportValidationError,
     UnknownDatabaseIdsError,
@@ -18,6 +19,7 @@ from auto_ontology.dal.model_interchange import (
 from auto_ontology.server.model_interchange import service
 from auto_ontology.server.model_interchange.schemas import ExportRequest
 from auto_ontology.server.responses import ModelImportResponse
+from auto_ontology.semantic.contract import SemanticModelDocument
 
 router = APIRouter()
 
@@ -26,6 +28,33 @@ class YamlResponse(Response):
     """Declares the export's media type so the spec doesn't also claim JSON."""
 
     media_type = "application/x-yaml"
+
+
+@router.get(
+    "/semantic-model",
+    response_model=SemanticModelDocument,
+    responses={404: {"description": "Catalog database not found"}},
+)
+def get_semantic_model(
+    database_name: str = Query(
+        min_length=1,
+        description="Name of one catalog database to include.",
+    ),
+) -> SemanticModelDocument:
+    """Return a portable JSON view of one database's semantic model.
+
+    Legacy records are marked ``unverified_legacy`` because their current
+    interchange representation does not contain enough provenance to assert
+    certification. The database name scopes the payload to one model. This
+    endpoint is read-only.
+    """
+    database_id = model_dal.fetch_database_id_by_name(database_name)
+    if database_id is None:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Catalog database {database_name!r} was not found",
+        )
+    return service.export_semantic_contract(ExportRequest(databases=[database_id]))
 
 
 @router.post(

@@ -59,6 +59,10 @@ required_fields:
     - rollback_target
     - status
 statuses:
+  - in_review
+  - approved
+  - rejected
+  - needs_revalidation
   - proposed
   - validated
   - published

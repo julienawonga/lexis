@@ -58,6 +58,10 @@ were there last quarter?"*
 
 ## Tools
 
+`get_semantic_model` returns the read-only, typed semantic model for one named
+database as JSON. Legacy items whose provenance is unavailable are marked
+`unverified_legacy`.
+
 `ask_question` is the one that answers questions: it runs Lexis's text-to-SQL agent
 and returns the answer, the SQL it ran, and the rows. The rest — `search_terms`,
 `describe_table`, `check_answerable` and friends — let an agent learn the

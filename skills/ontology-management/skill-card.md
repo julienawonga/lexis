@@ -41,7 +41,7 @@ Mitigation: Review and scan skill before deployment. <br>
 **Output Type(s):** [API Calls, Analysis, Configuration instructions] <br>
 **Output Format:** [Markdown with inline HTTP request examples against the Next.js /api gateway] <br>
 **Output Parameters:** [1D] <br>
-**Other Properties Related to Output:** [MCP access is read-only; writes need the token owner's permissions, and unsupported publication stops at an explicit receipt] <br>
+**Other Properties Related to Output:** [MCP access is read-only; semantic proposals require authenticated submission and independent review; approvals update the agent-neutral contract, not legacy query-planner inputs] <br>
 
 ## Evaluation Agents Used: <br>
 - Claude Code (`aws/anthropic/bedrock-claude-opus-4-8`) <br>

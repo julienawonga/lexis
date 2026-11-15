@@ -65,6 +65,9 @@ permission to act.
 
 Use the smallest supported change:
 
+- submit a database-scoped `SemanticObject` snapshot through the semantic
+  proposal API for human review; physical catalog bindings stay fixed in this
+  workflow;
 - patch an existing Term or ColumnAttribute for metadata corrections;
 - validate and create/update a SQL attribute for a reusable derivation;
 - use scoped native model export/import for concept population or relationship
@@ -73,7 +76,9 @@ Use the smallest supported change:
 Lexis has no direct public create-empty-Term endpoint and no complete direct
 structural relationship mutation workflow. Do not invent one. If the requested
 design cannot be expressed through the installed revision's public API, return
-a model gap instead of weakening the design.
+a model gap instead of weakening the design. An approved semantic proposal is
+available through the agent-neutral semantic model, but it does not yet update
+legacy Term rows or the text-to-SQL planner.
 
 ## Validate before handoff
 

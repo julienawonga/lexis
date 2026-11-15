@@ -1,0 +1,4 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026, Julien Awonga.
+# SPDX-License-Identifier: Apache-2.0
+
+"""Review workflow for portable semantic objects."""

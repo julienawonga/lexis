@@ -19,6 +19,57 @@
         "title": "Body_import_model_api_model_import_post",
         "type": "object"
       },
+      "CatalogBinding": {
+        "additionalProperties": false,
+        "description": "A stable reference from a semantic object to a physical data object.",
+        "properties": {
+          "catalog_id": {
+            "minLength": 1,
+            "title": "Catalog Id",
+            "type": "string"
+          },
+          "object_kind": {
+            "anyOf": [
+              {
+                "enum": [
+                  "database",
+                  "schema",
+                  "table",
+                  "column"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Object Kind"
+          },
+          "qualified_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Qualified Name"
+          },
+          "role": {
+            "description": "Meaning of this binding in context.",
+            "minLength": 1,
+            "title": "Role",
+            "type": "string"
+          }
+        },
+        "required": [
+          "catalog_id",
+          "role"
+        ],
+        "title": "CatalogBinding",
+        "type": "object"
+      },
       "ChatCancelResponse": {
         "additionalProperties": true,
         "properties": {
@@ -1893,6 +1944,47 @@
         "title": "EntityCoverageResult",
         "type": "object"
       },
+      "EvidenceReference": {
+        "additionalProperties": false,
+        "description": "Pointer to evidence; excerpts are intentionally not embedded by default.",
+        "properties": {
+          "captured_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Captured At"
+          },
+          "kind": {
+            "enum": [
+              "schema",
+              "document",
+              "query",
+              "execution",
+              "conversation",
+              "human_review"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "reference": {
+            "minLength": 1,
+            "title": "Reference",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "reference"
+        ],
+        "title": "EvidenceReference",
+        "type": "object"
+      },
       "ExplorationEdge": {
         "additionalProperties": true,
         "description": "Two tables connected by a shared SQL query and/or a foreign key.\n\n``queries`` is empty for an edge that exists only because of a foreign\nkey; ``foreign_keys`` is empty for a SQL-only edge. ``relationship_types``\nnames the relationship kind(s) behind the edge (``SQL`` and/or\n``FOREIGN_KEY``), for labeling the connection in the graph.",
@@ -2737,6 +2829,152 @@
         ],
         "title": "IdRef",
         "type": "object"
+      },
+      "KnowledgeProvenance": {
+        "additionalProperties": false,
+        "description": "Who or what asserted an item and the evidence available for it.",
+        "properties": {
+          "activity": {
+            "minLength": 1,
+            "title": "Activity",
+            "type": "string"
+          },
+          "actor_id": {
+            "minLength": 1,
+            "title": "Actor Id",
+            "type": "string"
+          },
+          "actor_type": {
+            "enum": [
+              "user",
+              "agent",
+              "system",
+              "job"
+            ],
+            "title": "Actor Type",
+            "type": "string"
+          },
+          "asserted_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Asserted At"
+          },
+          "evidence": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/EvidenceReference"
+            },
+            "title": "Evidence",
+            "type": "array"
+          },
+          "model_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model Id"
+          },
+          "prompt_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Prompt Version"
+          }
+        },
+        "required": [
+          "actor_type",
+          "actor_id",
+          "activity"
+        ],
+        "title": "KnowledgeProvenance",
+        "type": "object"
+      },
+      "KnowledgeScope": {
+        "additionalProperties": false,
+        "description": "Where an item is visible and authoritative.",
+        "properties": {
+          "database_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Database Id"
+          },
+          "domain_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Domain Id"
+          },
+          "kind": {
+            "enum": [
+              "personal",
+              "team",
+              "domain",
+              "database",
+              "shared"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "owner_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Owner Id"
+          }
+        },
+        "required": [
+          "kind"
+        ],
+        "title": "KnowledgeScope",
+        "type": "object"
+      },
+      "KnowledgeStatus": {
+        "description": "Epistemic or governance state; similarity rank never changes this.",
+        "enum": [
+          "observed",
+          "inferred",
+          "draft",
+          "in_review",
+          "certified",
+          "needs_revalidation",
+          "conflicted",
+          "deprecated",
+          "unverified_legacy"
+        ],
+        "title": "KnowledgeStatus",
+        "type": "string"
       },
       "ListResponse_DatabaseSummary_": {
         "additionalProperties": true,
@@ -3716,6 +3954,240 @@
         "title": "SchemasPayload",
         "type": "object"
       },
+      "SemanticAttribute": {
+        "additionalProperties": false,
+        "properties": {
+          "bindings": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/CatalogBinding"
+            },
+            "title": "Bindings",
+            "type": "array"
+          },
+          "concept_id": {
+            "minLength": 1,
+            "title": "Concept Id",
+            "type": "string"
+          },
+          "datatype": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Datatype"
+          },
+          "definition": {
+            "minLength": 1,
+            "title": "Definition",
+            "type": "string"
+          },
+          "id": {
+            "description": "Stable, opaque identifier.",
+            "minLength": 1,
+            "title": "Id",
+            "type": "string"
+          },
+          "kind": {
+            "const": "attribute",
+            "default": "attribute",
+            "title": "Kind",
+            "type": "string"
+          },
+          "labels": {
+            "items": {
+              "$ref": "#/components/schemas/SemanticLabel"
+            },
+            "minItems": 1,
+            "title": "Labels",
+            "type": "array"
+          },
+          "legacy_certification": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "boolean"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Legacy Certification"
+          },
+          "provenance": {
+            "$ref": "#/components/schemas/KnowledgeProvenance"
+          },
+          "scope": {
+            "$ref": "#/components/schemas/KnowledgeScope"
+          },
+          "status": {
+            "$ref": "#/components/schemas/KnowledgeStatus"
+          },
+          "supersedes": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Supersedes",
+            "type": "array"
+          },
+          "unit": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unit"
+          },
+          "valid_from": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Valid From"
+          },
+          "valid_to": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Valid To"
+          }
+        },
+        "required": [
+          "id",
+          "labels",
+          "definition",
+          "status",
+          "scope",
+          "provenance",
+          "concept_id"
+        ],
+        "title": "SemanticAttribute",
+        "type": "object"
+      },
+      "SemanticConcept": {
+        "additionalProperties": false,
+        "properties": {
+          "bindings": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/CatalogBinding"
+            },
+            "title": "Bindings",
+            "type": "array"
+          },
+          "definition": {
+            "minLength": 1,
+            "title": "Definition",
+            "type": "string"
+          },
+          "id": {
+            "description": "Stable, opaque identifier.",
+            "minLength": 1,
+            "title": "Id",
+            "type": "string"
+          },
+          "kind": {
+            "const": "concept",
+            "default": "concept",
+            "title": "Kind",
+            "type": "string"
+          },
+          "labels": {
+            "items": {
+              "$ref": "#/components/schemas/SemanticLabel"
+            },
+            "minItems": 1,
+            "title": "Labels",
+            "type": "array"
+          },
+          "legacy_certification": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "boolean"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Legacy Certification"
+          },
+          "provenance": {
+            "$ref": "#/components/schemas/KnowledgeProvenance"
+          },
+          "scope": {
+            "$ref": "#/components/schemas/KnowledgeScope"
+          },
+          "status": {
+            "$ref": "#/components/schemas/KnowledgeStatus"
+          },
+          "supersedes": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Supersedes",
+            "type": "array"
+          },
+          "valid_from": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Valid From"
+          },
+          "valid_to": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Valid To"
+          }
+        },
+        "required": [
+          "id",
+          "labels",
+          "definition",
+          "status",
+          "scope",
+          "provenance"
+        ],
+        "title": "SemanticConcept",
+        "type": "object"
+      },
       "SemanticDatabaseOverviewItem": {
         "additionalProperties": true,
         "description": "One database bubble and the number of distinct Terms linked to it.",
@@ -3739,6 +4211,110 @@
           "term_count"
         ],
         "title": "SemanticDatabaseOverviewItem",
+        "type": "object"
+      },
+      "SemanticDimension": {
+        "additionalProperties": false,
+        "properties": {
+          "attribute_ids": {
+            "items": {
+              "type": "string"
+            },
+            "minItems": 1,
+            "title": "Attribute Ids",
+            "type": "array"
+          },
+          "definition": {
+            "minLength": 1,
+            "title": "Definition",
+            "type": "string"
+          },
+          "id": {
+            "description": "Stable, opaque identifier.",
+            "minLength": 1,
+            "title": "Id",
+            "type": "string"
+          },
+          "kind": {
+            "const": "dimension",
+            "default": "dimension",
+            "title": "Kind",
+            "type": "string"
+          },
+          "labels": {
+            "items": {
+              "$ref": "#/components/schemas/SemanticLabel"
+            },
+            "minItems": 1,
+            "title": "Labels",
+            "type": "array"
+          },
+          "legacy_certification": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "boolean"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Legacy Certification"
+          },
+          "provenance": {
+            "$ref": "#/components/schemas/KnowledgeProvenance"
+          },
+          "scope": {
+            "$ref": "#/components/schemas/KnowledgeScope"
+          },
+          "status": {
+            "$ref": "#/components/schemas/KnowledgeStatus"
+          },
+          "supersedes": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Supersedes",
+            "type": "array"
+          },
+          "valid_from": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Valid From"
+          },
+          "valid_to": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Valid To"
+          }
+        },
+        "required": [
+          "id",
+          "labels",
+          "definition",
+          "status",
+          "scope",
+          "provenance",
+          "attribute_ids"
+        ],
+        "title": "SemanticDimension",
         "type": "object"
       },
       "SemanticExplorationGraph": {
@@ -3877,6 +4453,335 @@
         "title": "SemanticIndexStatus",
         "type": "object"
       },
+      "SemanticLabel": {
+        "additionalProperties": false,
+        "description": "A language-tagged preferred or alternate name.",
+        "properties": {
+          "kind": {
+            "default": "preferred",
+            "enum": [
+              "preferred",
+              "alternate",
+              "hidden"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "language": {
+            "description": "BCP 47 language tag.",
+            "minLength": 2,
+            "title": "Language",
+            "type": "string"
+          },
+          "text": {
+            "minLength": 1,
+            "title": "Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "text",
+          "language"
+        ],
+        "title": "SemanticLabel",
+        "type": "object"
+      },
+      "SemanticMetric": {
+        "additionalProperties": false,
+        "properties": {
+          "concept_id": {
+            "minLength": 1,
+            "title": "Concept Id",
+            "type": "string"
+          },
+          "definition": {
+            "minLength": 1,
+            "title": "Definition",
+            "type": "string"
+          },
+          "dependencies": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Dependencies",
+            "type": "array"
+          },
+          "dialect": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dialect"
+          },
+          "expression": {
+            "minLength": 1,
+            "title": "Expression",
+            "type": "string"
+          },
+          "expression_language": {
+            "const": "sql",
+            "default": "sql",
+            "title": "Expression Language",
+            "type": "string"
+          },
+          "filters": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Filters",
+            "type": "array"
+          },
+          "grain": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Grain",
+            "type": "array"
+          },
+          "id": {
+            "description": "Stable, opaque identifier.",
+            "minLength": 1,
+            "title": "Id",
+            "type": "string"
+          },
+          "kind": {
+            "const": "metric",
+            "default": "metric",
+            "title": "Kind",
+            "type": "string"
+          },
+          "labels": {
+            "items": {
+              "$ref": "#/components/schemas/SemanticLabel"
+            },
+            "minItems": 1,
+            "title": "Labels",
+            "type": "array"
+          },
+          "legacy_certification": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "boolean"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Legacy Certification"
+          },
+          "provenance": {
+            "$ref": "#/components/schemas/KnowledgeProvenance"
+          },
+          "scope": {
+            "$ref": "#/components/schemas/KnowledgeScope"
+          },
+          "status": {
+            "$ref": "#/components/schemas/KnowledgeStatus"
+          },
+          "supersedes": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Supersedes",
+            "type": "array"
+          },
+          "unit": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unit"
+          },
+          "valid_from": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Valid From"
+          },
+          "valid_to": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Valid To"
+          }
+        },
+        "required": [
+          "id",
+          "labels",
+          "definition",
+          "status",
+          "scope",
+          "provenance",
+          "concept_id",
+          "expression"
+        ],
+        "title": "SemanticMetric",
+        "type": "object"
+      },
+      "SemanticModelDocument": {
+        "additionalProperties": false,
+        "description": "Portable semantic model document, independent of agent protocol.",
+        "properties": {
+          "contract_version": {
+            "const": "0.1",
+            "default": "0.1",
+            "title": "Contract Version",
+            "type": "string"
+          },
+          "model_id": {
+            "minLength": 1,
+            "title": "Model Id",
+            "type": "string"
+          },
+          "objects": {
+            "default": [],
+            "items": {
+              "discriminator": {
+                "mapping": {
+                  "attribute": "#/components/schemas/SemanticAttribute",
+                  "concept": "#/components/schemas/SemanticConcept",
+                  "dimension": "#/components/schemas/SemanticDimension",
+                  "metric": "#/components/schemas/SemanticMetric",
+                  "relation": "#/components/schemas/SemanticRelation",
+                  "sql_attribute": "#/components/schemas/SemanticSqlAttribute",
+                  "verified_query": "#/components/schemas/SemanticVerifiedQuery"
+                },
+                "propertyName": "kind"
+              },
+              "oneOf": [
+                {
+                  "$ref": "#/components/schemas/SemanticConcept"
+                },
+                {
+                  "$ref": "#/components/schemas/SemanticAttribute"
+                },
+                {
+                  "$ref": "#/components/schemas/SemanticRelation"
+                },
+                {
+                  "$ref": "#/components/schemas/SemanticSqlAttribute"
+                },
+                {
+                  "$ref": "#/components/schemas/SemanticMetric"
+                },
+                {
+                  "$ref": "#/components/schemas/SemanticDimension"
+                },
+                {
+                  "$ref": "#/components/schemas/SemanticVerifiedQuery"
+                }
+              ]
+            },
+            "title": "Objects",
+            "type": "array"
+          }
+        },
+        "required": [
+          "model_id"
+        ],
+        "title": "SemanticModelDocument",
+        "type": "object"
+      },
+      "SemanticProposalCreate": {
+        "properties": {
+          "comment": {
+            "maxLength": 4000,
+            "minLength": 1,
+            "title": "Comment",
+            "type": "string"
+          },
+          "database_name": {
+            "minLength": 1,
+            "title": "Database Name",
+            "type": "string"
+          },
+          "evidence": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/EvidenceReference"
+            },
+            "title": "Evidence",
+            "type": "array"
+          },
+          "object": {
+            "additionalProperties": true,
+            "title": "Object",
+            "type": "object"
+          }
+        },
+        "required": [
+          "database_name",
+          "object",
+          "comment"
+        ],
+        "title": "SemanticProposalCreate",
+        "type": "object"
+      },
+      "SemanticProposalReview": {
+        "properties": {
+          "comment": {
+            "maxLength": 4000,
+            "minLength": 1,
+            "title": "Comment",
+            "type": "string"
+          },
+          "database_name": {
+            "minLength": 1,
+            "title": "Database Name",
+            "type": "string"
+          },
+          "decision": {
+            "enum": [
+              "approve",
+              "reject"
+            ],
+            "title": "Decision",
+            "type": "string"
+          },
+          "evidence": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/EvidenceReference"
+            },
+            "title": "Evidence",
+            "type": "array"
+          }
+        },
+        "required": [
+          "database_name",
+          "decision",
+          "comment"
+        ],
+        "title": "SemanticProposalReview",
+        "type": "object"
+      },
       "SemanticReindexResponse": {
         "additionalProperties": true,
         "description": "Result of rebuilding one database's semantic index.\n\n``written < expected`` is a partial rebuild: the embedding endpoint did not\nreturn a vector for every row.",
@@ -3900,6 +4805,284 @@
           "written"
         ],
         "title": "SemanticReindexResponse",
+        "type": "object"
+      },
+      "SemanticRelation": {
+        "additionalProperties": false,
+        "properties": {
+          "cardinality": {
+            "anyOf": [
+              {
+                "enum": [
+                  "one_to_one",
+                  "one_to_many",
+                  "many_to_one",
+                  "many_to_many"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cardinality"
+          },
+          "definition": {
+            "minLength": 1,
+            "title": "Definition",
+            "type": "string"
+          },
+          "id": {
+            "description": "Stable, opaque identifier.",
+            "minLength": 1,
+            "title": "Id",
+            "type": "string"
+          },
+          "join_bindings": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/CatalogBinding"
+            },
+            "title": "Join Bindings",
+            "type": "array"
+          },
+          "kind": {
+            "const": "relation",
+            "default": "relation",
+            "title": "Kind",
+            "type": "string"
+          },
+          "labels": {
+            "items": {
+              "$ref": "#/components/schemas/SemanticLabel"
+            },
+            "minItems": 1,
+            "title": "Labels",
+            "type": "array"
+          },
+          "legacy_certification": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "boolean"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Legacy Certification"
+          },
+          "object_id": {
+            "minLength": 1,
+            "title": "Object Id",
+            "type": "string"
+          },
+          "predicate": {
+            "minLength": 1,
+            "title": "Predicate",
+            "type": "string"
+          },
+          "provenance": {
+            "$ref": "#/components/schemas/KnowledgeProvenance"
+          },
+          "scope": {
+            "$ref": "#/components/schemas/KnowledgeScope"
+          },
+          "status": {
+            "$ref": "#/components/schemas/KnowledgeStatus"
+          },
+          "subject_id": {
+            "minLength": 1,
+            "title": "Subject Id",
+            "type": "string"
+          },
+          "supersedes": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Supersedes",
+            "type": "array"
+          },
+          "valid_from": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Valid From"
+          },
+          "valid_to": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Valid To"
+          }
+        },
+        "required": [
+          "id",
+          "labels",
+          "definition",
+          "status",
+          "scope",
+          "provenance",
+          "subject_id",
+          "predicate",
+          "object_id"
+        ],
+        "title": "SemanticRelation",
+        "type": "object"
+      },
+      "SemanticSqlAttribute": {
+        "additionalProperties": false,
+        "properties": {
+          "concept_id": {
+            "minLength": 1,
+            "title": "Concept Id",
+            "type": "string"
+          },
+          "definition": {
+            "minLength": 1,
+            "title": "Definition",
+            "type": "string"
+          },
+          "dialect": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dialect"
+          },
+          "expression": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expression"
+          },
+          "expression_language": {
+            "const": "sql",
+            "default": "sql",
+            "title": "Expression Language",
+            "type": "string"
+          },
+          "id": {
+            "description": "Stable, opaque identifier.",
+            "minLength": 1,
+            "title": "Id",
+            "type": "string"
+          },
+          "kind": {
+            "const": "sql_attribute",
+            "default": "sql_attribute",
+            "title": "Kind",
+            "type": "string"
+          },
+          "labels": {
+            "items": {
+              "$ref": "#/components/schemas/SemanticLabel"
+            },
+            "minItems": 1,
+            "title": "Labels",
+            "type": "array"
+          },
+          "legacy_certification": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "boolean"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Legacy Certification"
+          },
+          "provenance": {
+            "$ref": "#/components/schemas/KnowledgeProvenance"
+          },
+          "scope": {
+            "$ref": "#/components/schemas/KnowledgeScope"
+          },
+          "source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source"
+          },
+          "status": {
+            "$ref": "#/components/schemas/KnowledgeStatus"
+          },
+          "supersedes": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Supersedes",
+            "type": "array"
+          },
+          "valid_from": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Valid From"
+          },
+          "valid_to": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Valid To"
+          }
+        },
+        "required": [
+          "id",
+          "labels",
+          "definition",
+          "status",
+          "scope",
+          "provenance",
+          "concept_id"
+        ],
+        "title": "SemanticSqlAttribute",
         "type": "object"
       },
       "SemanticStatusResponse": {
@@ -3957,6 +5140,140 @@
           "last_failure_at"
         ],
         "title": "SemanticStatusResponse",
+        "type": "object"
+      },
+      "SemanticVerifiedQuery": {
+        "additionalProperties": false,
+        "properties": {
+          "definition": {
+            "minLength": 1,
+            "title": "Definition",
+            "type": "string"
+          },
+          "dependencies": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Dependencies",
+            "type": "array"
+          },
+          "dialect": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dialect"
+          },
+          "id": {
+            "description": "Stable, opaque identifier.",
+            "minLength": 1,
+            "title": "Id",
+            "type": "string"
+          },
+          "kind": {
+            "const": "verified_query",
+            "default": "verified_query",
+            "title": "Kind",
+            "type": "string"
+          },
+          "labels": {
+            "items": {
+              "$ref": "#/components/schemas/SemanticLabel"
+            },
+            "minItems": 1,
+            "title": "Labels",
+            "type": "array"
+          },
+          "legacy_certification": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "boolean"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Legacy Certification"
+          },
+          "parameters": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Parameters",
+            "type": "array"
+          },
+          "provenance": {
+            "$ref": "#/components/schemas/KnowledgeProvenance"
+          },
+          "question": {
+            "minLength": 1,
+            "title": "Question",
+            "type": "string"
+          },
+          "scope": {
+            "$ref": "#/components/schemas/KnowledgeScope"
+          },
+          "sql": {
+            "minLength": 1,
+            "title": "Sql",
+            "type": "string"
+          },
+          "status": {
+            "$ref": "#/components/schemas/KnowledgeStatus"
+          },
+          "supersedes": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Supersedes",
+            "type": "array"
+          },
+          "valid_from": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Valid From"
+          },
+          "valid_to": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Valid To"
+          }
+        },
+        "required": [
+          "id",
+          "labels",
+          "definition",
+          "status",
+          "scope",
+          "provenance",
+          "question",
+          "sql"
+        ],
+        "title": "SemanticVerifiedQuery",
         "type": "object"
       },
       "SqlAttribute": {
@@ -9460,6 +10777,301 @@
         "summary": "Build Value Index",
         "tags": [
           "semantic-compilation"
+        ]
+      }
+    },
+    "/api/semantic-model": {
+      "get": {
+        "description": "Return a portable JSON view of one database's semantic model.\n\nLegacy records are marked ``unverified_legacy`` because their current\ninterchange representation does not contain enough provenance to assert\ncertification. The database name scopes the payload to one model. This\nendpoint is read-only.",
+        "operationId": "get_semantic_model_api_semantic_model_get",
+        "parameters": [
+          {
+            "description": "Name of one catalog database to include.",
+            "in": "query",
+            "name": "database_name",
+            "required": true,
+            "schema": {
+              "description": "Name of one catalog database to include.",
+              "minLength": 1,
+              "title": "Database Name",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SemanticModelDocument"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "description": "Catalog database not found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Semantic Model",
+        "tags": [
+          "model-interchange"
+        ]
+      }
+    },
+    "/api/semantic-model/proposals": {
+      "get": {
+        "description": "List proposal metadata for one database; details include event history.",
+        "operationId": "list_semantic_proposals_api_semantic_model_proposals_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "database_name",
+            "required": true,
+            "schema": {
+              "minLength": 1,
+              "title": "Database Name",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "state",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "in_review",
+                    "approved",
+                    "rejected"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "State"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 100,
+              "maximum": 500,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "items": {
+                      "additionalProperties": true,
+                      "type": "object"
+                    },
+                    "type": "array"
+                  },
+                  "title": "Response List Semantic Proposals Api Semantic Model Proposals Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Semantic Proposals",
+        "tags": [
+          "semantic-governance"
+        ]
+      },
+      "post": {
+        "description": "Submit an existing or new database-scoped object for human review.",
+        "operationId": "create_semantic_proposal_api_semantic_model_proposals_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SemanticProposalCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "additionalProperties": true,
+                    "type": "object"
+                  },
+                  "title": "Response Create Semantic Proposal Api Semantic Model Proposals Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Semantic Proposal",
+        "tags": [
+          "semantic-governance"
+        ]
+      }
+    },
+    "/api/semantic-model/proposals/{proposal_id}": {
+      "get": {
+        "description": "Read one proposal with its immutable decision history.",
+        "operationId": "get_semantic_proposal_api_semantic_model_proposals__proposal_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "proposal_id",
+            "required": true,
+            "schema": {
+              "title": "Proposal Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "database_name",
+            "required": true,
+            "schema": {
+              "minLength": 1,
+              "title": "Database Name",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "additionalProperties": true,
+                    "type": "object"
+                  },
+                  "title": "Response Get Semantic Proposal Api Semantic Model Proposals  Proposal Id  Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Semantic Proposal",
+        "tags": [
+          "semantic-governance"
+        ]
+      }
+    },
+    "/api/semantic-model/proposals/{proposal_id}/review": {
+      "post": {
+        "description": "Approve or reject a proposal and persist the reviewer and evidence.",
+        "operationId": "review_semantic_proposal_api_semantic_model_proposals__proposal_id__review_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "proposal_id",
+            "required": true,
+            "schema": {
+              "title": "Proposal Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SemanticProposalReview"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "additionalProperties": true,
+                    "type": "object"
+                  },
+                  "title": "Response Review Semantic Proposal Api Semantic Model Proposals  Proposal Id  Review Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Review Semantic Proposal",
+        "tags": [
+          "semantic-governance"
         ]
       }
     },
