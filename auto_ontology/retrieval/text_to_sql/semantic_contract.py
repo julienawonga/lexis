@@ -18,6 +18,7 @@ failure as "no block", exactly like the Terms-definitions lookup.
 
 from __future__ import annotations
 
+import logging
 import os
 from dataclasses import dataclass
 from typing import Any
@@ -33,9 +34,18 @@ from auto_ontology.semantic.contract import (
 )
 
 BLOCK_HEADER = "Certified semantic definitions"
+# Single marker shared by render_block and the "already present" guard so the
+# two can never drift apart.
+BLOCK_MARKER = f"{BLOCK_HEADER} (human-reviewed; ids in parentheses):"
 
 _BUDGET_CHARS_ENV = "SEMANTIC_CONTRACT_BUDGET_CHARS"
 _DEFAULT_BUDGET_CHARS = 2000
+
+logger = logging.getLogger(__name__)
+
+
+class UnknownDatabaseError(ValueError):
+    """The catalog has no database under the requested name."""
 
 
 @dataclass(frozen=True)
@@ -47,12 +57,32 @@ class SemanticContractSettings:
 
     @classmethod
     def from_env(cls) -> "SemanticContractSettings":
+        raw = os.environ.get(_BUDGET_CHARS_ENV)
+        budget = _DEFAULT_BUDGET_CHARS
+        if raw:
+            try:
+                parsed = int(raw)
+            except ValueError:
+                logger.warning(
+                    "%s=%r is not an integer; using the default of %d",
+                    _BUDGET_CHARS_ENV,
+                    raw,
+                    _DEFAULT_BUDGET_CHARS,
+                )
+            else:
+                if parsed <= 0:
+                    logger.warning(
+                        "%s=%r is not a positive integer; using the default of %d",
+                        _BUDGET_CHARS_ENV,
+                        raw,
+                        _DEFAULT_BUDGET_CHARS,
+                    )
+                else:
+                    budget = parsed
         return cls(
             enabled=os.environ.get("SEMANTIC_CONTRACT_BLOCK", "").strip()
             in {"1", "true", "yes", "on"},
-            budget_chars=int(
-                os.environ.get(_BUDGET_CHARS_ENV) or _DEFAULT_BUDGET_CHARS
-            ),
+            budget_chars=budget,
         )
 
 
@@ -119,7 +149,7 @@ def render_block(
     objects: tuple[SemanticObject, ...], budget_chars: int
 ) -> tuple[str, tuple[SemanticObject, ...]]:
     """Render lines until the budget; returns the block and what fit."""
-    header = f"{BLOCK_HEADER} (human-reviewed; ids in parentheses):"
+    header = BLOCK_MARKER
     lines: list[str] = []
     rendered: list[SemanticObject] = []
     used = len(header) + 1
@@ -129,7 +159,8 @@ def render_block(
         except ValueError:
             continue
         if used + len(line) + 1 > budget_chars:
-            break
+            # Skip lines that do not fit; a later, shorter one still can.
+            continue
         lines.append(line)
         rendered.append(obj)
         used += len(line) + 1
@@ -146,7 +177,7 @@ def _default_load_document(database_name: str) -> SemanticModelDocument:
 
     database_id = model_dal.fetch_database_id_by_name(database_name)
     if database_id is None:
-        raise ValueError(f"Catalog database {database_name!r} was not found")
+        raise UnknownDatabaseError(f"Catalog database {database_name!r} was not found")
     return service.export_semantic_contract(ExportRequest(databases=[database_id]))
 
 
@@ -167,7 +198,7 @@ def build_semantic_contract_block(
     load = load_document or _default_load_document
     try:
         document = load(database_name)
-    except ValueError:
+    except UnknownDatabaseError:
         # Unknown database: no block, not an error — same contract as Terms.
         return None
     objects = eligible_objects(document)

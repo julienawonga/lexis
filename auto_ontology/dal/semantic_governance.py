@@ -5,6 +5,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from typing import Any
 
 from sqlalchemy import func, insert, select, update
@@ -12,6 +13,22 @@ from sqlalchemy.exc import IntegrityError
 
 from auto_ontology.dal import schema as s
 from auto_ontology.dal.session import store, write_transaction
+
+
+_IN_REVIEW_INDEX = "uq_semantic_proposal_in_review"
+
+
+def _violates_in_review_index(exc: IntegrityError) -> bool:
+    """True only for the one-open-proposal-per-object unique index.
+
+    Other integrity failures (CHECK constraints, a bad foreign key) are real
+    errors and must not be reported as a review conflict.
+    """
+    diag = getattr(exc.orig, "diag", None)
+    constraint = getattr(diag, "constraint_name", None)
+    if constraint is not None:
+        return constraint == _IN_REVIEW_INDEX
+    return _IN_REVIEW_INDEX in str(exc.orig)
 
 
 class ProposalConflict(ValueError):
@@ -115,6 +132,8 @@ def create_proposal(
                 comment=comment,
             )
     except IntegrityError as exc:
+        if not _violates_in_review_index(exc):
+            raise
         raise ProposalConflict(
             "An object already has a proposal awaiting review"
         ) from exc
@@ -190,8 +209,15 @@ def review_proposal(
     document: dict[str, Any],
     evidence: list[dict[str, Any]],
     comment: str,
+    verify: Callable[[dict[str, Any]], None] | None = None,
 ) -> dict[str, Any] | None:
-    """Record a review decision with optimistic version checking."""
+    """Record a review decision with optimistic version checking.
+
+    ``verify`` runs inside the transaction, after the proposal row is locked
+    and still in review, so a check such as "the catalog source has not
+    drifted" is made against the same state the decision is committed with.
+    It raises (typically ``ProposalConflict``) to refuse the decision.
+    """
     with write_transaction():
         rows = store().query_read(
             select(s.semantic_proposal)
@@ -206,6 +232,8 @@ def review_proposal(
         proposal = dict(rows[0])
         if proposal["state"] != "in_review":
             raise ProposalConflict("Proposal is no longer awaiting review")
+        if verify is not None:
+            verify(proposal)
 
         current_version = latest_approved_version(model_id, proposal["object_id"])
         if current_version != proposal["base_version"]:

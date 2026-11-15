@@ -475,14 +475,22 @@ def semantic_object_fingerprint(obj: SemanticObject) -> str:
     return hashlib.sha256(payload).hexdigest()
 
 
-def export_semantic_contract(request: ExportRequest) -> SemanticModelDocument:
+def export_semantic_contract(
+    request: ExportRequest,
+    *,
+    base: SemanticModelDocument | None = None,
+) -> SemanticModelDocument:
     """Project catalog meaning, then overlay the latest reviewed assertions.
 
     Governed objects retain their exact reviewed snapshot. If the legacy
     catalog row used as their source changes afterward, the object remains
     visible but its status drops to ``needs_revalidation``.
+
+    ``base`` is a catalog projection the caller already built for the same
+    request; passing it avoids projecting the whole catalog a second time.
     """
-    base = export_semantic_contract_base(request)
+    if base is None:
+        base = export_semantic_contract_base(request)
     legacy_by_id = {obj.id: obj for obj in base.objects}
     current = list(base.objects)
     adapter = TypeAdapter(SemanticObject)
@@ -513,6 +521,26 @@ def export_semantic_contract(request: ExportRequest) -> SemanticModelDocument:
                 )
                 continue
         pending.append((row, obj))
+
+    # Common case: every approved object fits together. Place them all and
+    # validate the document once, instead of re-validating the whole model per
+    # object. Only when that fails do we fall back to the slower pass-by-pass
+    # resolution below, which drops just the objects that cannot be placed.
+    if pending:
+        position = {existing.id: index for index, existing in enumerate(current)}
+        candidate = list(current)
+        for _, obj in pending:
+            if obj.id in position:
+                candidate[position[obj.id]] = obj
+            else:
+                position[obj.id] = len(candidate)
+                candidate.append(obj)
+        try:
+            return SemanticModelDocument(
+                model_id=base.model_id, objects=tuple(candidate)
+            )
+        except ValidationError:
+            pass
 
     # New objects can depend on other approved objects. Resolve in repeated
     # passes, so row order never decides whether a valid model can be exported.

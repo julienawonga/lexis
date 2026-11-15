@@ -6,6 +6,11 @@
 
 from __future__ import annotations
 
+import logging
+
+import pytest
+from pydantic import BaseModel, ValidationError
+
 from auto_ontology.retrieval.text_to_sql import semantic_contract as sc
 from auto_ontology.semantic.contract import (
     EvidenceReference,
@@ -48,6 +53,18 @@ def _concept(
 
 def _document(*objects: SemanticConcept) -> SemanticModelDocument:
     return SemanticModelDocument(model_id="db-1", objects=objects)
+
+
+class _TinyModel(BaseModel):
+    count: int
+
+
+def _validation_error() -> ValidationError:
+    try:
+        _TinyModel(count="not-an-int")  # type: ignore[arg-type]
+    except ValidationError as exc:
+        return exc
+    raise AssertionError("expected a ValidationError")
 
 
 def test_only_certified_concepts_attributes_relations_are_eligible() -> None:
@@ -122,6 +139,25 @@ def test_render_block_carries_ids_names_bindings_and_direction() -> None:
     assert [o.id for o in rendered] == ["a1", "c1", "c2", "r1"]
 
 
+def test_render_block_skips_a_line_that_does_not_fit_and_keeps_later_ones() -> None:
+    long_one = _concept("c1", definition="x" * 500)
+    short_two = _concept("c2", definition="Short one.")
+    short_three = _concept("c3", definition="Short two.")
+    objects = sc.eligible_objects(_document(long_one, short_two, short_three))
+    short_block, _ = sc.render_block((short_two,), 10_000)
+    short_line = short_block.split("\n")[-1]
+    budget = len(sc.BLOCK_MARKER) + 1 + 2 * (len(short_line) + 1) + 5
+
+    block, rendered = sc.render_block(objects, budget)
+
+    assert "x" * 500 not in block
+    assert [o.id for o in rendered] == ["c2", "c3"]
+    lines = block.split("\n")[1:]
+    assert len(lines) == 2
+    assert "c2" in lines[0]
+    assert "c3" in lines[1]
+
+
 def test_render_block_stops_at_the_budget() -> None:
     objects = sc.eligible_objects(_document(_concept("c1"), _concept("c2")))
     one_line = len(sc.render_block(objects[:1], 2000)[0])
@@ -154,14 +190,60 @@ def test_disabled_flag_or_blank_database_yields_none() -> None:
     assert sc.build_semantic_contract_block(None, _settings(True)) is None
 
 
-def test_unknown_database_yields_none() -> None:
+def test_unknown_database_error_yields_none() -> None:
     def unknown(database_name: str) -> SemanticModelDocument:
-        raise ValueError("Catalog database 'nope' was not found")
+        raise sc.UnknownDatabaseError("Catalog database 'nope' was not found")
 
     assert (
         sc.build_semantic_contract_block("nope", _settings(True), load_document=unknown)
         is None
     )
+
+
+def test_other_value_errors_propagate() -> None:
+    def broken(database_name: str) -> SemanticModelDocument:
+        raise ValueError("unexpected value error")
+
+    with pytest.raises(ValueError, match="unexpected value error"):
+        sc.build_semantic_contract_block("db", _settings(True), load_document=broken)
+
+
+def test_validation_errors_propagate() -> None:
+    def broken(database_name: str) -> SemanticModelDocument:
+        raise _validation_error()
+
+    with pytest.raises(ValidationError):
+        sc.build_semantic_contract_block("db", _settings(True), load_document=broken)
+
+
+@pytest.mark.parametrize(
+    ("raw", "expected"),
+    [
+        pytest.param("2k", 2000, id="non-integer"),
+        pytest.param("0", 2000, id="zero"),
+        pytest.param("-5", 2000, id="negative"),
+        pytest.param("", 2000, id="empty"),
+        pytest.param("500", 500, id="valid"),
+    ],
+)
+def test_from_env_never_raises_on_a_bad_budget(
+    monkeypatch: pytest.MonkeyPatch, raw: str, expected: int
+) -> None:
+    monkeypatch.setenv("SEMANTIC_CONTRACT_BLOCK", "1")
+    monkeypatch.setenv("SEMANTIC_CONTRACT_BUDGET_CHARS", raw)
+    settings = sc.SemanticContractSettings.from_env()
+    assert settings.enabled is True
+    assert settings.budget_chars == expected
+
+
+def test_from_env_warns_on_an_invalid_budget(
+    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    monkeypatch.setenv("SEMANTIC_CONTRACT_BUDGET_CHARS", "2k")
+    with caplog.at_level(logging.WARNING, logger=sc.__name__):
+        settings = sc.SemanticContractSettings.from_env()
+    assert settings.budget_chars == 2000
+    assert any(r.levelno == logging.WARNING for r in caplog.records)
 
 
 def test_block_builds_from_the_document_loader() -> None:

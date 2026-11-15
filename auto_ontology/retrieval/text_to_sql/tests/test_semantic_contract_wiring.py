@@ -9,6 +9,7 @@ from __future__ import annotations
 import logging
 
 import pytest
+from pydantic import BaseModel, ValidationError
 
 from auto_ontology.retrieval.text_to_sql.agents import candidates_retrieval
 from auto_ontology.retrieval.text_to_sql.agents.candidates_retrieval import (
@@ -72,13 +73,12 @@ def test_enabled_block_merges_after_the_evidence(
     monkeypatch: pytest.MonkeyPatch, enabled: None
 ) -> None:
     document = _document()
+    block, _ = sc.render_block(sc.eligible_objects(document), 2000)
     monkeypatch.setattr(
         candidates_retrieval,
         "build_semantic_contract_block",
         lambda db, settings: sc.SemanticContractBlock(
-            sc.BLOCK_HEADER + " (human-reviewed; ids in parentheses):\n- concept c1",
-            sc.eligible_objects(document),
-            80,
+            block, sc.eligible_objects(document), len(block)
         ),
     )
     agent = _agent()
@@ -87,7 +87,7 @@ def test_enabled_block_merges_after_the_evidence(
         "evidence text", "chinook", path_state=path_state
     )
     assert merged is not None
-    assert merged.startswith("evidence text\n\n" + sc.BLOCK_HEADER)
+    assert merged.startswith("evidence text\n\n" + sc.BLOCK_MARKER)
     assert path_state["offered_semantic_objects"] == [
         {"id": "c1", "kind": "concept", "status": "certified"}
     ]
@@ -96,14 +96,41 @@ def test_enabled_block_merges_after_the_evidence(
 def test_block_already_present_is_not_duplicated(
     monkeypatch: pytest.MonkeyPatch, enabled: None
 ) -> None:
+    document = _document()
+    block, rendered = sc.render_block(sc.eligible_objects(document), 2000)
     monkeypatch.setattr(
         candidates_retrieval,
         "build_semantic_contract_block",
-        lambda db, settings: sc.SemanticContractBlock("x", (), 1),
+        lambda db, settings: sc.SemanticContractBlock(block, rendered, len(block)),
     )
     agent = _agent()
-    evidence = "evidence\n\n" + sc.BLOCK_HEADER + ":\n- concept c1"
+    # Evidence carries a block that really came out of render_block above.
+    evidence = "evidence\n\n" + block
     assert agent._with_semantic_contract(evidence, "chinook") is None
+
+
+def test_node_logs_a_warning_when_the_block_build_raises(
+    monkeypatch: pytest.MonkeyPatch, enabled: None, caplog: pytest.LogCaptureFixture
+) -> None:
+    class _TinyModel(BaseModel):
+        count: int
+
+    try:
+        _TinyModel(count="not-an-int")  # type: ignore[arg-type]
+    except ValidationError as exc:
+        validation_error = exc
+    else:
+        raise AssertionError("expected a ValidationError")
+
+    def broken(database_name, settings):
+        raise validation_error
+
+    monkeypatch.setattr(candidates_retrieval, "build_semantic_contract_block", broken)
+    agent = _agent()
+    with caplog.at_level(logging.WARNING, logger="test-semantic-contract"):
+        merged = agent._with_semantic_contract("evidence", "chinook")
+    assert merged is None
+    assert any(r.exc_info for r in caplog.records)
 
 
 def test_loader_failure_leaves_the_evidence_alone(

@@ -59,7 +59,7 @@ from auto_ontology.retrieval.text_to_sql.term_definitions import (
     merge_evidence,
 )
 from auto_ontology.retrieval.text_to_sql.semantic_contract import (
-    BLOCK_HEADER as SEMANTIC_BLOCK_HEADER,
+    BLOCK_MARKER as SEMANTIC_BLOCK_HEADER,
     SemanticContractSettings,
     build_semantic_contract_block,
 )
@@ -807,7 +807,7 @@ class CandidateRetrievalAgent(BaseAgent):
         settings = SemanticContractSettings.from_env()
         if not settings.enabled:
             return None
-        if f"{SEMANTIC_BLOCK_HEADER}:\n" in evidence:
+        if f"{SEMANTIC_BLOCK_HEADER}\n" in evidence:
             return None
         try:
             found = build_semantic_contract_block(target_db, settings)

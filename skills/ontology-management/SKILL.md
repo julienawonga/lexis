@@ -56,9 +56,12 @@ the deployment or semantic layer is not ready.
 MCP is read-only and Lexis has no generic result-row writeback endpoint. Direct
 legacy certification flags and model import are not review workflows. The
 semantic proposal workflow publishes reviewed snapshots to
-`GET /api/semantic-model`; it does not yet rewrite legacy Term rows or change
-the text-to-SQL planner. Follow the publication gates below and fail closed
-when exact readback is unavailable.
+`GET /api/semantic-model`. Approved, certified concepts, attributes and
+relations reach the text-to-SQL planner evidence only when
+`SEMANTIC_CONTRACT_BLOCK` is enabled; it is off by default until the evaluation
+harness validates it. Stale (`needs_revalidation`) objects and metrics never
+reach the planner, and legacy Term rows are not rewritten. Follow the
+publication gates below and fail closed when exact readback is unavailable.
 
 ## Auth
 

@@ -191,3 +191,88 @@ def test_approval_rejects_missing_human_review_reference() -> None:
             comment="Reviewed.",
             reviewer_id="reviewer-2",
         )
+
+
+def _approval_fixture():
+    legacy = _concept()
+    current = SemanticModelDocument(model_id="lexis:db-1", objects=(legacy,))
+    proposed = legacy.model_dump(mode="json")
+    proposed.update(
+        status=KnowledgeStatus.IN_REVIEW.value,
+        provenance=KnowledgeProvenance(
+            actor_type="user",
+            actor_id="submitter-1",
+            activity="semantic_proposal",
+        ).model_dump(mode="json"),
+    )
+    proposal = {
+        "id": "proposal-1",
+        "object_id": legacy.id,
+        "proposed_by": "submitter-1",
+        "state": "in_review",
+        "base_fingerprint": service.model_service.semantic_object_fingerprint(legacy),
+        "proposed_document": proposed,
+    }
+    evidence = (EvidenceReference(kind="human_review", reference="review-1"),)
+    return legacy, current, proposal, evidence
+
+
+def _review(decision: str, current: SemanticModelDocument):
+    _, _, proposal, evidence = _approval_fixture()
+    with (
+        patch.object(service.governance_dal, "fetch_proposal", return_value=proposal),
+        patch.object(
+            service.model_service,
+            "export_semantic_contract_base",
+            return_value=current,
+        ),
+        patch.object(
+            service.model_service, "export_semantic_contract", return_value=current
+        ),
+        patch.object(
+            service.governance_dal,
+            "review_proposal",
+            return_value={"id": "proposal-1"},
+        ) as review,
+    ):
+        service.review_proposal(
+            proposal_id="proposal-1",
+            database_id="db-1",
+            decision=decision,
+            evidence=evidence,
+            comment="Reviewed.",
+            reviewer_id="reviewer-2",
+        )
+    return review.call_args.kwargs["verify"], proposal
+
+
+def test_source_drift_is_checked_inside_the_dal_transaction() -> None:
+    """The fingerprint check is handed to the DAL, not made before it."""
+    legacy, current, _, _ = _approval_fixture()
+    verify, proposal = _review("approve", current)
+    assert callable(verify)
+
+    with patch.object(
+        service.model_service, "export_semantic_contract_base", return_value=current
+    ):
+        verify(proposal)
+
+    drifted = SemanticModelDocument(
+        model_id="lexis:db-1",
+        objects=(legacy.model_copy(update={"definition": "Catalog changed."}),),
+    )
+    with (
+        patch.object(
+            service.model_service,
+            "export_semantic_contract_base",
+            return_value=drifted,
+        ),
+        pytest.raises(service.governance_dal.ProposalConflict, match="catalog"),
+    ):
+        verify(proposal)
+
+
+def test_rejection_does_not_check_the_source() -> None:
+    _, current, _, _ = _approval_fixture()
+    verify, _ = _review("reject", current)
+    assert verify is None

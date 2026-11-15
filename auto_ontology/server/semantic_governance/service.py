@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import json
 from datetime import UTC, datetime
+from collections.abc import Callable
 from typing import Any, Literal
 
 from pydantic import TypeAdapter
@@ -91,8 +92,8 @@ def create_proposal(
     changes need a separately governed catalog operation.
     """
     request = ExportRequest(databases=[database_id])
-    current = model_service.export_semantic_contract(request)
     baseline = model_service.export_semantic_contract_base(request)
+    current = model_service.export_semantic_contract(request, base=baseline)
     object_id = str(object_document.get("id") or "")
     kind = str(object_document.get("kind") or "")
     current_by_id = {obj.id: obj for obj in current.objects}
@@ -194,24 +195,31 @@ def review_proposal(
         raise ValueError("Approval requires a human_review evidence reference")
 
     proposal_object = _OBJECT_ADAPTER.validate_python(proposal["proposed_document"])
+    verify: Callable[[dict[str, Any]], None] | None = None
     if decision == "approve":
         request = ExportRequest(databases=[database_id])
-        baseline = model_service.export_semantic_contract_base(request)
-        baseline_object = next(
-            (obj for obj in baseline.objects if obj.id == proposal["object_id"]),
-            None,
-        )
-        fingerprint = (
-            model_service.semantic_object_fingerprint(baseline_object)
-            if baseline_object is not None
-            else "new"
-        )
-        if fingerprint != proposal["base_fingerprint"]:
-            raise governance_dal.ProposalConflict(
-                "The catalog meaning changed while this proposal was under review; "
-                "submit a new proposal against the latest model"
-            )
 
+        def _verify_source(locked: dict[str, Any]) -> None:
+            # Runs inside the DAL transaction, once the proposal row is locked
+            # and still in review, so the source is checked against the state
+            # the approval is committed with, not an earlier read.
+            baseline = model_service.export_semantic_contract_base(request)
+            baseline_object = next(
+                (obj for obj in baseline.objects if obj.id == locked["object_id"]),
+                None,
+            )
+            fingerprint = (
+                model_service.semantic_object_fingerprint(baseline_object)
+                if baseline_object is not None
+                else "new"
+            )
+            if fingerprint != locked["base_fingerprint"]:
+                raise governance_dal.ProposalConflict(
+                    "The catalog meaning changed while this proposal was under "
+                    "review; submit a new proposal against the latest model"
+                )
+
+        verify = _verify_source
         existing_evidence = proposal_object.provenance.evidence
         provenance = KnowledgeProvenance(
             actor_type="user",
@@ -240,6 +248,7 @@ def review_proposal(
         document=document,
         evidence=[item.model_dump(mode="json") for item in state_evidence],
         comment=comment,
+        verify=verify,
     )
 
 
