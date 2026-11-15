@@ -15,6 +15,7 @@ import type {
 	ClarificationEvent,
 	ClarificationReply,
 	GraphStep,
+	KnowledgeTraceEntry,
 	ResultEvent,
 	StepEvent,
 } from '@/types/chat';
@@ -110,7 +111,15 @@ export const useChat = () => {
 	// stays correct even if this component unmounts mid-stream), so there is
 	// no DB write to do here.
 	const appendAssistantMessage = useCallback(
-		(content: string, extras?: { sql?: string; sqlResponse?: string; thoughts?: string }) => {
+		(
+			content: string,
+			extras?: {
+				sql?: string;
+				sqlResponse?: string;
+				thoughts?: string;
+				knowledgeTrace?: KnowledgeTraceEntry[];
+			},
+		) => {
 			const assistantMsg: ChatMessage = {
 				id: uid(),
 				role: 'assistant',
@@ -118,6 +127,7 @@ export const useChat = () => {
 				sql: extras?.sql,
 				sqlResponse: extras?.sqlResponse,
 				thoughts: extras?.thoughts,
+				knowledgeTrace: extras?.knowledgeTrace,
 				timestamp: Date.now(),
 			};
 			setMessages((prev) => [...prev, assistantMsg]);
@@ -131,7 +141,12 @@ export const useChat = () => {
 	const appendSqlAnswerMessage = useCallback(
 		(answer: ResultEvent['answer']) => {
 			const msg = buildSqlAnswerMessage(answer);
-			if (msg) appendAssistantMessage(msg.content, { sql: msg.sql, thoughts: msg.thoughts });
+			if (msg)
+				appendAssistantMessage(msg.content, {
+					sql: msg.sql,
+					thoughts: msg.thoughts,
+					knowledgeTrace: msg.knowledgeTrace,
+				});
 		},
 		[appendAssistantMessage],
 	);

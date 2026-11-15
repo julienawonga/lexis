@@ -16,6 +16,7 @@
 // regardless of whether any browser tab stuck around to watch.
 
 import { stringifySqlResponse } from '@/lib/sqlResponse';
+import type { KnowledgeTraceEntry } from '@/types/chat';
 
 export const GENERIC_ANSWER_ERROR =
 	'Something went wrong. Please try again, and if the issue persists, contact our support';
@@ -26,6 +27,7 @@ export type AgentAnswer = {
 	sql_code?: string | null;
 	sql_response_from_db?: unknown;
 	thoughts?: string | null;
+	knowledge_trace?: KnowledgeTraceEntry[] | null;
 };
 
 export type AnswerMessage = {
@@ -33,6 +35,7 @@ export type AnswerMessage = {
 	sql?: string;
 	sqlResponse?: string;
 	thoughts?: string;
+	knowledgeTrace?: KnowledgeTraceEntry[];
 };
 
 const hasChartFence = (content: string): boolean =>
@@ -59,11 +62,18 @@ export const isResultMessage = (message: {
 
 /** Message 1 — prose + SQL, ready the moment the agent's answer lands. */
 export const buildSqlAnswerMessage = (answer: AgentAnswer): AnswerMessage | null => {
-	const { response, sql_code: sqlCode, thoughts } = answer;
+	const { response, sql_code: sqlCode, thoughts, knowledge_trace: knowledgeTrace } = answer;
 	const prose = stripChartFences(response ?? '');
 
 	if (prose || sqlCode) {
-		return { content: prose, sql: sqlCode ?? undefined, thoughts: thoughts ?? undefined };
+		const trace =
+			Array.isArray(knowledgeTrace) && knowledgeTrace.length > 0 ? knowledgeTrace : undefined;
+		return {
+			content: prose,
+			sql: sqlCode ?? undefined,
+			thoughts: thoughts ?? undefined,
+			knowledgeTrace: trace,
+		};
 	}
 
 	// Nothing to say and no executed result for Message 2 to fall back on —
