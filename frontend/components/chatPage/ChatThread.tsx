@@ -3,7 +3,7 @@
 
 'use client';
 
-import { useCallback } from 'react';
+import { useCallback, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
 	ActionBarPrimitive,
@@ -22,6 +22,7 @@ import { Icon, IconName } from '@/common/icons';
 import { SkeletonBlock } from '@/common/Skeleton';
 import { chatDisplayQueries } from '@/lib/queries/chatDisplay';
 import { chatSuggestionQueries } from '@/lib/queries/chatSuggestions';
+import { groupAnswerTurns } from '@/lib/answerTurns';
 import { glassFocus, glassHover, glassPrimaryButton, glassSurface } from './glass';
 import { MessageBubble } from './MessageBubble';
 import { ThinkingMessage } from './ThinkingMessage';
@@ -186,6 +187,8 @@ export const ChatThread = ({
 	onSend,
 	onStop,
 }: ChatThreadProps) => {
+	const turns = useMemo(() => groupAnswerTurns(messages), [messages]);
+
 	// Collapsed while loading or if the read fails: the setting's default.
 	const { data: detailsExpandedByDefault = false } = useQuery(
 		chatDisplayQueries.detailsExpanded(),
@@ -205,7 +208,7 @@ export const ChatThread = ({
 	const onCancel = useCallback(async () => onStop(), [onStop]);
 
 	const runtime = useExternalStoreRuntime<ChatMessage>({
-		messages,
+		messages: turns,
 		isRunning: isLoading,
 		convertMessage,
 		onNew,
@@ -260,7 +263,7 @@ export const ChatThread = ({
 													}
 													isLatest={
 														chatMessage.id ===
-														messages[messages.length - 1]?.id
+														turns[turns.length - 1]?.id
 													}
 													isRunning={isLoading}
 													onAnswerClarification={onSend}

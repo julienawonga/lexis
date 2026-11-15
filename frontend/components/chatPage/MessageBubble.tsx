@@ -20,7 +20,7 @@ import {
 import { ClarificationCard } from './ClarificationCard';
 import { DynamicTable } from './DynamicTable';
 import { FormattedContent } from './FormattedContent';
-import { KnowledgeTracePanel } from './KnowledgeTracePanel';
+import { AnswerPath } from './AnswerPath';
 import { glassFocus, glassSurface } from './glass';
 
 type SingleCellResult = { column: string; value: string };
@@ -139,6 +139,51 @@ export const MessageBubble = ({
 		);
 	}
 
+	if (!isUser && message.sql) {
+		const resultSqlResponse = message.result?.sqlResponse ?? message.sqlResponse;
+		const resultParsedTable = parseSqlResponse(resultSqlResponse);
+		const resultSingleCell = (() => {
+			if (!resultParsedTable) return null;
+			if (resultParsedTable.rows.length !== 1 || resultParsedTable.columns.length !== 1)
+				return null;
+			const [column] = resultParsedTable.columns;
+			return { column, value: resultParsedTable.rows[0][column] ?? '' };
+		})();
+
+		const hasChartResult = Boolean(
+			message.result?.content && hasEmbeddedChart(message.result.content),
+		);
+		const hasTableResult = Boolean(resultSqlResponse);
+
+		return (
+			<div className="flex justify-start">
+				<div className="w-full text-heading dark:text-zinc-100">
+					{hasChartResult && (
+						<div className="mb-3">
+							<FormattedContent
+								content={message.result!.content}
+								className="text-sm leading-relaxed"
+							/>
+						</div>
+					)}
+					{!hasChartResult && hasTableResult && (
+						<div className="mb-3">
+							<QueryResultsSection
+								sqlResponse={resultSqlResponse}
+								parsedTable={resultParsedTable}
+								singleCell={resultSingleCell}
+							/>
+						</div>
+					)}
+					<AnswerPath message={message} defaultOpen={detailsExpandedByDefault} />
+					<time className="mt-1.5 block text-right text-[10px] opacity-50">
+						{formatDate(message.timestamp, 'HH:mm')}
+					</time>
+				</div>
+			</div>
+		);
+	}
+
 	// Chat-app layout: the question sits in a bubble on the right, the answer
 	// reads as plain text across the whole column.
 	return (
@@ -183,13 +228,6 @@ export const MessageBubble = ({
 									: 'SQL'
 							}
 							className={showText ? 'mt-3' : undefined}
-						/>
-					)}
-
-					{message.knowledgeTrace && message.knowledgeTrace.length > 0 && (
-						<KnowledgeTracePanel
-							entries={message.knowledgeTrace}
-							className={showText || showSql ? 'mt-3' : undefined}
 						/>
 					)}
 				</div>
