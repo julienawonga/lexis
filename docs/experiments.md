@@ -6,7 +6,7 @@ SPDX-License-Identifier: Apache-2.0
 # Experiments log
 
 A chronological lab notebook of every measurement and key engineering finding on
-Lexis since the fork was cloned (2026-11-09) up to 2026-11-12. It is written so a
+Lexis since the fork was cloned (2026-11-09) up to 2026-11-15. It is written so a
 maintainer or reviewer can decide how far to trust each claim and, where
 possible, repeat it.
 
@@ -535,6 +535,73 @@ to interpret the entries is repeated.
   user header, so the 403 permission path was not exercised, and nothing went
   through the web app. `REAL-E2E`, manual.
 
+### E22 - "Who is our best customer?" ran in a loop for up to 300 s (2026-11-12 ~19:00-19:42)
+
+- **Question.** Why did one Chinook question sometimes take 45 to 303 s, and does
+  the fix remove it?
+- **Finding.** Evidence grounding saw only the `Customer` table, so its wording
+  ("allowed mapping targets") read as forbidding `Invoice` columns. The SQL
+  validator and the reconstruction step then alternated between two answers
+  (A, B, A) until the 300 s cut.
+- **Fix.** PR #52: the evidence wording says it does not forbid other schema
+  columns, discovered tables are declared legitimate, and an oscillation guard
+  stops at the third rejection and returns the best SQL with a caveat note.
+- **Result (maintainer's working notes, reports in `HomeLab/lexis-evals/deadlock/`).**
+  The question asked 10 times: `main` took 45 to 303 s (6 slow, 1 cut at 300 s,
+  9 of 10 correct); with the fix 49 to 62 s (0 slow, 10 of 10 correct, the same
+  customer and total). The oscillation guard never fired, so the wording change
+  alone removed the loop. Chinook 20x3 with the fix: 60/60. Pagila 13x3: 39/39.
+- **Limits.** Ten runs of one question. Pagila is a development set. Whether the
+  new wording changes the 180 LiveSQLBench questions (where the evidence wording
+  was the stated risk) was planned and is **not recorded here**.
+  `REAL-E2E`, manual.
+
+### E23 - Grouping Terms into business domains with a real model (2026-11-14)
+
+- **Question.** Does an LLM grouping of a database's Terms give domains a person
+  would accept, on databases of different sizes?
+- **Setup.** The domain map feature (PR #63): Terms grouped into named domains by
+  the gateway's chat model, with a Louvain-community fallback. Run by hand on four
+  databases of the local stack.
+- **Result.** Chinook 2 domains, Pagila 4, a cross-database view 6, a 95-Term
+  database 6. The groups read as sensible to the person running it. **A first
+  attempt on the 95-Term database failed:** the model's reply was empty, because
+  `max_tokens` of 4000 was consumed by the model's reasoning before any output;
+  raising it to 16000 fixed it.
+- **Limits.** **Not scored.** There is no reference grouping and nobody has
+  graded the business names, which is a human judgement. Four databases, one run
+  each. It is a presentation feature: it does not change SQL generation, so no
+  accuracy claim follows. `REAL-E2E`, manual.
+
+### E24 - Semantic contract: independent review, and a measurement that was stopped (2026-11-15)
+
+- **Question.** Is the semantic contract (PR #62, written by two coding agents)
+  correct, and does letting certified objects reach the planner change accuracy?
+- **Review.** A line-by-line review of the branch found 10 findings. Two were
+  confirmed by reading the code: a guard meant to prevent a duplicated prompt
+  block compared against a header string the renderer never emits, and its unit
+  test built its input by hand with the same wrong string, so it passed while the
+  behaviour was broken; and a malformed environment value crashed every chat
+  question. The others: real errors swallowed as "unknown database", one long
+  definition emptying the whole block, an approval check made outside its
+  transaction, repeated full catalog projections, a misleading conflict message,
+  a stale skill text, an unrelated auth change. All were fixed with tests that
+  fail on the old code (10 of the new tests fail on it).
+- **CI.** The pull request was red for three reasons, all from files generated on
+  Windows: a DAL signature snapshot holding memory addresses, a public OpenAPI
+  spec holding Windows paths and carriage returns, and an unformatted migration.
+  Generated artefacts are now produced on Linux only.
+- **Measurement: no result.** The planned gate (Chinook 20x3, flag off then flag
+  on, same frozen cases) was started and **stopped at 22 of 60 questions of the
+  flag-off run**. Docker builds were running on the same machine and several
+  questions hit the 300 s limit, so those partial numbers were contaminated and
+  are not reported. The partial log is kept outside the repository. The run is to
+  be repeated on an idle machine; until it gives an `ACCEPT`, the flag stays off
+  and the branch stays a draft.
+- **Limits.** The fixes to the transactional check and the error mapping are
+  tested with fakes (`FAKES`); a real-Postgres run of the governance lifecycle was
+  not repeated after them. Nothing is claimed about accuracy.
+
 ### Built but never run
 
 PR #44 (`bench split/run/score`) is tested with synthetic cases and fakes only;
@@ -616,11 +683,15 @@ held-out value cases (`chinook_values.json`) and the clarification flow (PRs #26
 | E20 | 11-12 | Chinook FR 20x3 | reworked #49 | 20/20, 59/60 | held-out | REAL-E2E |
 | E20 | 11-12 | Chinook EN 20x1 | reworked #49 | 18/20 | held-out | REAL-E2E |
 | E20 | 11-12 | Chinook EN 20x3 | reworked #49 | 20/20, 58/60 | held-out | REAL-E2E |
+| E22 | 11-12 | Chinook, one question x10 | `main` before #52 | 9/10 correct, 6 slow, 1 cut at 300 s | development | REAL-E2E |
+| E22 | 11-12 | same question x10 | with #52 | 10/10 correct, 0 slow (49-62 s) | development | REAL-E2E |
+| E22 | 11-12 | Chinook 20x3, Pagila 13x3 | with #52 | 60/60, 39/39 | held-out / development | REAL-E2E |
 
 Engineering findings without a score: E02 (empty index), E04 (FK extraction), E05
 (value probes and privacy incident), E06 (VIP term), E07 (learned test question),
 E10 (connection exhaustion), E11 (host crash), E12 (429 storm), E17 (startup
-re-ingestion), E18 (trace), E19 (flaky test), E21 (Terms API).
+re-ingestion), E18 (trace), E19 (flaky test), E21 (Terms API), E23 (domain grouping, not scored),
+E24 (semantic contract review; the measurement was stopped and has no result).
 
 ## 5. What is NOT yet measured
 
@@ -644,6 +715,11 @@ re-ingestion), E18 (trace), E19 (flaky test), E21 (Terms API).
   re-measured end to end with the final code.
 - **Human review** of the 20 Chinook expected answers and of the Pagila
   reference answers.
+- **The semantic contract's effect on accuracy** (E24): no result yet.
+- **Value-anchor literal repair (PR #58, draft):** not measured; it is an engine
+  change and needs an `ACCEPT` before merging.
+- **Domain names** (E23): not graded by anyone.
+- **Whether PR #52's evidence wording changes the 180 LiveSQLBench questions** (E22).
 - **Self-improving behaviour** (learned Terms, promotion, consolidation) is a
   design only; no code or measurement.
 - **Paraphrase robustness** of questions (memorisation check): not covered by the
