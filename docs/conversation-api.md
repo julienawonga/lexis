@@ -208,6 +208,15 @@ authoritative evidence (`The user defined "VIP customers" as: ...`), and the
 earlier conversation as context. A question is never asked twice for the same
 original question.
 
+When no database is selected, the readings offered may live in different
+databases. Each option then remembers the database of the column it relies on
+(the model copies it from the candidates it was shown, and a name that is not
+among them is dropped), and answering with that `option_id` runs the question
+against that database, so the automatic choice of database cannot pick another
+one. A `target_db` sent by the caller always wins. A free-text answer, or an
+option with no database, leaves the choice of database to the engine. The
+database name is never sent to the client.
+
 The request is refused with `422` when `clarification_id` is not the question
 pending in that conversation: an old one, one already answered, one from
 another conversation, an `option_id` that was not offered, or an answer with no
@@ -227,6 +236,10 @@ What do you mean by VIP customers?
 ```clarification
 {"clarification_id": "...", "term": "VIP customers", "question": "...", "options": [...], "allow_other": true, "original_question": "How many VIP customers do we have?"}
 ```
+
+Each option in the stored `options` also carries its `database` (or `null`), which
+is the only place the name is kept; the `clarification` event sent to the client
+has no such field.
 ````
 
 A clarification is *pending* exactly when it is the last message of its
