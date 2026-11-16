@@ -708,9 +708,16 @@ to interpret the entries is repeated.
   run because the change touches every generation, no significant regression on
   the 180 LiveSQLBench tasks (official metric, McNemar) and a flag rate under 10%
   on those answerable tasks.
-- **Status.** Nothing measured on the candidate yet. A first attempt to run the
-  probes was stopped after one minute for lack of time and its partial files were
-  deleted. The Chinook and LiveSQLBench runs need a few hours of idle machine.
+- **Status (candidate measured on criteria 1, 2 and 3 only).** On the 28 unanswerable
+  runs the candidate flagged 22 and refused 2 (24 of 24 completed runs, 4 timeouts;
+  `main`: 4 refusals, 21 substitutions, 3 timeouts). No flag on the 14 control runs.
+  Chinook 20x3, `main` against the candidate, same cases: 98.3% for both, 0 improved,
+  0 regressed, verdict ACCEPT (Chinook is at its ceiling, so this cannot show a small
+  loss). The first report script summed the refusals of both engines in criterion 1
+  (ratio 1.167); fixed to count the candidate's own (24/24). Criteria 4 (LiveSQLBench
+  180, McNemar) and 5 (flag rate under 10% on the answerable tasks, the real
+  false-alarm check) are **not measured**, so nothing is merged. The candidate image
+  was built on a `main` a little older (only the "Understood" sentence differs).
 - **Limits.** Two small hand-made sets on a database the model knows well; the
   development set shaped the design, so only the held-out set counts as unseen;
   two runs per question; the classification is read by the maintainer's
