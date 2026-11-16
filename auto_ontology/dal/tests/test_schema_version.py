@@ -58,6 +58,26 @@ def test_an_unreachable_database_is_not_told_to_migrate() -> None:
     assert "alembic upgrade head" not in state.detail
 
 
+def test_a_database_newer_than_the_build_is_not_told_to_upgrade() -> None:
+    """A rollback to an older image: upgrading is the one thing that cannot help."""
+    state = sv.SchemaState(expected="b2", applied="c3", known=frozenset({"a1", "b2"}))
+    assert not state.current
+    assert "c3" in state.detail and "b2" in state.detail
+    assert "newer version" in state.detail
+    assert "backup" in state.detail
+    assert "alembic upgrade head" not in state.detail
+
+
+def test_a_database_behind_a_build_that_knows_its_revision_is_told_to_upgrade() -> None:
+    state = sv.SchemaState(expected="b2", applied="a1", known=frozenset({"a1", "b2"}))
+    assert "alembic upgrade head" in state.detail
+
+
+def test_known_revisions_contain_the_head() -> None:
+    known = sv._known_revisions()
+    assert known is not None and sv.head_revision() in known
+
+
 def test_unknown_expected_revision_is_not_treated_as_fine() -> None:
     """A packaging mistake that hides the migrations must not read as healthy."""
     state = sv.SchemaState(expected=None, applied="abc123")
