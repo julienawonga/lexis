@@ -16,10 +16,11 @@ from __future__ import annotations
 
 from typing import Any
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Query
 from fastapi.responses import JSONResponse
 
 from auto_ontology.server.chat.worker import chat_worker_stats
+from auto_ontology.server.health.chat_readiness import chat_readiness
 from auto_ontology.server.health.checks import check_schema, check_store
 from auto_ontology.server.responses import HealthResponse
 
@@ -83,3 +84,30 @@ def liveness() -> JSONResponse:
     depend on one converts a database blip into a rolling restart.
     """
     return JSONResponse(status_code=200, content={"status": "ok"})
+
+
+@router.get(
+    "/health/chat",
+    # Not polled and not public: unlike the two routes above it is behind the
+    # internal token, because ``probe=true`` spends two model calls.
+    include_in_schema=False,
+    responses={
+        200: {"description": "Chat has what it needs to answer"},
+        503: {"description": "A setting, the model gateway or the index is not usable"},
+    },
+)
+def chat_health(
+    probe: bool = Query(
+        False,
+        description="Also call the embedding and chat models once each.",
+    ),
+) -> JSONResponse:
+    """Can the chat answer a question? What ``/health`` does not look at.
+
+    Always checked: the model settings resolve, and every database's ontology
+    is in the semantic index. With ``probe=true``: one embedding call (and its
+    width against the store's) and one short completion. Without it those two
+    entries read ``skipped``, which is neither a pass nor a failure.
+    """
+    ready, body = chat_readiness(probe=probe)
+    return JSONResponse(status_code=200 if ready else 503, content=body)

@@ -121,6 +121,10 @@ POSTGRES_PASSWORD=<a new password>
 AUTO_ONTOLOGY_ADMIN_PASSWORD=<a new password>
 ```
 
+Embeddings use the same endpoint and key as the chat model unless you set `EMBED_ENDPOINT` and `EMBED_API_KEY`.
+If the first `docker compose up -d --build` runs out of memory (the two images build side by side), build them one
+at a time with `docker compose build auto-ontology` then `docker compose build auto-ontology-frontend`.
+
 **2. Start the stack and load the sample data**
 
 ```bash
