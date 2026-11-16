@@ -22,6 +22,7 @@ import { ClarificationCard } from './ClarificationCard';
 import { DynamicTable } from './DynamicTable';
 import { FormattedContent } from './FormattedContent';
 import { AnswerPath } from './AnswerPath';
+import { ResultSwitch } from './ResultSwitch';
 import { glassFocus, glassSurface } from './glass';
 
 type SingleCellResult = { column: string; value: string };
@@ -155,6 +156,10 @@ export const MessageBubble = ({
 			message.result?.content && hasEmbeddedChart(message.result.content),
 		);
 		const hasTableResult = Boolean(resultSqlResponse);
+		const showResultSwitch =
+			hasChartResult &&
+			hasTableResult &&
+			Boolean(resultParsedTable && resultParsedTable.rows.length > 1);
 
 		return (
 			<div className="flex justify-start">
@@ -173,22 +178,43 @@ export const MessageBubble = ({
 							/>
 						</div>
 					)}
-					{hasChartResult && (
-						<div className="mb-3">
-							<FormattedContent
-								content={message.result!.content}
-								className="text-sm leading-relaxed"
-							/>
-						</div>
-					)}
-					{!hasChartResult && hasTableResult && (
-						<div className="mb-3">
-							<QueryResultsSection
-								sqlResponse={resultSqlResponse}
-								parsedTable={resultParsedTable}
-								singleCell={resultSingleCell}
-							/>
-						</div>
+					{showResultSwitch ? (
+						<ResultSwitch
+							className="mb-3"
+							chart={
+								<FormattedContent
+									content={message.result!.content}
+									className="text-sm leading-relaxed"
+								/>
+							}
+							table={
+								<QueryResultsSection
+									sqlResponse={resultSqlResponse}
+									parsedTable={resultParsedTable}
+									singleCell={resultSingleCell}
+								/>
+							}
+						/>
+					) : (
+						<>
+							{hasChartResult && (
+								<div className="mb-3">
+									<FormattedContent
+										content={message.result!.content}
+										className="text-sm leading-relaxed"
+									/>
+								</div>
+							)}
+							{!hasChartResult && hasTableResult && (
+								<div className="mb-3">
+									<QueryResultsSection
+										sqlResponse={resultSqlResponse}
+										parsedTable={resultParsedTable}
+										singleCell={resultSingleCell}
+									/>
+								</div>
+							)}
+						</>
 					)}
 					<AnswerPath message={message} defaultOpen={detailsExpandedByDefault} />
 					<time className="mt-1.5 block text-right text-[10px] opacity-50">
