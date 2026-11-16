@@ -37,6 +37,9 @@ export default function AgentSettingsPage() {
 	const [visualization, setVisualization] = useState(true);
 	const [saving, setSaving] = useState(false);
 	const [error, setError] = useState<string | null>(null);
+	// A setting that could not be read still shows its default below. Saving on
+	// top of it would overwrite a stored value nobody saw, so saving is blocked.
+	const [loadFailed, setLoadFailed] = useState(false);
 
 	// Defaults to off, matching a missing `chat_details_expanded` configuration.
 	const queryClient = useQueryClient();
@@ -64,20 +67,24 @@ export default function AgentSettingsPage() {
 	useEffect(() => {
 		let cancelled = false;
 		visualizationApi.get().then((res) => {
-			if (cancelled || res.error) return;
+			if (cancelled) return;
+			if (res.error) return setLoadFailed(true);
 			setVisualization(res.enabled);
 		});
 		chatDetailsApi.get().then((res) => {
-			if (cancelled || res.error) return;
+			if (cancelled) return;
+			if (res.error) return setLoadFailed(true);
 			setDetailsExpanded(res.enabled);
 		});
 		sqlQueryTimeoutApi.get().then((res) => {
-			if (cancelled || res.error) return;
+			if (cancelled) return;
+			if (res.error) return setLoadFailed(true);
 			setTimeoutSeconds(res.seconds);
 			setTimeoutDraft(String(res.seconds));
 		});
 		sqlResultMaxRowsApi.get().then((res) => {
-			if (cancelled || res.error) return;
+			if (cancelled) return;
+			if (res.error) return setLoadFailed(true);
 			setRowLimit(res.rows);
 			setRowLimitDraft(String(res.rows));
 		});
@@ -158,6 +165,17 @@ export default function AgentSettingsPage() {
 					Agent Settings
 				</h1>
 
+				{loadFailed && (
+					<p
+						role="alert"
+						className="rounded-card border border-red-300 bg-red-50 p-3 text-sm text-red-800 dark:border-red-500/40 dark:bg-red-950/40 dark:text-red-200"
+					>
+						The saved settings could not be loaded. The values below are the defaults,
+						not what is stored, so they cannot be changed from here. Reload the page to
+						try again.
+					</p>
+				)}
+
 				<div className="border p-4 border-white/70 dark:border-white/10 rounded-card glass">
 					<div className="flex items-center justify-between gap-4">
 						<div className="min-w-0">
@@ -173,7 +191,7 @@ export default function AgentSettingsPage() {
 							role="switch"
 							aria-checked={visualization}
 							aria-label="Visualize SQL Results"
-							disabled={saving}
+							disabled={saving || loadFailed}
 							onClick={() => {
 								void handleToggle();
 							}}
@@ -204,7 +222,7 @@ export default function AgentSettingsPage() {
 						<Toggle
 							checked={detailsExpanded}
 							aria-label="Expand Reasoning and SQL"
-							disabled={savingDetails}
+							disabled={savingDetails || loadFailed}
 							onChange={(next) => {
 								void handleDetailsToggle(next);
 							}}
@@ -243,7 +261,7 @@ export default function AgentSettingsPage() {
 								max={MAX_SQL_QUERY_TIMEOUT_SECONDS}
 								step={1}
 								value={timeoutDraft}
-								disabled={savingTimeout}
+								disabled={savingTimeout || loadFailed}
 								aria-invalid={!draftValid}
 								onChange={(e) => setTimeoutDraft(e.target.value)}
 								className="h-9 w-24 rounded-xl border border-zinc-900/15 bg-white/70 px-3 text-sm text-body outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/30 disabled:cursor-not-allowed disabled:bg-zinc-100 disabled:text-disabled aria-[invalid=true]:border-red-500 dark:border-white/15 dark:bg-white/[0.06] dark:text-zinc-300 dark:disabled:bg-zinc-800/50 dark:disabled:text-zinc-400"
@@ -252,7 +270,7 @@ export default function AgentSettingsPage() {
 								theme={ButtonTheme.Primary}
 								size={Size.REGULAR}
 								type="submit"
-								disabled={savingTimeout || !timeoutDirty}
+								disabled={savingTimeout || !timeoutDirty || loadFailed}
 							>
 								{savingTimeout ? 'Saving…' : 'Save'}
 							</Button>
@@ -293,7 +311,7 @@ export default function AgentSettingsPage() {
 								max={MAX_SQL_RESULT_MAX_ROWS}
 								step={1}
 								value={rowLimitDraft}
-								disabled={savingRowLimit}
+								disabled={savingRowLimit || loadFailed}
 								aria-invalid={!rowLimitValid}
 								onChange={(e) => setRowLimitDraft(e.target.value)}
 								className="h-9 w-28 rounded-xl border border-zinc-900/15 bg-white/70 px-3 text-sm text-body outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/30 disabled:cursor-not-allowed disabled:bg-zinc-100 disabled:text-disabled aria-[invalid=true]:border-red-500 dark:border-white/15 dark:bg-white/[0.06] dark:text-zinc-300 dark:disabled:bg-zinc-800/50 dark:disabled:text-zinc-400"
@@ -302,7 +320,7 @@ export default function AgentSettingsPage() {
 								theme={ButtonTheme.Primary}
 								size={Size.REGULAR}
 								type="submit"
-								disabled={savingRowLimit || !rowLimitDirty}
+								disabled={savingRowLimit || !rowLimitDirty || loadFailed}
 							>
 								{savingRowLimit ? 'Saving…' : 'Save'}
 							</Button>

@@ -496,11 +496,15 @@ export const useChat = () => {
 			const accepted = new Promise<boolean>((resolve) => {
 				settle = resolve;
 			});
+			// Whether the server took the request (the stream opened). Until then
+			// nothing was submitted, whatever the reason for the failure.
+			let started = false;
 
 			const controller = streamChat(
 				{ question: text, conversationId, clarification },
 				{
 					onStart() {
+						started = true;
 						settle(true);
 					},
 
@@ -579,6 +583,20 @@ export const useChat = () => {
 							setMessages((prev) => prev.filter((m) => m.id !== userMsg.id));
 							setClarificationAnswer(false, true);
 							appendAssistantMessage(clarificationRefusalMessage(message));
+							settle(false);
+							return;
+						}
+
+						// Refused before the stream opened (no free chat slot, an expired
+						// session, the API or the network down): nothing was submitted
+						// and nothing was stored. Undo the optimistic turn, reopen the
+						// clarification card so it can be answered again, and hand the
+						// text back to the input; only the reason stays in the thread.
+						if (!started) {
+							setMessages((prev) => prev.filter((m) => m.id !== userMsg.id));
+							setClarificationAnswer(false);
+							appendAssistantMessage(message);
+							updateLiveSql(null);
 							settle(false);
 							return;
 						}
