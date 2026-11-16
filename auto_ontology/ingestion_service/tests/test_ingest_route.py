@@ -15,7 +15,12 @@ from auto_ontology.ingestion_service import router as ingest_router
 @pytest.fixture
 def started(monkeypatch: pytest.MonkeyPatch) -> list[dict]:
     calls: list[dict] = []
-    monkeypatch.setattr(ingest_router, "trigger_ingest", calls.append)
+
+    def start(connection: dict) -> bool:
+        calls.append(connection)
+        return True
+
+    monkeypatch.setattr(ingest_router, "trigger_ingest", start)
     return calls
 
 
@@ -43,3 +48,14 @@ def test_a_named_connection_is_accepted(started: list[dict]) -> None:
 
     assert response.status_code == 202
     assert started == [{"database": "pagila"}]
+
+
+def test_a_database_already_being_ingested_is_reported(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(ingest_router, "trigger_ingest", lambda _c: False)
+
+    response = _client().post("/ingest", json={"database": "pagila"})
+
+    assert response.status_code == 202
+    assert response.json() == {"status": "already_running"}

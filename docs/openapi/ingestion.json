@@ -118,7 +118,7 @@
   "paths": {
     "/ingest": {
       "post": {
-        "description": "Trigger a non-blocking ingest for a single connection.",
+        "description": "Trigger a non-blocking ingest for a single connection.\n\nAt most one ingest per database runs at a time. A request for a database\nthat is already being ingested starts nothing and answers 202 with\n``{\"status\": \"already_running\"}``: the data is being ingested, so the\ncaller's goal is met, and a 4xx would make the server's best-effort proxy\nlog a failure.",
         "operationId": "ingest_connection_ingest_post",
         "requestBody": {
           "content": {
