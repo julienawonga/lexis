@@ -241,6 +241,12 @@ export const ExplorationView = () => {
 	const [domains, setDomains] = useState<SemanticDomains | null>(null);
 	const [generatingDomains, setGeneratingDomains] = useState(false);
 	const [generateError, setGenerateError] = useState<string | null>(null);
+	// A failed domains load is not "not generated yet": it gets its own state.
+	const [domainsLoadError, setDomainsLoadError] = useState<string | null>(null);
+	// Bumped by the Retry buttons to re-run the matching loader.
+	const [graphRetry, setGraphRetry] = useState(0);
+	const [overviewRetry, setOverviewRetry] = useState(0);
+	const [domainsRetry, setDomainsRetry] = useState(0);
 	const [selectedDomainId, setSelectedDomainId] = useState<string | null>(null);
 	const [showAllTerms, setShowAllTerms] = useState(false);
 	const [dataError, setDataError] = useState<string | null>(null);
@@ -415,7 +421,7 @@ export const ExplorationView = () => {
 		return () => {
 			cancelled = true;
 		};
-	}, [selectedDatabaseId]);
+	}, [selectedDatabaseId, graphRetry]);
 
 	useEffect(() => {
 		if (selectedDatabaseId === null) {
@@ -427,14 +433,14 @@ export const ExplorationView = () => {
 		let cancelled = false;
 		setDomains(null);
 		setGenerateError(null);
+		setDomainsLoadError(null);
 		setSelectedDomainId(null);
 		setShowAllTerms(false);
 		const loadDomains = async () => {
 			const response = await explorationApi.getSemanticDomains(selectedDatabaseId);
 			if (cancelled) return;
 			if (response.error) {
-				setDomains({ generated: false, domains: [], links: [] });
-				setGenerateError(response.message ?? 'Failed to load business domains');
+				setDomainsLoadError(response.message ?? 'Failed to load business domains');
 				return;
 			}
 			setDomains(response.data ?? { generated: false, domains: [], links: [] });
@@ -443,7 +449,7 @@ export const ExplorationView = () => {
 		return () => {
 			cancelled = true;
 		};
-	}, [selectedDatabaseId]);
+	}, [selectedDatabaseId, domainsRetry]);
 
 	useEffect(() => {
 		if (
@@ -468,7 +474,7 @@ export const ExplorationView = () => {
 		return () => {
 			cancelled = true;
 		};
-	}, [layer, selectedDatabaseId, overview]);
+	}, [layer, selectedDatabaseId, overview, overviewRetry]);
 
 	const loadedDatabaseIdRef = useRef<string | null | undefined>(undefined);
 
@@ -513,7 +519,7 @@ export const ExplorationView = () => {
 		return () => {
 			cancelled = true;
 		};
-	}, [layer, selectedDatabaseId]);
+	}, [layer, selectedDatabaseId, graphRetry]);
 
 	useEffect(() => {
 		setActiveNodeId(activeNodeIdFromUrl);
@@ -2380,6 +2386,13 @@ export const ExplorationView = () => {
 						<div className="flex h-full items-center justify-center px-6 text-center">
 							<div className="rounded-xl border border-red-200 px-8 py-6 text-sm text-red-700 dark:border-red-900/50 dark:text-red-300 glass-strong">
 								Couldn&apos;t load exploration: {overviewError}
+								<button
+									type="button"
+									className="mt-3 block w-full text-sm font-medium text-primary hover:underline"
+									onClick={() => setOverviewRetry((n) => n + 1)}
+								>
+									Retry
+								</button>
 							</div>
 						</div>
 					)}
@@ -2416,6 +2429,22 @@ export const ExplorationView = () => {
 					/>
 				</div>
 			)}
+
+			{selectedDatabaseId !== null &&
+				layer === ExplorationLayer.Semantic &&
+				!showOverview &&
+				domainsLoadError !== null && (
+					<div className="pointer-events-auto absolute top-24 left-1/2 z-10 -translate-x-1/2 rounded-xl border border-red-200 px-6 py-4 text-center text-sm text-red-700 dark:border-red-900/50 dark:text-red-300 glass-strong">
+						Could not load the domains: {domainsLoadError}
+						<button
+							type="button"
+							className="mt-2 block w-full text-sm font-medium text-primary hover:underline"
+							onClick={() => setDomainsRetry((n) => n + 1)}
+						>
+							Retry
+						</button>
+					</div>
+				)}
 
 			{selectedDatabaseId !== null &&
 				layer === ExplorationLayer.Semantic &&
@@ -2457,6 +2486,13 @@ export const ExplorationView = () => {
 				<div className="flex h-full items-center justify-center px-6 text-center">
 					<div className="rounded-xl border border-red-200 px-8 py-6 text-sm text-red-700 dark:border-red-900/50 dark:text-red-300 glass-strong">
 						Couldn&apos;t load exploration: {error}
+						<button
+							type="button"
+							className="mt-3 block w-full text-sm font-medium text-primary hover:underline"
+							onClick={() => setGraphRetry((n) => n + 1)}
+						>
+							Retry
+						</button>
 					</div>
 				</div>
 			)}

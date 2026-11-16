@@ -4,7 +4,7 @@
 
 'use client';
 
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import { connectionsApi } from '@/api/connections';
 import { ModalWithSteps, type StepperFooterAction } from '@/common/modal';
 import { ConnectionConnectStep } from '@/components/connectionsPage/steps/ConnectionConnectStep';
@@ -16,6 +16,7 @@ import {
 	ConnectionType,
 	type ConnectionFieldKey,
 } from '@/enums/connection';
+import { createLatestGuard } from '@/lib/latestRequest';
 import { DEFAULT_ONTOLOGY_LANGUAGE } from '@/lib/ontologyLanguage';
 import type { Connection, ConnectionInput, ConnectionParams } from '@/types/connection';
 
@@ -74,6 +75,8 @@ export const ConnectionModal = ({
 	const [loading, setLoading] = useState(false);
 	const [testingConnection, setTestingConnection] = useState(false);
 	const [isConnectionTested, setIsConnectionTested] = useState(false);
+	// Only the latest test's result is applied; an edit invalidates any in flight.
+	const testGuard = useRef(createLatestGuard());
 	const [testSuccessMessage, setTestSuccessMessage] = useState<string | null>(null);
 	const [activeStep, setActiveStep] = useState(0);
 	const [connectionType, setConnectionType] = useState<ConnectionType>(
@@ -197,6 +200,8 @@ export const ConnectionModal = ({
 	}, [initialSchemas]);
 
 	const handleSelectType = (type: ConnectionType): void => {
+		testGuard.current.invalidate();
+		setTestingConnection(false);
 		setConnectionType(type);
 		setValues({});
 		setAlert(null);
@@ -207,6 +212,9 @@ export const ConnectionModal = ({
 	};
 
 	const handleFieldChange = (key: ConnectionFieldKey, value: string): void => {
+		// A test started before this edit tested other credentials: drop its result.
+		testGuard.current.invalidate();
+		setTestingConnection(false);
 		setValues((prev) => ({ ...prev, [key]: value }));
 		setIsConnectionTested(false);
 		setTestSuccessMessage(null);
@@ -216,6 +224,7 @@ export const ConnectionModal = ({
 	};
 
 	const handleTestConnection = useCallback(async (): Promise<void> => {
+		const ticket = testGuard.current.start();
 		setTestingConnection(true);
 		setAlert(null);
 		setTestSuccessMessage(null);
@@ -224,6 +233,7 @@ export const ConnectionModal = ({
 			buildConnection({ forTest: true }),
 			connection?.database_name,
 		);
+		if (!testGuard.current.isCurrent(ticket)) return;
 		setTestingConnection(false);
 
 		if ('error' in res && res.error) {
