@@ -811,9 +811,31 @@ to interpret the entries is repeated.
   `disaster` reading: the stored options carried their databases, the run went
   with `target_db=disaster`, no database vote ran, and the SQL was anchored on the
   `disaster` column. One live trial.
-- **Finding 3 (a separate defect, not fixed).** A certified metric "VIP Customer"
-  at distance 0.61 (threshold 0.62) made the detector skip the question for a
-  satisfaction question, because both mention "customer". Seen once.
+- **Finding 3 (a separate defect, not fixed, on purpose).** A certified metric "VIP
+  Customer" at distance 0.61 (skip threshold `definition_max_distance` = 0.62) made
+  the detector skip the question for a satisfaction question, because both mention
+  "customer". Seen once live. Distances of the best SqlAttribute hit (this one
+  metric, Pagila), measured afterwards with embedding calls only: 5 questions about
+  VIP customers (one in French) 0.38 to 0.46; 7 questions unrelated to it 0.55 to
+  0.64, so the threshold sits inside the unrelated range (3 of the 7 are under it).
+  Consequence: a clarification is missed and the engine answers as it did before the
+  feature existed. It is not a wrong answer produced by the metric, so the severity
+  is low. The definition is still shown to the model up to 0.75 and the model has a
+  `covered_by_definition` field, so lowering the automatic skip (for example to
+  0.50) would move the decision in the grey zone to the model; that is the likely
+  design.
+  - **Why it was not changed.** The only evidence is 12 questions, one metric, and
+    questions seen before the number was chosen: a threshold fitted to the sample at
+    hand. The index holds 2 metrics and no saved analysis, public benchmark
+    databases only, and no real questions to validate on. A constant chosen this way
+    would look measured without being so. A change needs a frozen set of related and
+    unrelated questions written beforehand, ideally on real data, measured against
+    `main`.
+  - **Generalisation limit of everything in this entry.** All measurements here use
+    public benchmark databases (Chinook as a regression guard, Pagila, the
+    LiveSQLBench databases for the undefined terms). Frozen questions protect
+    against adjusting after seeing results; they do not show the behaviour holds on
+    a customer's data.
 - **Not measured.** The frozen eval cases were not rerun, so it is unknown whether
   the change alters how often the engine asks; the offered labels still vary from
   one conversation to the next (temperature not fixed). In this test stack the
