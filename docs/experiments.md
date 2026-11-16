@@ -716,6 +716,44 @@ to interpret the entries is repeated.
   two runs per question; the classification is read by the maintainer's
   assistant, not by an independent reviewer. `REAL-E2E`, manual.
 
+### E28 - Does the chat apply a certified business metric? (2026-11-16)
+
+- **Question.** README step 4 (business metrics): when a person defines and
+  certifies a metric, does the chat build its SQL from that definition?
+- **Setup.** Chinook on the running stack. A Term "Gross revenue" and a certified
+  SqlAttribute whose SQL sums `UnitPrice * Quantity` over invoice lines of tracks
+  whose `MediaTypeId <> 3` (music only), both created through the API. The
+  definition was chosen to give a number that differs from the naive query:
+  2107.71 with the definition, 2328.60 without. Question: "What is our gross
+  revenue?". Nothing else was changed; the test Term and metric were deleted
+  afterwards so they do not enter later measurements.
+- **Result 1, `main` as it was.** The metric was retrieved and shown to the model
+  in 2 of 2 runs, but the answer was 2328.60 (naive) both times. Cause found in the
+  logs: the table-relevance filter (an LLM call) removed `Track` and `InvoiceLine`,
+  and only `InvoiceLine` was put back by the deterministic reconciliation. The
+  model then wrote that it could not apply the music-only filter because `Track`
+  was not in the schema (in one run it said so in its prose, in the other it did
+  not).
+- **A flaw in my own setup.** My first Term description said "all invoice lines",
+  which contradicts the metric; a definition that conflicts with the Term text is
+  followed by the model. Corrected description: music tracks only.
+- **Change.** The tables read by a **certified** SqlAttribute are put back by code
+  after the relevance filter (same mechanism as the bridge tables); uncertified
+  ones stay a suggestion. Unit tests: both cases.
+- **Result 2, with the change and the corrected description.** 3 of 3 runs gave
+  2107.71 with the join and the filter; the logs show `Track` force-included.
+- **Control, without the change but with the corrected description.** Also 3 of 3
+  gave 2107.71, so on these runs the filter kept `Track` by itself. The filter is
+  not deterministic (it dropped `Track` in 2 of 2 earlier runs), and **three runs
+  do not show that the change is needed**; it removes a known failure path, it is
+  not measured to improve a score.
+- **Effect on the existing evaluations.** The change only acts when a certified
+  SqlAttribute is retrieved for the question. Not run: no Chinook or LiveSQLBench
+  measurement was repeated for it.
+- **Limits.** One database, one metric, one question, three runs per arm, no
+  independent review. `REAL-E2E` for the retrieval and the answers, `FAKES` for
+  the unit test.
+
 ### Built but never run
 
 PR #44 (`bench split/run/score`) is tested with synthetic cases and fakes only;
@@ -810,7 +848,7 @@ Engineering findings without a score: E02 (empty index), E04 (FK extraction), E0
 E10 (connection exhaustion), E11 (host crash), E12 (429 storm), E17 (startup
 re-ingestion), E18 (trace), E19 (flaky test), E21 (Terms API), E23 (domain grouping, not scored),
 E24 (semantic contract review; the measurement was stopped twice and has no result),
-E25 (domain map review), E26 (value-anchor repair, not merged), E27 (unanswerable questions: baseline).
+E25 (domain map review), E26 (value-anchor repair, not merged), E27 (unanswerable questions: baseline), E28 (certified metric: tables kept).
 
 ## 5. What is NOT yet measured
 

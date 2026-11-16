@@ -188,7 +188,9 @@ def test_linked_tables_are_backfilled_before_relevance_filter(
     monkeypatch.setattr(
         candidates_preparation,
         "fetch_tables_from_sql_attributes",
-        lambda ids: [linked_table] if source == "sql_attribute" else [],
+        lambda ids, certified_only=False: (
+            [linked_table] if source == "sql_attribute" else []
+        ),
     )
     monkeypatch.setattr(
         candidates_preparation,
@@ -461,6 +463,89 @@ def test_connected_junctions_are_forced_in_with_their_join_hops(monkeypatch) -> 
         "junction",
     ]
     assert {"path": [hop]} in result["attribute_join_paths"]
+
+
+@pytest.mark.parametrize("certified", [True, False])
+def test_tables_of_a_certified_metric_survive_the_relevance_filter(
+    monkeypatch, certified: bool
+) -> None:
+    """A certified SqlAttribute's SQL reads Track: the filter may not drop it.
+
+    An uncertified one stays a suggestion the filter is free to ignore.
+    """
+    invoice_line = {
+        "id": "il",
+        "name": "InvoiceLine",
+        "schema_name": "public",
+        "database_name": "db",
+        "columns": [{"name": "UnitPrice", "sample_values": [1], "is_nullable": False}],
+    }
+    track = {**invoice_line, "id": "track", "name": "Track"}
+
+    monkeypatch.setattr(
+        CandidatePreparationAgent,
+        "_retrieve_additional_tables",
+        lambda self, retriever, question, entities, target_db: [],
+    )
+    monkeypatch.setattr(
+        CandidatePreparationAgent,
+        "_filter_tables_by_relevance",
+        lambda self, state, question, tables, custom_analyses=None, attribute_join_paths=None: (
+            [t for t in tables if t["id"] == "il"],
+            "",
+        ),
+    )
+    monkeypatch.setattr(
+        candidates_preparation, "fetch_custom_analyses_with_sql", lambda ids: []
+    )
+    monkeypatch.setattr(
+        candidates_preparation, "fetch_tables_from_custom_analyses", lambda ids: []
+    )
+    monkeypatch.setattr(
+        candidates_preparation,
+        "fetch_sql_attributes_with_sql",
+        lambda ids: [{"id": "metric"}],
+    )
+    monkeypatch.setattr(
+        candidates_preparation,
+        "fetch_tables_from_sql_attributes",
+        lambda ids, certified_only=False: (
+            [invoice_line, track] if certified or not certified_only else []
+        ),
+    )
+    monkeypatch.setattr(
+        candidates_preparation, "get_relevant_tables_from_candidates", lambda c: []
+    )
+    monkeypatch.setattr(
+        candidates_preparation,
+        "fetch_tables_by_ids",
+        lambda ids: [t for t in (invoice_line, track) if t["id"] in ids],
+    )
+    monkeypatch.setattr(
+        candidates_preparation, "find_connected_junction_tables", lambda ids: ([], [])
+    )
+    monkeypatch.setattr(
+        candidates_preparation,
+        "find_kept_table_bridges",
+        lambda kept_ids, candidate_ids: ([], [], 0),
+    )
+
+    state = cast(
+        AgentState,
+        {
+            "initial_question": "gross revenue",
+            "data_retriever": object(),
+            "path_state": {
+                "target_db": "db",
+                "retrieved_sql_attributes": [{"id": "metric"}],
+            },
+        },
+    )
+
+    result = CandidatePreparationAgent().execute(state)["path_state"]
+
+    kept = {table["id"] for table in result["relevant_tables"]}
+    assert ("track" in kept) is certified
 
 
 def test_anchors_naming_a_column_in_scope_are_dropped(monkeypatch) -> None:

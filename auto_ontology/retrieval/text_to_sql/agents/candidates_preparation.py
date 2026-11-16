@@ -524,6 +524,11 @@ class CandidatePreparationAgent(BaseAgent):
 
         # --- 4b. Enrich SqlAttributes with SQL + term from the store ---
         sql_attributes: list[dict] = []
+        # Tables read by a CERTIFIED SqlAttribute's SQL: the relevance filter
+        # may not drop them (it once removed Track and the model then answered
+        # a certified "music only" metric without its filter). Applied after
+        # the filter, by code, like the bridge reconciliation.
+        certified_attr_table_ids: set[str] = set()
         if sql_attributes_raw:
             sa_ids = [
                 str(hit.get("id") or "") for hit in sql_attributes_raw if hit.get("id")
@@ -537,6 +542,11 @@ class CandidatePreparationAgent(BaseAgent):
             )
 
             sa_linked_tables = fetch_tables_from_sql_attributes(sa_ids)
+            certified_attr_table_ids = {
+                str(t["id"])
+                for t in fetch_tables_from_sql_attributes(sa_ids, certified_only=True)
+                if t.get("id")
+            }
             prev_len = len(relevant_tables)
             relevant_tables = _merge_tables(relevant_tables, sa_linked_tables)
             self.logger.info(
@@ -749,6 +759,7 @@ class CandidatePreparationAgent(BaseAgent):
                 len(bridge_paths),
             )
 
+        forced_table_ids.update(certified_attr_table_ids & pre_filter_candidate_ids)
         forced_table_ids -= {t.get("id") for t in relevant_tables}
         if forced_table_ids:
             forced_tables = fetch_tables_by_ids(list(forced_table_ids))

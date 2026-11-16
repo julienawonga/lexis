@@ -22,7 +22,7 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from sqlalchemy import String, delete, func, literal, or_, select, update
+from sqlalchemy import String, delete, func, literal, or_, select, true, update
 from sqlalchemy.dialects.postgresql import insert
 
 from auto_ontology.dal import schema as s
@@ -619,8 +619,13 @@ def fetch_sql_attributes_with_sql(attr_ids: list[str]) -> list[dict[str, str]]:
 
 def fetch_tables_from_sql_attributes(
     attr_ids: list[str],
+    *,
+    certified_only: bool = False,
 ) -> list[dict[str, Any]]:
     """The tables these attributes' SQL actually references, with column summaries.
+
+    With *certified_only*, only attributes a person has certified count: their
+    SQL is a verified definition, so the tables it reads are not optional.
 
     Deduplicated by table id, since several attributes commonly reference the
     same table. Returns ``[]`` on failure, as above.
@@ -668,6 +673,13 @@ def fetch_tables_from_sql_attributes(
                 )
             )
             .where(s.sql_attribute__sql.c.attribute_id.in_(list(attr_ids)))
+            .where(
+                s.sql_attribute__sql.c.attribute_id.in_(
+                    select(s.sql_attribute.c.id).where(s.sql_attribute.c.certified)
+                )
+                if certified_only
+                else true()
+            )
             .distinct()
             .order_by(s.catalog_table.c.id, s.catalog_column.c.ordinal_position)
         )
