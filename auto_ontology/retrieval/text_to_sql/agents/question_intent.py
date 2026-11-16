@@ -18,7 +18,7 @@ from pydantic import Field, model_validator
 from auto_ontology.retrieval.text_to_sql.connector_routing import (
     resolve_target_database_name,
 )
-from auto_ontology.retrieval.text_to_sql.base import BaseAgent
+from auto_ontology.retrieval.text_to_sql.base import BaseAgent, record_thought
 from auto_ontology.retrieval.text_to_sql.state import (
     AgentState,
     get_standalone_question,
@@ -403,6 +403,42 @@ Question:
 {question}"""
 
 
+def _intent_thought(
+    question_type: str,
+    subtype: str | None,
+    target_db: str | None,
+    original_question: str,
+    rewritten: str,
+    evidence: str | list[str] | None,
+) -> str:
+    """Build the display-only thought for the ``question_intent`` graph node.
+
+    Pure and deterministic: no model call. The text is only ever read for the
+    answer's timeline and thoughts summary (see ``main.py``); it is never fed
+    back into a prompt.
+    """
+    kind = question_type.capitalize()
+    if subtype:
+        kind += f" ({subtype.replace('_', ' ')})"
+    parts = [f"{kind} question."]
+    if target_db:
+        parts.append(f"Database: {target_db}.")
+    normalized_original = " ".join(original_question.split()).lower()
+    normalized_rewritten = " ".join(rewritten.split()).lower()
+    if rewritten and normalized_rewritten != normalized_original:
+        sentence = f"Rewritten as: {rewritten}"
+        if not sentence.endswith((".", "?")):
+            sentence += "."
+        parts.append(sentence)
+    if evidence:
+        evidence_text = "; ".join(evidence) if isinstance(evidence, list) else evidence
+        if len(evidence_text) > 240:
+            evidence_text = evidence_text[:240] + "…"
+        closing = "" if evidence_text.endswith((".", "…", "?", "!")) else "."
+        parts.append(f"Evidence given: {evidence_text}{closing}")
+    return " ".join(parts)
+
+
 def _merge_evidence(existing: str, extracted: str) -> str:
     """Append extracted evidence without replacing or duplicating caller evidence."""
     existing = existing.strip()
@@ -541,6 +577,18 @@ class QuestionIntentAgent(BaseAgent):
         path_state["normalized_question"] = rewritten
 
         merged_evidence = _merge_evidence(existing_evidence, extracted)
+        record_thought(
+            path_state,
+            "question_intent",
+            _intent_thought(
+                question_type.value,
+                subtype.value if subtype else None,
+                path_state.get("target_db"),
+                question,
+                rewritten,
+                extracted,
+            ),
+        )
         self.logger.info(
             "Question intent: type=%s subtype=%s target_db=%s rewritten=%r "
             "evidence_extracted=%s",

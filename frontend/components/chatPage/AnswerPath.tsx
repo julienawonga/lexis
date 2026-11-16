@@ -64,7 +64,10 @@ export const AnswerPath = ({ message, defaultOpen = false }: AnswerPathProps) =>
 			{isOpen && (
 				<div className="relative ml-2 border-l border-black/10 pl-4 dark:border-white/10 flex flex-col gap-3 pt-1">
 					{knownSteps.map((step) => {
-						const isStepExpanded = expandedStep === step.id;
+						// A row opens only when it has something to show: the understood step
+						// shows the engine's note on the question.
+						const expandable = step.id !== 'understood' || Boolean(understoodThought);
+						const isStepExpanded = expandable && expandedStep === step.id;
 
 						return (
 							<div key={step.id} className="relative flex flex-col gap-2">
@@ -72,9 +75,14 @@ export const AnswerPath = ({ message, defaultOpen = false }: AnswerPathProps) =>
 
 								<button
 									type="button"
-									aria-expanded={isStepExpanded}
+									disabled={!expandable}
+									aria-expanded={expandable ? isStepExpanded : undefined}
 									onClick={() => setExpandedStep(isStepExpanded ? null : step.id)}
-									className={`flex w-full cursor-pointer items-center justify-between text-left text-xs font-medium text-heading dark:text-zinc-100 transition-colors hover:text-primary dark:hover:text-primary-soft ${glassFocus}`}
+									className={`flex w-full items-center justify-between text-left text-xs font-medium text-heading dark:text-zinc-100 transition-colors ${
+										expandable
+											? 'cursor-pointer hover:text-primary dark:hover:text-primary-soft'
+											: 'cursor-default'
+									} ${glassFocus}`}
 								>
 									<span>{step.title}</span>
 									<div className="flex items-center gap-1.5 text-secondary dark:text-zinc-400">
@@ -83,10 +91,12 @@ export const AnswerPath = ({ message, defaultOpen = false }: AnswerPathProps) =>
 												{step.summary}
 											</span>
 										)}
-										<Icon
-											name={IconName.ChevronRight}
-											className={`h-3 w-3 shrink-0 transition-transform ${isStepExpanded ? 'rotate-90' : ''}`}
-										/>
+										{expandable && (
+											<Icon
+												name={IconName.ChevronRight}
+												className={`h-3 w-3 shrink-0 transition-transform ${isStepExpanded ? 'rotate-90' : ''}`}
+											/>
+										)}
 									</div>
 								</button>
 
