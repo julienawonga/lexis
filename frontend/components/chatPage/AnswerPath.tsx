@@ -36,8 +36,18 @@ export const AnswerPath = ({ message, defaultOpen = false }: AnswerPathProps) =>
 	const [isOpen, setIsOpen] = useState(defaultOpen);
 	const [expandedStep, setExpandedStep] = useState<PathStepId | null>('sql');
 
-	if (knownSteps.length === 0) {
+	if (knownSteps.length === 0 && !message.database) {
 		return null;
+	}
+
+	const databaseLine = message.database ? (
+		<p className="text-[11px] text-secondary dark:text-zinc-400">
+			Answered from database: <span className="font-medium">{message.database}</span>
+		</p>
+	) : null;
+
+	if (knownSteps.length === 0) {
+		return <div className="w-full text-xs">{databaseLine}</div>;
 	}
 
 	const closedSummaryText = 'How: ' + knownSteps.map(formatStepClosedSummary).join(' › ');
@@ -48,6 +58,7 @@ export const AnswerPath = ({ message, defaultOpen = false }: AnswerPathProps) =>
 
 	return (
 		<div className="flex flex-col gap-2 w-full text-xs">
+			{databaseLine}
 			<button
 				type="button"
 				aria-expanded={isOpen}

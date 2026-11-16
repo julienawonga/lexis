@@ -125,6 +125,7 @@ export const useChat = () => {
 				sqlResponse?: string;
 				thoughts?: string;
 				knowledgeTrace?: KnowledgeTraceEntry[];
+				database?: string;
 				steps?: GraphStep[];
 			},
 		) => {
@@ -136,6 +137,7 @@ export const useChat = () => {
 				sqlResponse: extras?.sqlResponse,
 				thoughts: extras?.thoughts,
 				knowledgeTrace: extras?.knowledgeTrace,
+				database: extras?.database,
 				steps: extras?.steps,
 				timestamp: Date.now(),
 			};
@@ -155,6 +157,7 @@ export const useChat = () => {
 					sql: msg.sql,
 					thoughts: msg.thoughts,
 					knowledgeTrace: msg.knowledgeTrace,
+					database: msg.database,
 					steps: stepsRef.current,
 				});
 		},
