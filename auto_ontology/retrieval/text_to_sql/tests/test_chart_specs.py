@@ -230,6 +230,21 @@ def test_kpi_tiles_text_when_the_result_has_no_measure() -> None:
     }
 
 
+def test_kpi_with_more_than_four_values_is_refused_not_truncated() -> None:
+    """Five values on one row must reach the user whole: the caller falls back
+    to the table instead of tiling the first four and hiding the fifth."""
+    df = pd.DataFrame(
+        [{"avg_rate": 0.5, "low": 110, "moderate": 93, "high": 102, "severe": 695}]
+    )
+    assert build_chart_spec(df, _plot(plot_type="kpi", title="Churn")) is None
+
+
+def test_kpi_with_exactly_four_values_still_tiles_all_of_them() -> None:
+    df = pd.DataFrame([{"a": 1, "b": 2, "c": 3, "d": 4}])
+    spec = build_chart_spec(df, _plot(plot_type="kpi", title="Four"))
+    assert spec is not None and len(spec["kpis"]) == 4
+
+
 def test_kpi_is_refused_for_a_multi_row_directory() -> None:
     """Row zero is not the answer to "the phone number of each customer"."""
     df = pd.DataFrame(

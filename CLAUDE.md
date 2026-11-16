@@ -67,6 +67,21 @@ Editing a docstring on any `@router` handler — not just changing a signature o
 model — makes the committed spec stale and fails "Backend spec is up to date".
 Regenerate and commit the result whenever a route's code or docs change.
 
+Traps seen in practice:
+
+- **CRLF noise on Windows.** `generate_backend_openapi` can rewrite
+  `docs/openapi/*.json` with CRLF line endings, so `git status` shows both files
+  modified with an empty content diff. If the content did not change, restore them
+  with `git checkout -- docs/openapi`; do not commit the line-ending churn.
+- **`test_dal_surface[sql_fragments]`** has failed on the maintainer's machine while
+  CI passes (not investigated). Trust CI for it; do not edit `dal_surface.json` to
+  silence it.
+- **Fakes do not cover the worker-to-server boundary.** The chat worker is a separate
+  process and the router rebuilds objects from the events it sends. A feature that
+  crosses that boundary can pass every unit test and still fail live (a clarification
+  option lost its database that way, PR #82). Give it one live
+  trial on the stack and log the result before calling it verified.
+
 ### Changing the text-to-SQL engine
 
 A change to what the model sees or how its SQL is built (prompts, retrieval,
