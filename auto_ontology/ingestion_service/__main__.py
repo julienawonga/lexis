@@ -48,6 +48,7 @@ from auto_ontology.server.internal_auth import (  # noqa: E402
     InternalTokenMiddleware,
     check_internal_token_config,
 )
+from auto_ontology.server.errors import install_error_handler  # noqa: E402
 from auto_ontology.version import get_app_version  # noqa: E402
 
 logger = logging.getLogger(__name__)
@@ -98,6 +99,7 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="Lexis Ingestion Service", lifespan=lifespan)
+install_error_handler(app)
 app.add_middleware(InternalTokenMiddleware, public_paths=INGESTION_PUBLIC_PATHS)
 app.include_router(router)
 

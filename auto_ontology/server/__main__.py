@@ -32,6 +32,7 @@ from auto_ontology.server.chat.worker import get_pool, shutdown_pool  # noqa: E4
 from auto_ontology.server.connections.router import router as connections_router  # noqa: E402
 from auto_ontology.server.datasources.router import router as datasources_router  # noqa: E402
 from auto_ontology.server.exploration.router import router as exploration_router  # noqa: E402
+from auto_ontology.server.errors import install_error_handler  # noqa: E402
 from auto_ontology.server.health.router import router as health_router  # noqa: E402
 from auto_ontology.server.internal_auth import (  # noqa: E402
     BACKEND_PUBLIC_PATHS,
@@ -87,6 +88,7 @@ def create_app() -> FastAPI:
     starting uvicorn.
     """
     app = FastAPI(title="Lexis API", lifespan=lifespan)
+    install_error_handler(app)
 
     # Added before CORS so CORS ends up outermost: preflight requests carry no
     # token and must be answered before this rejects them.

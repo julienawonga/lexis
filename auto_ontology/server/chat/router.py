@@ -783,7 +783,17 @@ async def chat_completions(
     ``CHAT_MAX_RUN_S`` (default 300) is cancelled and ends with an ``error``
     event.
     """
-    logger.info("Chat completions request: %s", request.model_dump())
+    # The question and the evidence are the user's own words and can hold
+    # personal data, so only their sizes are logged.
+    logger.info(
+        "Chat completions request: conversation=%s target_db=%s question_chars=%d "
+        "evidence_chars=%d clarification=%s",
+        request.conversation_id,
+        request.target_db,
+        len(request.question),
+        len(request.evidence or ""),
+        request.clarification is not None,
+    )
 
     if request.clarification is not None and request.conversation_id is None:
         raise HTTPException(

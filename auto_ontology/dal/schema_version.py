@@ -53,6 +53,10 @@ class SchemaState:
     #: one is not, and telling an operator to migrate a database nothing can
     #: connect to sends them down the wrong path.
     unreachable: str | None = None
+    #: Every revision this build's migrations contain, when that could be read.
+    #: A database stamped with one that is not among them was migrated by a
+    #: newer build, and "upgrade" is then the wrong advice.
+    known: frozenset[str] | None = None
 
     @property
     def current(self) -> bool:
@@ -77,6 +81,14 @@ class SchemaState:
             return (
                 "the database has no alembic_version table, so no migration has "
                 f"ever been applied to it. Run: {_UPGRADE_COMMAND}"
+            )
+        if self.known and self.applied not in self.known:
+            return (
+                f"the database is at revision {self.applied}, which this build "
+                f"(expecting {self.expected}) does not contain: a newer version "
+                "migrated it. Start that version again, or restore the backup "
+                "taken before the upgrade (docs/backup-restore.md). Upgrading "
+                "cannot fix this."
             )
         return (
             f"the database is at revision {self.applied}, but this build expects "
@@ -108,6 +120,22 @@ def head_revision() -> str | None:
         logger.warning("Expected exactly one alembic head, found %s", heads or "none")
         return None
     return heads[0]
+
+
+@lru_cache(maxsize=1)
+def known_revisions() -> frozenset[str] | None:
+    """Every revision in this build's migration scripts, or ``None`` if unreadable."""
+    try:
+        from alembic.config import Config
+        from alembic.script import ScriptDirectory
+
+        config = Config(str(_REPO_ROOT / "alembic.ini"))
+        config.set_main_option("script_location", str(_REPO_ROOT / "alembic"))
+        script = ScriptDirectory.from_config(config)
+        return frozenset(revision.revision for revision in script.walk_revisions())
+    except Exception:
+        logger.warning("Could not list the alembic revisions", exc_info=True)
+        return None
 
 
 def applied_revision() -> tuple[str | None, str | None]:
@@ -150,7 +178,10 @@ def schema_state() -> SchemaState:
     """Compare what the database has against what this build expects."""
     applied, unreachable = applied_revision()
     return SchemaState(
-        expected=head_revision(), applied=applied, unreachable=unreachable
+        expected=head_revision(),
+        applied=applied,
+        unreachable=unreachable,
+        known=known_revisions(),
     )
 
 
