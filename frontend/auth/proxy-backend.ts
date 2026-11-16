@@ -14,6 +14,7 @@
 // is what every proxied call gets.
 
 import { buildInternalHeaders } from '@/lib/internalIdentity';
+import { PROXY_TIMEOUT_MS, retryAfterHeader, upstreamFailure } from '@/lib/upstream';
 
 const PYTHON_API_URL = process.env.PYTHON_API_URL ?? 'http://127.0.0.1:3001';
 
@@ -62,16 +63,29 @@ export async function proxyToBackend(
 	const hasBody = req.method !== 'GET' && req.method !== 'HEAD';
 	const body = hasBody ? await req.text() : undefined;
 
-	const upstream = await fetch(target, { method: req.method, headers, body });
+	// These answers are whole bodies, never streams, so one timeout covers the
+	// headers and the body. A down or hung backend answers 502/504 JSON that the
+	// client wrapper shows, rather than a bare 500 or a request that never ends.
+	try {
+		const upstream = await fetch(target, {
+			method: req.method,
+			headers,
+			body,
+			signal: AbortSignal.timeout(PROXY_TIMEOUT_MS),
+		});
 
-	// Relayed as bytes: decoding as text would replace every byte of a binary
-	// answer, such as the Ossie export's zip, that is not valid UTF-8.
-	const respBody = await upstream.arrayBuffer();
-	return new Response(respBody, {
-		status: upstream.status,
-		headers: {
-			'Content-Type': upstream.headers.get('content-type') ?? 'application/json',
-			'Cache-Control': PROXY_CACHE_CONTROL,
-		},
-	});
+		// Relayed as bytes: decoding as text would replace every byte of a binary
+		// answer, such as the Ossie export's zip, that is not valid UTF-8.
+		const respBody = await upstream.arrayBuffer();
+		return new Response(respBody, {
+			status: upstream.status,
+			headers: {
+				'Content-Type': upstream.headers.get('content-type') ?? 'application/json',
+				'Cache-Control': PROXY_CACHE_CONTROL,
+				...retryAfterHeader(upstream),
+			},
+		});
+	} catch (err) {
+		return upstreamFailure(err);
+	}
 }

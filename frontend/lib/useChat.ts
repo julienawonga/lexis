@@ -9,6 +9,7 @@ import { cancelChat, streamChat, watchChat } from '@/api/chat';
 import { conversationsApi, toConversation } from '@/api/conversations';
 import { GENERIC_ANSWER_ERROR, buildSqlAnswerMessage, isResultMessage } from '@/lib/answerMessages';
 import { clarificationRefusalMessage, toClarificationPart } from '@/lib/clarification';
+import { busyMessage } from '@/lib/upstream';
 import type {
 	ChartsEvent,
 	ChatMessage,
@@ -564,7 +565,11 @@ export const useChat = () => {
 					},
 
 					onError(event) {
-						const message = event.message.trim() || GENERIC_ANSWER_ERROR;
+						// A 503 that says when to come back: say so, in seconds.
+						const message =
+							event.status === 503 && event.retryAfterSeconds
+								? busyMessage(event.retryAfterSeconds)
+								: event.message.trim() || GENERIC_ANSWER_ERROR;
 						finishRun();
 
 						// Another stream already owns this conversation (a second tab,

@@ -18,6 +18,7 @@ import { withPermission } from '@/auth/with-auth';
 import { userCan } from '@/auth/permissions';
 import { resolveSubjectToken } from '@/auth/sso-token';
 import { buildInternalHeaders } from '@/lib/internalIdentity';
+import { fetchUntilHeaders, retryAfterHeader, upstreamFailure } from '@/lib/upstream';
 
 const PYTHON_API_URL = process.env.PYTHON_API_URL ?? 'http://127.0.0.1:3001';
 
@@ -73,7 +74,7 @@ export const POST = withPermission({ chat: ['use'] })(async (req, { user }) => {
 
 	let upstream: Response;
 	try {
-		upstream = await fetch(`${PYTHON_API_URL}/api/chat/completions`, {
+		upstream = await fetchUntilHeaders(`${PYTHON_API_URL}/api/chat/completions`, {
 			method: 'POST',
 			headers: upstreamHeaders,
 			body,
@@ -82,11 +83,8 @@ export const POST = withPermission({ chat: ['use'] })(async (req, { user }) => {
 			// streaming bodies; not yet in DOM lib types.
 			duplex: 'half',
 		});
-	} catch {
-		return new Response('Backend connection failed', {
-			status: 502,
-			headers: { 'Content-Type': 'text/plain' },
-		});
+	} catch (err) {
+		return upstreamFailure(err);
 	}
 
 	if (!upstream.ok || !upstream.body) {
@@ -103,7 +101,7 @@ export const POST = withPermission({ chat: ['use'] })(async (req, { user }) => {
 		}
 		return new Response(errorBody || `Upstream responded with ${upstream.status}`, {
 			status: upstream.status || 502,
-			headers: { 'Content-Type': contentType },
+			headers: { 'Content-Type': contentType, ...retryAfterHeader(upstream) },
 		});
 	}
 
