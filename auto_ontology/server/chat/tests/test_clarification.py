@@ -287,6 +287,26 @@ def test_the_question_is_stored_with_the_original_question(
     assert stored[0]["analytics_id"] == "analytics"
 
 
+def test_option_databases_are_stored_and_never_streamed(
+    stored: list[dict[str, Any]],
+) -> None:
+    clarification = _clarification()
+    worker_event = {
+        **clarification.event(),
+        "option_databases": {"opt-1": "alpha"},
+    }
+    slot = _slot([worker_event])
+
+    router._pump(slot)
+    frames = list(router._stream_slot(slot))
+
+    persisted = stored[0]["clarification"]
+    assert [o.database for o in persisted.options] == ["alpha", None]
+    # The client gets exactly the public event: no database, no internal key.
+    assert router._sse(clarification.event()) in frames
+    assert not any("option_databases" in f or "alpha" in f for f in frames)
+
+
 def test_a_storage_failure_does_not_break_the_stream(
     monkeypatch: pytest.MonkeyPatch, stored: list[dict[str, Any]]
 ) -> None:
@@ -381,7 +401,7 @@ def test_worker_ends_the_turn_with_the_question_and_does_not_run_the_agent(
     )
 
     assert seen["agent"] == 0
-    assert (worker_module._TAG_EVENT, clarification.event()) in puts
+    assert (worker_module._TAG_EVENT, clarification.worker_event()) in puts
     assert puts[-1] == (worker_module._TAG_DONE, None)
     assert seen["detector_kwargs"]["question"] == "How many VIP customers do we have?"
     assert seen["detector_kwargs"]["semantic_retriever"] == "semantic"
@@ -424,3 +444,22 @@ def test_submit_forwards_the_switch(monkeypatch: pytest.MonkeyPatch) -> None:
     assert sent[0][1][-1] is True
     # Off is the original six-field message, so older tests and senders agree.
     assert len(sent[1][1]) == 6
+
+
+def test_answer_database_follows_the_chosen_option() -> None:
+    pending = _clarification(
+        options=[
+            ClarificationOption(id="opt-1", label="A", database="alpha"),
+            ClarificationOption(id="opt-2", label="B"),
+        ]
+    )
+
+    def answer(**fields: Any) -> cl.ClarificationAnswer:
+        return cl.ClarificationAnswer(
+            clarification_id=pending.clarification_id, **fields
+        )
+
+    assert cl.answer_database(pending, answer(option_id="opt-1")) == "alpha"
+    assert cl.answer_database(pending, answer(option_id="opt-2")) is None
+    assert cl.answer_database(pending, answer(text="something else")) is None
+    assert cl.answer_database(pending, None) is None

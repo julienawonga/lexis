@@ -786,6 +786,39 @@ to interpret the entries is repeated.
   design would need a check of the question's entities against the schema, which is
   not built. `REAL` data, analysis only.
 
+### E31 - Does a clarification choice decide the database? (2026-11-16, change not merged)
+
+- **Question.** With no database selected, the clarification offers readings that
+  live in different databases. Does choosing one of them decide which database
+  answers, or does the later database vote override it?
+- **Finding 1 (before the change).** The chosen option reached the engine only as
+  text in the evidence. The vote (`_select_candidate_database`) then picked the
+  database alone. Live, same question twice on the stack: choosing a reading from
+  `mental` gave `mental`; choosing a reading from `disaster` gave `virtual`, a
+  database that holds a different satisfaction measure (aggregate distance 0.99,
+  one entity covered). Two trials, one wrong: a real defect, not a frequency.
+- **Change.** Each option keeps the database of the candidate it relies on (the
+  model copies it from the tagged candidates; a name not among the candidates is
+  dropped). Picking the option pins the answer to that database. Candidates are
+  listed in a fixed order. The database never reaches the client.
+- **Finding 2 (a wrong first fix).** The first deployment still failed live: the
+  databases were present after validation (logged) but missing from the stored
+  message, because the worker handed the server the client-facing event, which has
+  no databases, and the server rebuilt the clarification from it. Unit tests with
+  fakes did not catch it. Fixed by carrying the databases on an internal key that
+  the server stores and removes before streaming.
+- **Result after the fix (live, 15:10).** The same question, choosing the
+  `disaster` reading: the stored options carried their databases, the run went
+  with `target_db=disaster`, no database vote ran, and the SQL was anchored on the
+  `disaster` column. One live trial.
+- **Finding 3 (a separate defect, not fixed).** A certified metric "VIP Customer"
+  at distance 0.61 (threshold 0.62) made the detector skip the question for a
+  satisfaction question, because both mention "customer". Seen once.
+- **Not measured.** The frozen eval cases were not rerun, so it is unknown whether
+  the change alters how often the engine asks; the offered labels still vary from
+  one conversation to the next (temperature not fixed). In this test stack the
+  databases are unrelated, which exaggerates the spread of readings.
+
 ### Built but never run
 
 PR #44 (`bench split/run/score`) is tested with synthetic cases and fakes only;
