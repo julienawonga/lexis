@@ -19,7 +19,12 @@ from dev_tools.evals.cases import (
     snapshot_file,
 )
 
-CASE_FILES = sorted(DEFAULT_CASES_DIR.glob("*.json"))
+# Conversation-protocol files hold questions only (no gold SQL): see test_conversation.
+CASE_FILES = [
+    p
+    for p in sorted(DEFAULT_CASES_DIR.glob("*.json"))
+    if json.loads(p.read_text(encoding="utf-8")).get("kind") != "conversation"
+]
 
 
 @pytest.mark.parametrize("path", CASE_FILES, ids=lambda p: p.name)
