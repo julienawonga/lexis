@@ -800,6 +800,13 @@ to interpret the entries is repeated.
   model might fix some of these without the value index (the abbreviations at least),
   and no run without the index was made, so this does not show the index is what
   fixed them. It shows the live instance does not fail on them. `REAL-E2E`, manual.
+- **Same session, clarification questions (not verified).** The setting
+  `clarification_enabled` is already `true` on the stack. Asked without a
+  conversation, "Who are our VIP customers?" and "What is our churn rate?" were
+  answered with an invented definition (22 customers; 22.0%), which is the case the
+  feature is meant to prevent. With a conversation id the API answers 401
+  ("Authenticated conversation required"), so the feature can only be checked
+  through the web app by a signed-in user; that check was not done.
 
 ### Built but never run
 
