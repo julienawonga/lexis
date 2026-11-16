@@ -4,7 +4,7 @@
 
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { distinctValueProbingApi, semanticCompilationApi } from '@/api/settings';
 import { formatDate } from '@/common/date';
 import { Icon, IconName } from '@/common/icons';
@@ -13,12 +13,13 @@ import { Spinner } from '@/common/Spinner';
 import { Toast } from '@/common/Toast';
 import { Toggle } from '@/common/Toggle';
 import { ToastVariant } from '@/enums/toast';
+import { nextPollDelay } from '@/lib/compilationPolling';
 import {
 	describeIndexEntry,
 	describeReindexResult,
 	reindexErrorMessage,
 } from '@/lib/semanticIndex';
-import type { SemanticCompilationStatus, SemanticIndexEntry } from '@/types/semanticIndex';
+import type { SemanticIndexEntry } from '@/types/semanticIndex';
 
 export const SemanticCompilationForm = ({
 	initialEnabled,
@@ -47,18 +48,34 @@ export const SemanticCompilationForm = ({
 	// Undefined `index` (older backend) renders no index section at all.
 	const [indexEntries, setIndexEntries] = useState<SemanticIndexEntry[]>([]);
 	const [rebuilding, setRebuilding] = useState<string | null>(null);
-	const applyStatus = (result: SemanticCompilationStatus) => {
-		setRunning(result.running);
-		setLastSuccessAt(result.last_success_at);
-		setLastFailureAt(result.last_failure_at);
-		setIndexEntries(result.index ?? []);
-	};
-	useEffect(() => {
-		semanticCompilationApi
-			.getStatus()
-			.then(applyStatus)
-			.catch(() => {});
+	// Set when the status could not be read, so a dead backend is not shown as
+	// a stale "ready".
+	const [statusError, setStatusError] = useState(false);
+	const refreshStatus = useCallback(async () => {
+		try {
+			const result = await semanticCompilationApi.getStatus();
+			setRunning(result.running);
+			setLastSuccessAt(result.last_success_at);
+			setLastFailureAt(result.last_failure_at);
+			setIndexEntries(result.index ?? []);
+			setStatusError(false);
+		} catch {
+			setStatusError(true);
+		}
 	}, []);
+	useEffect(() => {
+		void refreshStatus();
+	}, [refreshStatus]);
+	// While a run is in progress, re-read the status so the screen leaves
+	// "running" by itself. The timer is cleared when the run ends or on unmount.
+	useEffect(() => {
+		const delay = nextPollDelay(running);
+		if (delay === null) return;
+		const timer = setInterval(() => {
+			void refreshStatus();
+		}, delay);
+		return () => clearInterval(timer);
+	}, [running, refreshStatus]);
 	// Only set when it's more recent than the last success (see history.py),
 	// so a stale failure never outlives the run that fixed it.
 	const failed = !running && lastFailureAt !== null;
@@ -89,10 +106,7 @@ export const SemanticCompilationForm = ({
 				// time this resolves the ingestion service has already inserted a
 				// history row and is very likely already running — refresh status
 				// so the section appears now instead of only on the next page load.
-				semanticCompilationApi
-					.getStatus()
-					.then(applyStatus)
-					.catch(() => {});
+				void refreshStatus();
 			}
 		} catch {
 			setEnabled(!next); // roll back the optimistic update
@@ -148,10 +162,7 @@ export const SemanticCompilationForm = ({
 			setError('Failed to reach the server. Please try again.');
 		}
 		// Refresh either way: a refused or partial run may still have changed the counts.
-		await semanticCompilationApi
-			.getStatus()
-			.then(applyStatus)
-			.catch(() => {});
+		await refreshStatus();
 		setRebuilding(null);
 	};
 
@@ -162,10 +173,13 @@ export const SemanticCompilationForm = ({
 		// request only starts the reset. Nothing here depends on the response, so
 		// it is left unawaited and only a failure to reach the API is surfaced.
 		setMessage('Semantic layer reset started — it runs in the background.');
-		semanticCompilationApi.reset().catch(() => {
-			setMessage(null);
-			setError('Failed to reset the semantic layer. Please try again.');
-		});
+		semanticCompilationApi
+			.reset()
+			.then(() => refreshStatus())
+			.catch(() => {
+				setMessage(null);
+				setError('Failed to reset the semantic layer. Please try again.');
+			});
 	};
 
 	return (
@@ -190,6 +204,23 @@ export const SemanticCompilationForm = ({
 
 				{hasDatabases && (
 					<>
+						{statusError && (
+							<div className="mb-3 flex items-center justify-between rounded-lg border border-red-300 px-4 py-3 dark:border-red-900/60">
+								<span className="text-sm text-red-700 dark:text-red-300">
+									Could not read the compilation status
+								</span>
+								<button
+									type="button"
+									onClick={() => {
+										void refreshStatus();
+									}}
+									className="cursor-pointer rounded-lg border border-red-300 px-3 py-1.5 text-sm font-medium text-red-700 transition-colors hover:bg-red-50 dark:border-red-900/60 dark:text-red-300 dark:hover:bg-red-950/40"
+								>
+									Retry
+								</button>
+							</div>
+						)}
+
 						{enabled && hasHistory && (
 							<div className="mb-3 flex items-center justify-between rounded-lg border border-zinc-200 px-4 py-3 dark:border-zinc-700">
 								<div className="flex flex-col">
