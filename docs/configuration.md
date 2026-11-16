@@ -190,7 +190,7 @@ replacement starts). Size it against the host's memory: each worker is roughly o
 of the backend's Python footprint. `GET /api/health` reports the current
 `chat_workers.in_use` and `chat_workers.cap`.
 
-Two more knobs bound how long a run may hold a slot:
+Three more knobs bound how long a run, or a worker start, may hold a slot:
 
 - `CHAT_ORPHAN_GRACE_S` (default 60): how long a *conversation* run (one with a
   `conversation_id`) keeps going after its client disconnected and nobody reattached
@@ -201,6 +201,12 @@ Two more knobs bound how long a run may hold a slot:
 - `CHAT_MAX_RUN_S` (default 300): wall-clock limit for one question. A run over it is
   cancelled, the client receives an `error` event ("This question exceeded the
   CHAT_MAX_RUN_S limit ...") and the conversation records it as a failed turn.
+
+- `CHAT_WORKER_READY_S` (default 120): how long a new worker subprocess may take to finish its
+  imports and initialisation. A worker that errors, dies or exceeds it is killed, its slot is
+  released, and one fresh start is tried; if that fails too the request gets a 503 "The chat
+  worker could not start: <reason>" and `GET /api/health` shows the reason as
+  `chat_workers.last_start_error`. The default is a placeholder, not tuned on data.
 
 Each cancellation is logged at WARNING with its reason (`client_disconnected`,
 `orphaned`, `max_run_time`). The eval runner retries a 503 using `Retry-After` (up to 10

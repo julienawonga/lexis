@@ -41,12 +41,15 @@ from __future__ import annotations
 import logging
 import multiprocessing as mp
 import threading
+import time
 from queue import Empty
 from typing import Any, Generator
 
 from auto_ontology.server.chat.limits import (
     ChatWorkerGate,
+    ChatWorkerStartError,
     max_concurrent,
+    worker_ready_s,
 )
 
 logger = logging.getLogger(__name__)
@@ -67,6 +70,16 @@ _MSG_ASK = "ask"
 # How often events() polls the outbound queue. Doubles as the heartbeat
 # cadence the router uses to write SSE comments.
 _QUEUE_POLL_S = 0.25
+
+# The last reason a worker failed to start (None once one started fine), for
+# the health endpoint. Plain assignment of a str/None is atomic.
+_last_start_error: str | None = None
+
+
+def _record_start_error(reason: str | None) -> None:
+    global _last_start_error
+    _last_start_error = reason
+
 
 # Grace window between SIGTERM and SIGKILL.
 _TERMINATE_GRACE_S = 1.0
@@ -320,6 +333,8 @@ class PrewarmedWorker:
             args=(self._in_q, self._out_q),
             daemon=True,
         )
+        # Why init failed or timed out; None while starting or once ready.
+        self.start_error: str | None = None
         self._proc.start()
 
     def is_alive(self) -> bool:
@@ -389,19 +404,40 @@ class PrewarmedWorker:
             yield value  # _TAG_EVENT
 
     def drain_until_ready(self, timeout: float | None = None) -> bool:
-        """Block until the subprocess has finished its imports.
+        """Block until the subprocess has finished its init.
 
-        Returns False if the worker errored or didn't become ready within
-        the timeout. The pool uses this on warm spawns to log health; the
-        request path doesn't need to wait — submit/events handle a still-
-        warming worker transparently (they just block longer).
+        Returns False if init failed, the process died, or *timeout* seconds
+        passed without ``ready``; the reason is kept in ``start_error``
+        rather than discarded. Callers must not hand out a worker for which
+        this returned False.
         """
 
-        try:
-            tag, _ = self._out_q.get(timeout=timeout)
-        except Empty:
-            return False
-        return tag == _TAG_READY
+        deadline = None if timeout is None else time.monotonic() + timeout
+        while True:
+            wait = _QUEUE_POLL_S
+            if deadline is not None:
+                wait = min(wait, max(deadline - time.monotonic(), 0.0))
+            try:
+                tag, value = self._out_q.get(timeout=wait)
+            except Empty:
+                if not self._proc.is_alive():
+                    self.start_error = "the worker process exited while starting"
+                    return False
+                if deadline is not None and time.monotonic() >= deadline:
+                    self.start_error = (
+                        f"the worker did not become ready within {timeout:g}s"
+                    )
+                    return False
+                continue
+            if tag == _TAG_READY:
+                return True
+            if tag == _TAG_ERROR:
+                self.start_error = str(value)
+                return False
+            # An event or a bare done before ready: the worker is not usable.
+            if tag == _TAG_DONE:
+                self.start_error = "the worker stopped while starting"
+                return False
 
     def kill(self) -> None:
         proc = self._proc
@@ -468,9 +504,14 @@ class WarmPool:
             worker = PrewarmedWorker()
             # Block here (off the request path) until imports complete, so
             # ``acquire()`` is more likely to hand back a fully warm worker.
-            # We don't enforce a timeout — initial imports can be slow on
-            # cold caches and we'd rather wait than serve a half-warm one.
-            worker.drain_until_ready()
+            # Bounded by CHAT_WORKER_READY_S so a stuck worker is dropped.
+            if not worker.drain_until_ready(timeout=worker_ready_s()):
+                reason = getattr(worker, "start_error", None) or "unknown"
+                logger.error("Standby chat worker failed to start: %s", reason)
+                _record_start_error(reason)
+                worker.kill()
+                return
+            _record_start_error(None)
             with self._lock:
                 if self._standby is None:
                     self._standby = worker
@@ -494,6 +535,24 @@ class WarmPool:
         if checked_out:
             self._gate.release()
 
+    def _start_ready_worker(self) -> PrewarmedWorker:
+        """Start a worker and wait (bounded) until it is ready; retry once.
+
+        Raises ChatWorkerStartError, with the reason, when both attempts fail.
+        Never returns a worker that failed to start.
+        """
+        reason = "unknown"
+        for _attempt in range(2):
+            w = PrewarmedWorker()
+            if w.drain_until_ready(timeout=worker_ready_s()):
+                _record_start_error(None)
+                return w
+            reason = getattr(w, "start_error", None) or "unknown"
+            logger.error("Chat worker failed to start: %s", reason)
+            w.kill()
+        _record_start_error(reason)
+        raise ChatWorkerStartError(f"The chat worker could not start: {reason}")
+
     def acquire(self, cancel: threading.Event | None = None) -> PrewarmedWorker:
         # Permit first: nothing is handed out — warm or cold — above the cap.
         # *cancel* lets a request whose client left stop waiting for one.
@@ -503,9 +562,9 @@ class WarmPool:
                 w = self._standby
                 self._standby = None
             if w is None or not w.is_alive():
-                # Standby missing/dead — pay cold start synchronously this once.
-                w = PrewarmedWorker()
-                w.drain_until_ready()
+                # Standby missing/dead — pay cold start synchronously, and
+                # retry once if the fresh worker fails to start.
+                w = self._start_ready_worker()
         except BaseException:
             # No worker was handed out, so the permit must go straight back.
             self._gate.release()
@@ -574,8 +633,8 @@ def refresh_chat_workers() -> None:
     pool._spawn_async()
 
 
-def chat_worker_stats() -> dict[str, int]:
-    """Slots in use and the cap, for the health endpoint.
+def chat_worker_stats() -> dict[str, int | str | None]:
+    """Slots in use, the cap and the last start error, for the health endpoint.
 
     Deliberately does not create the pool (that would spawn a subprocess):
     no chat has run yet simply means zero slots in use.
@@ -583,4 +642,10 @@ def chat_worker_stats() -> dict[str, int]:
     with _pool_lock:
         pool = _pool
     in_use = pool.slots_in_use() if pool is not None else 0
-    return {"in_use": in_use, "cap": max_concurrent()}
+    return {
+        "in_use": in_use,
+        "cap": max_concurrent(),
+        # Why the last worker start failed; None if none has failed since the
+        # last good start.
+        "last_start_error": _last_start_error,
+    }

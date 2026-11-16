@@ -38,6 +38,11 @@ without restarting), mirroring :mod:`auto_ontology.connectors.source_limits`:
     Wall-clock limit for one run. A run over it is cancelled and the client
     gets an ``error`` event; the conversation records a failed turn.
 
+``CHAT_WORKER_READY_S`` (default 120)
+    How long a new worker subprocess may take to finish its imports and
+    initialisation before it is treated as failed (killed, its permit given
+    back). The default is a placeholder, not tuned on data.
+
 A value that is not a positive number falls back to the default with a
 warning, rather than failing the process at import or, worse, disabling the
 cap.
@@ -56,6 +61,7 @@ DEFAULT_MAX_CONCURRENT = 4
 DEFAULT_WAIT_S = 120.0
 DEFAULT_ORPHAN_GRACE_S = 60.0
 DEFAULT_MAX_RUN_S = 300.0
+DEFAULT_WORKER_READY_S = 120.0
 
 
 class ChatAbandoned(RuntimeError):
@@ -67,6 +73,13 @@ class ChatBusyTimeout(RuntimeError):
 
     The router maps this to HTTP 503 with a ``Retry-After`` header, before
     any stream starts, so the client sees an error instead of a hang.
+    """
+
+
+class ChatWorkerStartError(RuntimeError):
+    """A chat worker subprocess failed or timed out while starting.
+
+    The router maps this to HTTP 503 before any stream starts.
     """
 
 
@@ -100,6 +113,10 @@ def orphan_grace_s() -> float:
 
 def max_run_s() -> float:
     return _number("CHAT_MAX_RUN_S", DEFAULT_MAX_RUN_S)
+
+
+def worker_ready_s() -> float:
+    return _number("CHAT_WORKER_READY_S", DEFAULT_WORKER_READY_S)
 
 
 def _timeout(cap: int, budget: float) -> ChatBusyTimeout:
