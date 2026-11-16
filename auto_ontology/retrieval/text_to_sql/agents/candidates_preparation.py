@@ -525,8 +525,8 @@ class CandidatePreparationAgent(BaseAgent):
         # --- 4b. Enrich SqlAttributes with SQL + term from the store ---
         sql_attributes: list[dict] = []
         # Tables read by a CERTIFIED SqlAttribute's SQL: the relevance filter
-        # may not drop them (it once removed Track and the model then answered
-        # a certified "music only" metric without its filter). Applied after
+        # may not drop them (it once removed a table and the model then answered
+        # a certified metric without its filter). Applied after
         # the filter, by code, like the bridge reconciliation.
         certified_attr_table_ids: set[str] = set()
         if sql_attributes_raw:
