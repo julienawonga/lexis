@@ -531,7 +531,14 @@ def fetch_database_link_candidates(database_id: str) -> list[dict[str, Any]]:
             )
         )
         .where(s.catalog_schema.c.database_id == database_id)
-        .order_by(s.catalog_table.c.name, s.catalog_table.c.id)
+        # Columns in table order: without it PostgreSQL returns them in any
+        # order, and the result changed from one call to the next.
+        .order_by(
+            s.catalog_table.c.name,
+            s.catalog_table.c.id,
+            s.catalog_column.c.ordinal_position,
+            s.catalog_column.c.name,
+        )
     )
     tables: dict[str, dict[str, Any]] = {}
     for row in rows:
