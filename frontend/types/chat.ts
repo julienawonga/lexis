@@ -119,6 +119,8 @@ export type ErrorEvent = {
 	message: string;
 	/** HTTP status when the request itself was refused before streaming. */
 	status?: number;
+	/** Seconds the backend asked us to wait (`Retry-After`), when it did. */
+	retryAfterSeconds?: number;
 };
 
 /**

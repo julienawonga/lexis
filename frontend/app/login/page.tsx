@@ -14,6 +14,7 @@ import { authApi, type SsoProvider } from '@/api/auth';
 import { useSession } from '@/auth/auth-client';
 import { resumeAuthorizeFromApp } from '@/auth/oauth-loopback';
 import { SkeletonVariant } from '@/enums/skeleton';
+import { safeNext } from '@/lib/safeNext';
 
 const inputClass =
 	'w-full rounded-xl border border-zinc-900/15 bg-white/70 px-3 py-2 text-sm text-body outline-none transition-colors placeholder:text-secondary focus:border-primary focus:ring-2 focus:ring-primary/30 dark:border-white/15 dark:bg-white/[0.06] dark:text-zinc-300';
@@ -46,7 +47,7 @@ const resumeAuthorize = (params: URLSearchParams): string | null =>
 const LoginForm = () => {
 	const router = useRouter();
 	const params = useSearchParams();
-	const next = params.get('next') || resumeAuthorize(params) || '/chat';
+	const next = safeNext(params.get('next') || resumeAuthorize(params));
 
 	// The authorize endpoint is a route handler, not a page. Resume it with a
 	// same-origin fetch so a loopback redirect_uri stays on Lexis's thank-you
