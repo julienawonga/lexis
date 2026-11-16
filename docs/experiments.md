@@ -786,6 +786,21 @@ to interpret the entries is repeated.
   design would need a check of the question's entities against the schema, which is
   not built. `REAL` data, analysis only.
 
+### E30 - Value matching on the running stack, Chinook (2026-11-16)
+
+- **Question.** README item "matching question values to stored values": does the chat
+  map a misspelt or abbreviated value to the stored one on the live instance?
+- **Setup.** Chinook, through the chat API, one run per question, no conversation.
+  Expected counts checked in Postgres first (India 2, Czech Republic 2, United Kingdom 3).
+- **Result.** "Indai" gave `Country = 'India'` (2); "Czech Rep" gave
+  `'Czech Republic'` (2); "UK" gave `'United Kingdom'` (3). Earlier in the day, "United
+  States" gave `'USA'` (13) in English and in French. The logs show value anchors
+  adding tables during these runs.
+- **Limits.** 6 questions, one database, one run each, questions written by me. The
+  model might fix some of these without the value index (the abbreviations at least),
+  and no run without the index was made, so this does not show the index is what
+  fixed them. It shows the live instance does not fail on them. `REAL-E2E`, manual.
+
 ### Built but never run
 
 PR #44 (`bench split/run/score`) is tested with synthetic cases and fakes only;
@@ -880,7 +895,7 @@ Engineering findings without a score: E02 (empty index), E04 (FK extraction), E0
 E10 (connection exhaustion), E11 (host crash), E12 (429 storm), E17 (startup
 re-ingestion), E18 (trace), E19 (flaky test), E21 (Terms API), E23 (domain grouping, not scored),
 E24 (semantic contract review; the measurement was stopped twice and has no result),
-E25 (domain map review), E26 (value-anchor repair, not merged), E27 (unanswerable questions: baseline), E28 (certified metric, change not merged), E29 (rule on the SQL, exploration).
+E25 (domain map review), E26 (value-anchor repair, not merged), E27 (unanswerable questions: baseline), E28 (certified metric, change not merged), E29 (rule on the SQL, exploration), E30 (value matching, live check).
 
 ## 5. What is NOT yet measured
 
