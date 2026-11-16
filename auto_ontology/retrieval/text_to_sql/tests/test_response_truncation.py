@@ -37,3 +37,20 @@ def test_a_complete_result_gets_no_note() -> None:
 
     assert "limited" not in final["response"]
     assert final["result_truncated_at"] is None
+
+
+def test_an_empty_result_is_said_in_the_answer() -> None:
+    final = _run(sql_response_from_db=["[]"])
+
+    assert "The query ran and returned no rows." in final["response"]
+
+
+def test_no_empty_note_when_rows_came_back() -> None:
+    final = _run(sql_response_from_db=['[{"n": 1}]'])
+
+    assert "returned no rows" not in final["response"]
+
+
+def test_no_empty_note_when_no_query_ran() -> None:
+    assert "returned no rows" not in _run()["response"]
+    assert "returned no rows" not in _run(sql_response_from_db=None)["response"]
