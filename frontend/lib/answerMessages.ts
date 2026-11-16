@@ -29,6 +29,7 @@ export type AgentAnswer = {
 	thoughts?: string | null;
 	knowledge_trace?: KnowledgeTraceEntry[] | null;
 	caveats?: AnswerCaveat[] | null;
+	database?: string | null;
 };
 
 export type AnswerMessage = {
@@ -38,6 +39,7 @@ export type AnswerMessage = {
 	thoughts?: string;
 	knowledgeTrace?: KnowledgeTraceEntry[];
 	caveats?: AnswerCaveat[];
+	database?: string;
 };
 
 const hasChartFence = (content: string): boolean =>
@@ -79,6 +81,7 @@ export const buildSqlAnswerMessage = (answer: AgentAnswer): AnswerMessage | null
 				Array.isArray(answer.caveats) && answer.caveats.length > 0
 					? answer.caveats
 					: undefined,
+			database: answer.database || undefined,
 		};
 	}
 

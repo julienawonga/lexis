@@ -13,6 +13,7 @@
 import { withPermission } from '@/auth/with-auth';
 import { findOwnedConversation } from '@/lib/chatConversations';
 import { buildInternalHeaders } from '@/lib/internalIdentity';
+import { fetchUntilHeaders, retryAfterHeader, upstreamFailure } from '@/lib/upstream';
 
 const PYTHON_API_URL = process.env.PYTHON_API_URL ?? 'http://127.0.0.1:3001';
 
@@ -36,19 +37,26 @@ export const GET = withPermission({ conversation: ['read'] })(async (req, { user
 		return new Response('Conversation not found', { status: 404 });
 	}
 
-	const upstream = await fetch(
-		`${PYTHON_API_URL}/api/chat/watch?conversation_id=${encodeURIComponent(conversationId)}`,
-		{
-			headers: {
-				Accept: 'text/event-stream',
-				...buildInternalHeaders(user.id),
+	let upstream: Response;
+	try {
+		// Headers only: the stream itself lasts as long as the run does.
+		upstream = await fetchUntilHeaders(
+			`${PYTHON_API_URL}/api/chat/watch?conversation_id=${encodeURIComponent(conversationId)}`,
+			{
+				headers: {
+					Accept: 'text/event-stream',
+					...buildInternalHeaders(user.id),
+				},
 			},
-		},
-	);
+		);
+	} catch (err) {
+		return upstreamFailure(err);
+	}
 
 	if (!upstream.ok || !upstream.body) {
 		return new Response('Upstream watch request failed', {
 			status: upstream.status || 502,
+			headers: retryAfterHeader(upstream),
 		});
 	}
 

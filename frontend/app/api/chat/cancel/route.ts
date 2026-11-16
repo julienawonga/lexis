@@ -14,6 +14,7 @@
 import { withPermission } from '@/auth/with-auth';
 import { findOwnedConversation } from '@/lib/chatConversations';
 import { buildInternalHeaders } from '@/lib/internalIdentity';
+import { PROXY_TIMEOUT_MS, retryAfterHeader, upstreamFailure } from '@/lib/upstream';
 
 const PYTHON_API_URL = process.env.PYTHON_API_URL ?? 'http://127.0.0.1:3001';
 
@@ -35,22 +36,28 @@ export const POST = withPermission({ conversation: ['write'] })(async (req, { us
 		return new Response('Conversation not found', { status: 404 });
 	}
 
-	const upstream = await fetch(
-		`${PYTHON_API_URL}/api/chat/cancel?conversation_id=${encodeURIComponent(conversation.id)}`,
-		{
-			method: 'POST',
-			headers: buildInternalHeaders(user.id),
-		},
-	);
+	try {
+		const upstream = await fetch(
+			`${PYTHON_API_URL}/api/chat/cancel?conversation_id=${encodeURIComponent(conversation.id)}`,
+			{
+				method: 'POST',
+				headers: buildInternalHeaders(user.id),
+				signal: AbortSignal.timeout(PROXY_TIMEOUT_MS),
+			},
+		);
 
-	if (!upstream.ok) {
-		return new Response('Upstream cancel request failed', {
-			status: upstream.status || 502,
+		if (!upstream.ok) {
+			return new Response('Upstream cancel request failed', {
+				status: upstream.status || 502,
+				headers: retryAfterHeader(upstream),
+			});
+		}
+
+		return new Response(await upstream.text(), {
+			status: 200,
+			headers: { 'Content-Type': 'application/json' },
 		});
+	} catch (err) {
+		return upstreamFailure(err);
 	}
-
-	return new Response(await upstream.text(), {
-		status: 200,
-		headers: { 'Content-Type': 'application/json' },
-	});
 });

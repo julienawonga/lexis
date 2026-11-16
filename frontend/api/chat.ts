@@ -14,6 +14,7 @@ import type {
 } from '@/types/chat';
 import { responseErrorMessage } from '@/lib/chatErrors';
 import { parseClarificationEvent } from '@/lib/clarification';
+import { parseRetryAfterSeconds } from '@/lib/upstream';
 
 const getResponseErrorMessage = async (res: Response): Promise<string> =>
 	responseErrorMessage(res.status, await res.text().catch(() => ''));
@@ -172,6 +173,8 @@ export const streamChat = (
 					type: 'error',
 					message: await getResponseErrorMessage(res),
 					status: res.status,
+					retryAfterSeconds:
+						parseRetryAfterSeconds(res.headers.get('retry-after')) ?? undefined,
 				});
 				return;
 			}

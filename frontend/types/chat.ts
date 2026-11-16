@@ -26,6 +26,8 @@ export type ChatMessage = {
 	knowledgeTrace?: KnowledgeTraceEntry[];
 	/** Live answers only: not stored with the conversation. */
 	caveats?: AnswerCaveat[];
+	/** The database that answered. Live answers only: it is not stored with the conversation. */
+	database?: string;
 	/**
 	 * The agent steps this answer went through, kept when the answer lands. Live
 	 * answers only: it is not stored with the conversation.
@@ -117,6 +119,7 @@ export type ResultEvent = {
 		thoughts?: string;
 		knowledge_trace?: KnowledgeTraceEntry[] | null;
 		caveats?: AnswerCaveat[] | null;
+		database?: string | null;
 	};
 };
 
@@ -125,6 +128,8 @@ export type ErrorEvent = {
 	message: string;
 	/** HTTP status when the request itself was refused before streaming. */
 	status?: number;
+	/** Seconds the backend asked us to wait (`Retry-After`), when it did. */
+	retryAfterSeconds?: number;
 };
 
 /**

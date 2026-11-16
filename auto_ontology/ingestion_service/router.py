@@ -73,14 +73,22 @@ async def liveness() -> dict[str, str]:
 
 @router.post("/ingest", status_code=202, response_model=StatusResponse)
 async def ingest_connection(connection: dict[str, Any] = Body(...)) -> dict[str, str]:
-    """Trigger a non-blocking ingest for a single connection."""
+    """Trigger a non-blocking ingest for a single connection.
+
+    At most one ingest per database runs at a time. A request for a database
+    that is already being ingested starts nothing and answers 202 with
+    ``{"status": "already_running"}``: the data is being ingested, so the
+    caller's goal is met, and a 4xx would make the server's best-effort proxy
+    log a failure.
+    """
     if not str(connection.get("database") or "").strip():
         # Without a name there is nothing to look up: the ingest thread would
         # log "no loaded connector" and the caller would still read "accepted".
         raise HTTPException(
             status_code=422, detail="The connection must name its 'database'."
         )
-    trigger_ingest(connection)
+    if not trigger_ingest(connection):
+        return {"status": "already_running"}
     return {"status": "accepted"}
 
 

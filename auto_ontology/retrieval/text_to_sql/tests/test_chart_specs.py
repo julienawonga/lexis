@@ -47,6 +47,63 @@ def test_numeric_y_is_summed_per_category() -> None:
     ]
 
 
+# --- the chart draws the rows it was given, it never sums them ---------------
+
+
+def test_a_repeated_category_is_not_summed_into_a_number_no_query_returned() -> None:
+    """An average per category and month, drawn by category, used to become the
+    sum of the averages: 10 and 20 drawn as 30."""
+    df = pd.DataFrame(
+        {
+            "category": ["A", "A", "B", "B"],
+            "month": ["jan", "feb", "jan", "feb"],
+            "avg_basket": [10.0, 20.0, 5.0, 7.0],
+        }
+    )
+
+    assert build_chart_spec(df, _plot(x="category", y="avg_basket")) is None
+
+
+def test_a_repeated_category_and_series_pair_is_not_summed() -> None:
+    df = pd.DataFrame(
+        {
+            "category": ["A", "A"],
+            "region": ["north", "north"],
+            "rate": [0.5, 0.25],
+        }
+    )
+
+    spec = build_chart_spec(
+        df, _plot(plot_type="grouped-bar", x="category", y="rate", hue="region")
+    )
+
+    assert spec is None
+
+
+def test_distinct_categories_still_chart_with_their_own_values() -> None:
+    df = pd.DataFrame({"category": ["B", "A"], "total": [7, 10]})
+
+    spec = build_chart_spec(df, _plot(x="category", y="total"))
+
+    assert spec is not None
+    assert spec["data"] == [
+        {"category": "A", "total": 10},
+        {"category": "B", "total": 7},
+    ]
+
+
+def test_rows_with_an_empty_value_are_said_to_be_left_out() -> None:
+    df = pd.DataFrame(
+        {"category": ["A", "B", "C"], "total": [1.0, None, 3.0]},
+    )
+
+    spec = build_chart_spec(df, _plot(x="category", y="total"))
+
+    assert spec is not None
+    assert [row["category"] for row in spec["data"]] == ["A", "C"]
+    assert spec["subtitle"] == "1 rows with an empty value not drawn"
+
+
 # --- results with no numeric measure are listings, not charts ----------------
 
 

@@ -9,6 +9,7 @@ import { cancelChat, streamChat, watchChat } from '@/api/chat';
 import { conversationsApi, toConversation } from '@/api/conversations';
 import { GENERIC_ANSWER_ERROR, buildSqlAnswerMessage, isResultMessage } from '@/lib/answerMessages';
 import { clarificationRefusalMessage, toClarificationPart } from '@/lib/clarification';
+import { busyMessage } from '@/lib/upstream';
 import type {
 	ChartsEvent,
 	ChatMessage,
@@ -127,6 +128,7 @@ export const useChat = () => {
 				thoughts?: string;
 				knowledgeTrace?: KnowledgeTraceEntry[];
 				caveats?: AnswerCaveat[];
+				database?: string;
 				steps?: GraphStep[];
 			},
 		) => {
@@ -139,6 +141,7 @@ export const useChat = () => {
 				thoughts: extras?.thoughts,
 				knowledgeTrace: extras?.knowledgeTrace,
 				caveats: extras?.caveats,
+				database: extras?.database,
 				steps: extras?.steps,
 				timestamp: Date.now(),
 			};
@@ -159,6 +162,7 @@ export const useChat = () => {
 					thoughts: msg.thoughts,
 					knowledgeTrace: msg.knowledgeTrace,
 					caveats: msg.caveats,
+					database: msg.database,
 					steps: stepsRef.current,
 				});
 		},
@@ -565,7 +569,11 @@ export const useChat = () => {
 					},
 
 					onError(event) {
-						const message = event.message.trim() || GENERIC_ANSWER_ERROR;
+						// A 503 that says when to come back: say so, in seconds.
+						const message =
+							event.status === 503 && event.retryAfterSeconds
+								? busyMessage(event.retryAfterSeconds)
+								: event.message.trim() || GENERIC_ANSWER_ERROR;
 						finishRun();
 
 						// Another stream already owns this conversation (a second tab,

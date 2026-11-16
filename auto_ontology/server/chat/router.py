@@ -112,6 +112,7 @@ from auto_ontology.server.chat.helpers import (
 from auto_ontology.server.chat.limits import (
     ChatAbandoned,
     ChatBusyTimeout,
+    ChatWorkerStartError,
     max_run_s,
     orphan_grace_s,
 )
@@ -523,7 +524,9 @@ def _build_charts_event(slot: _Slot, answer: dict[str, Any]) -> dict[str, Any] |
     if slot.cancelled.is_set():
         return None
 
-    built = build_result_message(sql_response_from_db, charts)
+    built = build_result_message(
+        sql_response_from_db, charts, answer.get("result_truncated_at")
+    )
     if built is None:
         return None
     content, sql_response = built
@@ -663,6 +666,25 @@ def _pump(slot: _Slot) -> None:
                 if charts_event is not None:
                     with slot.buffer_lock:
                         slot.buffer.append(charts_event)
+        with slot.buffer_lock:
+            ended_without_answer = not any(
+                e.get("type") in ("result", "clarification", "error")
+                for e in slot.buffer
+            )
+        if (
+            ended_without_answer
+            and slot.cancel_message is None
+            and not slot.cancelled.is_set()
+        ):
+            # The worker said done (or died) with no answer and no error:
+            # never end the stream silently.
+            silent_event = {
+                "type": "error",
+                "message": "The agent stopped without an answer.",
+            }
+            persist_event(silent_event)
+            with slot.buffer_lock:
+                slot.buffer.append(silent_event)
         if slot.cancel_message is not None:
             # The supervisor killed the run (time limit / orphaned): the worker
             # stream just ended, so say why and record a failed turn rather
@@ -844,6 +866,8 @@ async def chat_completions(
             detail=str(exc),
             headers={"Retry-After": _RETRY_AFTER_S},
         ) from exc
+    except ChatWorkerStartError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
 
     if await http_request.is_disconnected():
         # The client went away while this request waited for a slot: hand

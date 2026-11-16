@@ -20,6 +20,9 @@ from langchain_core.messages import AIMessage
 from auto_ontology.retrieval.text_to_sql.base import BaseAgent
 from auto_ontology.retrieval.text_to_sql.state import AgentState
 from auto_ontology.retrieval.data_access.response_formatting import format_response
+from auto_ontology.retrieval.text_to_sql.agents.empty_like_result_check import (
+    _is_empty_db_result,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -77,6 +80,12 @@ class ResponseAgent(BaseAgent):
                 "\n\n> **Note:** the result was limited to the first "
                 f"{truncated_at:,} rows, so the figures above may be incomplete."
             )
+
+        # The text above was written before the query ran, so on its own it
+        # cannot tell the reader that nothing was found.
+        executed = path_state.get("sql_response_from_db")
+        if executed is not None and _is_empty_db_result(executed):
+            formatted_response += "\n\nThe query ran and returned no rows."
 
         caveat = path_state.get("validation_caveat")
         if caveat:

@@ -37,3 +37,27 @@ def test_a_chart_without_rows_has_no_table() -> None:
 def test_nothing_to_show() -> None:
     assert build_result_message(None, None) is None
     assert build_result_message("   ", []) is None
+
+
+def test_a_cut_result_says_so_in_the_table_message() -> None:
+    built = build_result_message(ROWS, None, truncated_at=10_000)
+    assert built is not None
+    content, sql_response = built
+    assert "Showing the first 10,000 rows" in content
+    assert "Totals computed from this table are incomplete." in content
+    assert sql_response == json.dumps(ROWS)
+
+
+def test_a_cut_result_says_so_above_the_chart() -> None:
+    built = build_result_message(ROWS, [CHART], truncated_at=500)
+    assert built is not None
+    content, _ = built
+    assert content.startswith("> **Result note:** Showing the first 500 rows")
+    assert "```chart\n" in content
+
+
+def test_a_complete_result_has_no_note() -> None:
+    assert build_result_message(ROWS, None, truncated_at=None) == (
+        "",
+        json.dumps(ROWS),
+    )
