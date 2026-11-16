@@ -121,10 +121,15 @@ def build_result_message(
 
     Returns ``None`` when there is nothing to show — no chart and no
     executed result to fall back to as a table.
+
+    A chart no longer replaces the rows: Message 2 carries the chart fence AND
+    the stored result, so the interface can switch between them and the raw data
+    is never lost. A client that predates the switch still shows only the chart,
+    because it renders the chart whenever a fence is present.
     """
-    if charts:
-        return charts_to_fenced_content(charts), None
     sql_response = stringify_sql_response(sql_response_from_db)
+    if charts:
+        return charts_to_fenced_content(charts), sql_response
     if sql_response:
         return "", sql_response
     return None
