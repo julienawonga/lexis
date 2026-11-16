@@ -49,7 +49,12 @@ export const conversationsApi = {
 			body: JSON.stringify({ title }),
 		}),
 
-	delete: (id: string) => fetch(`/api/conversations/${id}`, { method: 'DELETE' }),
+	// A refused delete must reach the caller: a plain fetch resolves on a 4xx or
+	// 5xx, and the sidebar then dropped a conversation that was still stored.
+	delete: async (id: string): Promise<void> => {
+		const res = await fetch(`/api/conversations/${id}`, { method: 'DELETE' });
+		if (!res.ok) throw new Error(`API ${res.status}: ${res.statusText}`);
+	},
 
 	addMessage: (
 		conversationId: string,

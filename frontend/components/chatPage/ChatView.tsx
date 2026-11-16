@@ -6,6 +6,8 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Spinner } from '@/common/Spinner';
+import { Toast } from '@/common/Toast';
+import { ToastVariant } from '@/enums/toast';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useChat } from '@/lib/useChat';
 import type { ClarificationReply, Conversation } from '@/types/chat';
@@ -34,6 +36,9 @@ export const ChatView = () => {
 	const [messageListLoading, setMessageListLoading] = useState<boolean>(focusId != null);
 	// null = still checking; false = semantic layer missing (block the chat area).
 	const [semanticReady, setSemanticReady] = useState<boolean | null>(null);
+	// The readiness check itself failed (as opposed to answering "not ready").
+	const [statusFailed, setStatusFailed] = useState(false);
+	const [notice, setNotice] = useState<string | null>(null);
 	const loadedFocusRef = useRef<string | null>(null);
 
 	const {
@@ -78,15 +83,22 @@ export const ChatView = () => {
 		}
 	}, []);
 
-	useEffect(() => {
-		setSidebarLoading(true);
-		refreshConversations().finally(() => setSidebarLoading(false));
-
+	// A check that could not be made is not an answer: showing "not ready" for a
+	// 401, a 502 or a network error sent people to rebuild a layer that exists.
+	const checkSemanticStatus = useCallback(() => {
+		setStatusFailed(false);
+		setSemanticReady(null);
 		semanticCompilationApi
 			.getStatus()
 			.then((res) => setSemanticReady(res.calculated))
-			.catch(() => setSemanticReady(false));
-	}, [refreshConversations]);
+			.catch(() => setStatusFailed(true));
+	}, []);
+
+	useEffect(() => {
+		setSidebarLoading(true);
+		refreshConversations().finally(() => setSidebarLoading(false));
+		checkSemanticStatus();
+	}, [refreshConversations, checkSemanticStatus]);
 
 	useEffect(() => {
 		if (!focusId) {
@@ -183,7 +195,7 @@ export const ChatView = () => {
 				}
 				await refreshConversations();
 			} catch {
-				// ignore
+				setNotice('The conversation could not be deleted. Try again.');
 			}
 		},
 		[activeConvId, clearConversation, refreshConversations, updateFocusInUrl],
@@ -226,7 +238,21 @@ export const ChatView = () => {
 			/>
 
 			<main className="flex min-w-0 flex-1 flex-col">
-				{semanticReady == null ? (
+				{statusFailed ? (
+					<div className="flex flex-1 flex-col items-center justify-center gap-3 px-6 text-center">
+						<p className="text-sm text-secondary dark:text-zinc-400">
+							Could not check whether the semantic layer is ready. Your session may
+							have expired or the server may be unreachable.
+						</p>
+						<button
+							type="button"
+							onClick={checkSemanticStatus}
+							className="rounded-card border border-white/70 px-4 py-2 text-sm font-medium glass dark:border-white/10"
+						>
+							Try again
+						</button>
+					</div>
+				) : semanticReady == null ? (
 					<div className="flex flex-1 items-center justify-center">
 						<Spinner aria-label="Checking semantic layer" className="h-10 w-10" />
 					</div>
@@ -244,6 +270,13 @@ export const ChatView = () => {
 					/>
 				)}
 			</main>
+
+			<Toast
+				open={notice !== null}
+				message={notice ?? ''}
+				variant={ToastVariant.Error}
+				onClose={() => setNotice(null)}
+			/>
 		</div>
 	);
 };
