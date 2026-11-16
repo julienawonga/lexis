@@ -1003,6 +1003,48 @@ to interpret the entries is repeated.
   question was answered correctly once: this is a "does it run" check, not an
   accuracy measure. `REAL-E2E`, manual.
 
+### E35 - Rebuilt from `main`, eight chats again, and a chat worker that cannot start (2026-11-16)
+
+- **Question.** After the phase 2 pull requests (#98 to #105), does the stack
+  built from `main` still hold eight concurrent chats without false alarms on
+  the new answer notices, and does a chat worker that cannot start now fail
+  loudly (audit O3, PR #100, whose worker-to-server boundary needs a live trial)?
+- **Setup.** Both images rebuilt from `main` at `eef2c54b` (the stack stopped
+  for the frontend build), restarted with the internal token. Trial 1: the same
+  eight Chinook questions as E33, written for that trial, sent at once with
+  `target_db=chinook`, no conversation, no retry. The script now also records
+  the answer's `caveats`, `database`, `result_truncated_at` and whether the text
+  says "returned no rows". Trial 2: a throwaway second backend from the same
+  image on the stack's network with `EMBED_DIMENSIONS=abc` (a worker's
+  initialisation fails when its retriever reads it), asked two chat questions
+  directly. It was removed afterwards. Cost: 8 questions of model calls and the
+  start-up compilation pass; trial 2 made no model call.
+- **Result, trial 1.** 8 of 8 answered (HTTP 200, a `result` event, `[DONE]`, no
+  error, no 503); slots in use peaked at 4 of 4; `/api/health` `ok` in every
+  sample; memory 465 MiB idle, 1,130 MiB at the peak, 501 MiB after; processes 10
+  at the peak; no restart. **0 of 8 answers carried a caveat**, none was cut at
+  the row cap, none was empty, and `database` read `chinook` on all eight.
+  Totals ran from 32 to 100 s (E33: 42 to 100 s).
+- **Result, trial 2.** With a real worker subprocess failing in its init, both
+  questions answered immediately with HTTP 503 and `{"detail": "The chat worker
+  could not start: Worker init failed: EMBED_DIMENSIONS must be a positive
+  integer, got 'abc'"}`, the worker's init failure was logged ten times (the
+  standby and the one retry per request), and `/api/health` carried the same
+  text in `chat_workers.last_start_error` while still answering `ok`. Before the
+  fix the audit predicted an answer stream that ends with no answer and no error;
+  a first attempt with the model and embedding endpoints emptied did **not**
+  break the worker's start (the chat models are also configured by
+  `REASONING_*`), so it proved nothing and was replaced by this one.
+- **Limits.** One batch of easy questions in one database: 0 of 8 caveats is not
+  a false-alarm rate (E27's was 52% on a different design), and a database was
+  named each time, so the vote path behind `database` was not exercised. The
+  eight answers were not scored. The web app's proxy and screens were not part of
+  the trial (calls went to the API with the token), so the new notices and the
+  database line were not seen. Trial 2 shows the 503 path of a failing start; it
+  does not show a worker that hangs (the bounded wait) or the "agent stopped
+  without an answer" error. `REAL-E2E` for trial 1 at the API; `REAL-ENGINE` for
+  trial 2 (a real subprocess and database, a throwaway backend, no web app).
+
 ### Built but never run
 
 PR #44 (`bench split/run/score`) is tested with synthetic cases and fakes only;
@@ -1097,7 +1139,7 @@ Engineering findings without a score: E02 (empty index), E04 (FK extraction), E0
 E10 (connection exhaustion), E11 (host crash), E12 (429 storm), E17 (startup
 re-ingestion), E18 (trace), E19 (flaky test), E21 (Terms API), E23 (domain grouping, not scored),
 E24 (semantic contract review; the measurement was stopped twice and has no result),
-E25 (domain map review), E26 (value-anchor repair, not merged), E27 (unanswerable questions: baseline), E28 (certified metric, change not merged), E29 (rule on the SQL, exploration), E30 (value matching, live check), E31 (clarification choice and its database), E32 (internal API token, live), E33 (eight chats at once, live), E34 (install from scratch, images rebuilt).
+E25 (domain map review), E26 (value-anchor repair, not merged), E27 (unanswerable questions: baseline), E28 (certified metric, change not merged), E29 (rule on the SQL, exploration), E30 (value matching, live check), E31 (clarification choice and its database), E32 (internal API token, live), E33 (eight chats at once, live), E34 (install from scratch, images rebuilt), E35 (rebuilt from `main`, eight chats, a worker that cannot start).
 
 ## 5. What is NOT yet measured
 
