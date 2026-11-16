@@ -10,6 +10,7 @@ import { CopyButton } from '@/common/Button';
 import { formatDate } from '@/common/date';
 import { Icon, IconName } from '@/common/icons';
 import { parseSqlResponse, type ParsedTable } from '@/lib/parseSqlResponse';
+import { NO_ROWS_MESSAGE, isEmptyResult, splitResultNotice } from '@/lib/resultNotice';
 import { hasValidationCaveat } from '@/lib/validationCaveat';
 import {
 	SqlBlock,
@@ -45,7 +46,10 @@ const QueryResultsSection = ({
 			Query results
 		</div>
 		{!sqlResponse && <p className="text-xs italic text-secondary dark:text-zinc-500">null</p>}
-		{sqlResponse && singleCell && (
+		{isEmptyResult(sqlResponse) && (
+			<p className="text-sm text-secondary dark:text-zinc-400">{NO_ROWS_MESSAGE}</p>
+		)}
+		{sqlResponse && !isEmptyResult(sqlResponse) && singleCell && (
 			// A single figure is the whole answer, so it gets a card of its own.
 			<div
 				className={`inline-flex min-w-48 flex-col gap-1 rounded-2xl px-5 py-4 ${glassSurface}`}
@@ -58,8 +62,10 @@ const QueryResultsSection = ({
 				</span>
 			</div>
 		)}
-		{sqlResponse && parsedTable && !singleCell && <DynamicTable table={parsedTable} />}
-		{sqlResponse && !parsedTable && (
+		{sqlResponse && !isEmptyResult(sqlResponse) && parsedTable && !singleCell && (
+			<DynamicTable table={parsedTable} />
+		)}
+		{sqlResponse && !isEmptyResult(sqlResponse) && !parsedTable && (
 			<div className={`group relative overflow-hidden rounded-xl ${codeSurfaceClass}`}>
 				<div className={codeHeaderClass}>
 					<span className={codeLabelClass}>Raw</span>
@@ -152,9 +158,10 @@ export const MessageBubble = ({
 			return { column, value: resultParsedTable.rows[0][column] ?? '' };
 		})();
 
-		const hasChartResult = Boolean(
-			message.result?.content && hasEmbeddedChart(message.result.content),
+		const { notice: resultNotice, body: resultContent } = splitResultNotice(
+			message.result?.content,
 		);
+		const hasChartResult = Boolean(resultContent && hasEmbeddedChart(resultContent));
 		const hasTableResult = Boolean(resultSqlResponse);
 		const showResultSwitch =
 			hasChartResult &&
@@ -178,12 +185,20 @@ export const MessageBubble = ({
 							/>
 						</div>
 					)}
+					{resultNotice && (
+						<div
+							role="note"
+							className="mb-3 rounded-xl border border-amber-500/40 bg-amber-500/10 p-3 text-xs text-amber-900 dark:text-amber-200"
+						>
+							{resultNotice}
+						</div>
+					)}
 					{showResultSwitch ? (
 						<ResultSwitch
 							className="mb-3"
 							chart={
 								<FormattedContent
-									content={message.result!.content}
+									content={resultContent}
 									className="text-sm leading-relaxed"
 								/>
 							}
@@ -200,7 +215,7 @@ export const MessageBubble = ({
 							{hasChartResult && (
 								<div className="mb-3">
 									<FormattedContent
-										content={message.result!.content}
+										content={resultContent}
 										className="text-sm leading-relaxed"
 									/>
 								</div>

@@ -524,7 +524,9 @@ def _build_charts_event(slot: _Slot, answer: dict[str, Any]) -> dict[str, Any] |
     if slot.cancelled.is_set():
         return None
 
-    built = build_result_message(sql_response_from_db, charts)
+    built = build_result_message(
+        sql_response_from_db, charts, answer.get("result_truncated_at")
+    )
     if built is None:
         return None
     content, sql_response = built

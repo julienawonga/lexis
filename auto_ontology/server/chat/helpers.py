@@ -114,8 +114,23 @@ def charts_to_fenced_content(charts: list[dict[str, Any]]) -> str:
     return "\n\n".join(f"```chart\n{json.dumps(spec)}\n```" for spec in charts)
 
 
+#: Marks the line of Message 2 that tells the reader the result was cut. The
+#: frontend (``lib/resultNotice.ts``) looks for the same prefix.
+RESULT_NOTE_PREFIX = "> **Result note:** "
+
+
+def truncation_notice(truncated_at: int) -> str:
+    """The plain-words line shown with a result that was cut at the row limit."""
+    return (
+        f"{RESULT_NOTE_PREFIX}Showing the first {truncated_at:,} rows; the result "
+        "was cut at the row limit. Totals computed from this table are incomplete."
+    )
+
+
 def build_result_message(
-    sql_response_from_db: Any, charts: list[dict[str, Any]] | None
+    sql_response_from_db: Any,
+    charts: list[dict[str, Any]] | None,
+    truncated_at: int | None = None,
 ) -> tuple[str, str | None] | None:
     """Build Message 2's ``(content, sql_response)`` for persistence + SSE.
 
@@ -128,8 +143,9 @@ def build_result_message(
     because it renders the chart whenever a fence is present.
     """
     sql_response = stringify_sql_response(sql_response_from_db)
+    notice = f"{truncation_notice(truncated_at)}\n\n" if truncated_at else ""
     if charts:
-        return charts_to_fenced_content(charts), sql_response
+        return notice + charts_to_fenced_content(charts), sql_response
     if sql_response:
-        return "", sql_response
+        return notice.rstrip(), sql_response
     return None
