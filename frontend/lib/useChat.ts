@@ -16,6 +16,7 @@ import type {
 	ClarificationEvent,
 	ClarificationReply,
 	GraphStep,
+	AnswerCaveat,
 	KnowledgeTraceEntry,
 	ResultEvent,
 	StepEvent,
@@ -126,6 +127,7 @@ export const useChat = () => {
 				sqlResponse?: string;
 				thoughts?: string;
 				knowledgeTrace?: KnowledgeTraceEntry[];
+				caveats?: AnswerCaveat[];
 				database?: string;
 				steps?: GraphStep[];
 			},
@@ -138,6 +140,7 @@ export const useChat = () => {
 				sqlResponse: extras?.sqlResponse,
 				thoughts: extras?.thoughts,
 				knowledgeTrace: extras?.knowledgeTrace,
+				caveats: extras?.caveats,
 				database: extras?.database,
 				steps: extras?.steps,
 				timestamp: Date.now(),
@@ -158,6 +161,7 @@ export const useChat = () => {
 					sql: msg.sql,
 					thoughts: msg.thoughts,
 					knowledgeTrace: msg.knowledgeTrace,
+					caveats: msg.caveats,
 					database: msg.database,
 					steps: stepsRef.current,
 				});

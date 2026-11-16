@@ -16,7 +16,7 @@
 // regardless of whether any browser tab stuck around to watch.
 
 import { stringifySqlResponse } from '@/lib/sqlResponse';
-import type { KnowledgeTraceEntry } from '@/types/chat';
+import type { AnswerCaveat, KnowledgeTraceEntry } from '@/types/chat';
 
 export const GENERIC_ANSWER_ERROR =
 	'Something went wrong. Please try again, and if the issue persists, contact our support';
@@ -28,6 +28,7 @@ export type AgentAnswer = {
 	sql_response_from_db?: unknown;
 	thoughts?: string | null;
 	knowledge_trace?: KnowledgeTraceEntry[] | null;
+	caveats?: AnswerCaveat[] | null;
 	database?: string | null;
 };
 
@@ -37,6 +38,7 @@ export type AnswerMessage = {
 	sqlResponse?: string;
 	thoughts?: string;
 	knowledgeTrace?: KnowledgeTraceEntry[];
+	caveats?: AnswerCaveat[];
 	database?: string;
 };
 
@@ -75,6 +77,10 @@ export const buildSqlAnswerMessage = (answer: AgentAnswer): AnswerMessage | null
 			sql: sqlCode ?? undefined,
 			thoughts: thoughts ?? undefined,
 			knowledgeTrace: trace,
+			caveats:
+				Array.isArray(answer.caveats) && answer.caveats.length > 0
+					? answer.caveats
+					: undefined,
 			database: answer.database || undefined,
 		};
 	}

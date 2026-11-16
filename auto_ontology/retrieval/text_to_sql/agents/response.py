@@ -102,6 +102,7 @@ class ResponseAgent(BaseAgent):
             "custom_analyses_used": [],
             "sql_response_from_db": sql_response_from_db,
             "result_truncated_at": truncated_at,
+            "caveats": list(path_state.get("caveats") or []),
         }
 
         self.logger.info("Calculation response prepared and returned")

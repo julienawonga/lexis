@@ -14,6 +14,10 @@ from auto_ontology.retrieval.text_to_sql.text_to_sql_graph import (
     _prediction_enabled,
     create_graph,
 )
+from auto_ontology.retrieval.text_to_sql.base import (
+    FALLBACK_SQL_CAVEAT,
+    add_caveat,
+)
 from auto_ontology.retrieval.text_to_sql.connector_routing import (
     resolve_target_database_name,
 )
@@ -128,6 +132,7 @@ _FULL_RETRY_PATH_KEYS_TO_CLEAR = frozenset(
         "discovered_tables",
         "validation_caveat",
         "returned_deterministic_fallback",
+        "caveats",
         "unconstructable_explanation",
         "final_response",
         "formatted_response",
@@ -360,14 +365,17 @@ def _apply_last_deterministic_sql_fallback(
 
     path_state["sql_code"] = fallback_sql
     path_state["returned_deterministic_fallback"] = True
+    add_caveat(path_state, *FALLBACK_SQL_CAVEAT)
     final_response = path_state.get("final_response")
     if isinstance(final_response, dict):
         final_response = dict(final_response)
         final_response["sql_code"] = fallback_sql
+        final_response["caveats"] = list(path_state.get("caveats") or [])
     else:
         final_response = {
             "response": str(final_response or "SQL intent validation was exhausted."),
             "sql_code": fallback_sql,
+            "caveats": list(path_state.get("caveats") or []),
         }
     path_state["final_response"] = final_response
     final_state["path_state"] = path_state

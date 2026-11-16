@@ -12,6 +12,7 @@ import { Icon, IconName } from '@/common/icons';
 import { parseSqlResponse, type ParsedTable } from '@/lib/parseSqlResponse';
 import { NO_ROWS_MESSAGE, isEmptyResult, splitResultNotice } from '@/lib/resultNotice';
 import { hasValidationCaveat } from '@/lib/validationCaveat';
+import { extraCaveats } from '@/lib/answerCaveats';
 import {
 	SqlBlock,
 	codeHeaderClass,
@@ -183,6 +184,21 @@ export const MessageBubble = ({
 								content={message.content}
 								className="text-xs leading-relaxed"
 							/>
+						</div>
+					)}
+					{extraCaveats(message).length > 0 && (
+						<div
+							role="note"
+							className="mb-3 rounded-xl border border-amber-500/40 bg-amber-500/10 p-3 text-xs leading-relaxed text-amber-900 dark:text-amber-200"
+						>
+							<div className="mb-1 font-semibold">
+								Check this answer before relying on it
+							</div>
+							<ul className="list-disc pl-4">
+								{extraCaveats(message).map((caveat) => (
+									<li key={caveat.code}>{caveat.message}</li>
+								))}
+							</ul>
 						</div>
 					)}
 					{resultNotice && (

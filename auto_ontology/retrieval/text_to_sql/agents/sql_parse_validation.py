@@ -31,7 +31,13 @@ from sqlglot import expressions as exp
 
 from auto_ontology.catalog.sql_parse import parse_query_single
 from auto_ontology.dal.datasources import find_table_key_columns
-from auto_ontology.retrieval.text_to_sql.base import BaseAgent, record_thought
+from auto_ontology.retrieval.text_to_sql.base import (
+    VALIDATION_UNRESOLVED_CODE,
+    VALIDATION_SKIPPED_CAVEAT,
+    BaseAgent,
+    add_caveat,
+    record_thought,
+)
 from auto_ontology.retrieval.text_to_sql.numeric_types import (
     float_casts_to_numeric,
     order_string_aggregates,
@@ -1105,6 +1111,7 @@ class SQLValidationAgent(BaseAgent):
             )
         except Exception as error:
             self.logger.error("Intent validation LLM call failed: %s", error)
+            add_caveat(path_state, *VALIDATION_SKIPPED_CAVEAT)
             return {"decision": "valid_sql", "path_state": path_state}
 
         if (
@@ -1116,6 +1123,9 @@ class SQLValidationAgent(BaseAgent):
                 "validate_sql_query",
                 validation_result.reasoning.strip(),
             )
+
+        if validation_result is None:
+            add_caveat(path_state, *VALIDATION_SKIPPED_CAVEAT)
 
         if validation_result is None or (
             validation_result.is_valid
@@ -1138,6 +1148,7 @@ class SQLValidationAgent(BaseAgent):
             self.logger.info(
                 "SQL intent validation passed (is_valid=False without issues)"
             )
+            add_caveat(path_state, *VALIDATION_SKIPPED_CAVEAT)
             return {"decision": "valid_sql", "path_state": path_state}
 
         error_parts = ["Critical SQL issues found:"]
@@ -1186,6 +1197,12 @@ class SQLValidationAgent(BaseAgent):
             path_state["sql_code"] = best["sql_code"]
             path_state["sql_columns"] = best["sql_columns"]
             path_state["sql_tables"] = best["sql_tables"]
+            add_caveat(
+                path_state,
+                VALIDATION_UNRESOLVED_CODE,
+                "Automatic validation kept rejecting alternative versions of "
+                "this query, so this answer was not fully validated.",
+            )
             path_state["validation_caveat"] = (
                 "Automatic validation kept rejecting alternative versions of this "
                 "query for conflicting reasons, so this answer was not fully "
