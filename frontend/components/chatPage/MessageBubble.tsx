@@ -10,6 +10,7 @@ import { CopyButton } from '@/common/Button';
 import { formatDate } from '@/common/date';
 import { Icon, IconName } from '@/common/icons';
 import { parseSqlResponse, type ParsedTable } from '@/lib/parseSqlResponse';
+import { hasValidationCaveat } from '@/lib/validationCaveat';
 import {
 	SqlBlock,
 	codeHeaderClass,
@@ -158,6 +159,20 @@ export const MessageBubble = ({
 		return (
 			<div className="flex justify-start">
 				<div className="w-full text-heading dark:text-zinc-100">
+					{hasValidationCaveat(message.content) && (
+						<div
+							role="note"
+							className="mb-3 rounded-xl border border-amber-500/40 bg-amber-500/10 p-3 text-amber-900 dark:text-amber-200"
+						>
+							<div className="mb-1 font-semibold">
+								Check this answer before relying on it
+							</div>
+							<FormattedContent
+								content={message.content}
+								className="text-xs leading-relaxed"
+							/>
+						</div>
+					)}
 					{hasChartResult && (
 						<div className="mb-3">
 							<FormattedContent
