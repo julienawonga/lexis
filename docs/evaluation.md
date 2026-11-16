@@ -259,6 +259,63 @@ python -m dev_tools.evals bench run --split ~/lsb-split --slice canary --label c
   future work. A crashed `run` is not resumable; its raw reports are written
   only after the run.
 
+### Paired evidence printed by `compare`
+
+After its verdict, `compare` prints evidence that does not change the verdict or
+the exit code (which still come from `--margin` and `--tolerance` alone):
+
+- **Pass counts per question**, base and candidate (`2/3 -> 3/3`). A `*` marks a
+  question whose pass rate differs.
+- **Exact two-sided sign (McNemar) p-value** over the questions whose *majority
+  outcome* flipped. A question's majority outcome is "pass" when it passed in
+  strictly more than half of its runs. Questions that did not flip say nothing
+  about the change. With few flipped questions the test cannot reach small
+  p-values: 5 flips in one direction and none in the other is p = 0.0625.
+- **Paired bootstrap 95% interval** of the score difference: questions are
+  resampled with replacement (2000 resamples, fixed seed, so the same reports
+  always give the same interval), the mean per-question pass-rate difference is
+  taken each time, and the 2.5th and 97.5th percentiles are shown. An interval
+  that contains 0 means the data do not exclude "no change".
+- **Noise band sentence.** When the baseline has repeats (several runs per
+  question), the spread between its own repeats (best minus worst repeat score)
+  is the band; the sentence says whether the difference is inside or outside it.
+  Without repeats it says the spread is unknown. It is a rough guide, not a test:
+  the spread of three repeats underestimates the real noise.
+
+What these numbers cannot tell: whether the cases are representative, whether a
+gain on questions the change was written for generalises (use held-out
+questions), or anything about a set that is too small. On a 13- or 20-question
+set one question is 5 to 8 points, so a single flipped question moves the score
+more than the 4-point run-to-run noise measured on 180 questions (E13), and no
+test here can separate those.
+
+### History of results
+
+`python -m dev_tools.evals history ...` keeps an append-only JSON-lines file,
+`docs/eval-history/history.jsonl`, committed to the repo. Pass `--file PATH`
+before the subcommand to use another file.
+
+```bash
+python -m dev_tools.evals history add reports/candidate.json --note "after #58"     [--strict-report reports/candidate-strict.json] [--backend-image TAG]
+python -m dev_tools.evals history show [--cases-sha 1a2b3c]
+python -m dev_tools.evals history check reports/new.json [--against LABEL] [--tolerance 0.34]
+```
+
+A line is a summary only: label, UTC time, repo git sha, backend image note,
+cases file name and `cases_sha256`, strict score (only when `--strict-report` is
+given) and tolerant score, `[passes, runs]` per question id, the ontology-index
+state, the number of runs and the note. It never holds question text, gold
+answers, rows, SQL or tokens: the fields are whitelisted, not copied.
+
+`history check` compares a report with the latest entry that has per-question
+detail and the same `cases_sha256`; it refuses (exit 2) when there is none,
+exits 1 and lists the questions whose pass rate fell by more than the tolerance,
+and exits 0 otherwise. The lines seeded from `experiments.md` are marked
+`"source": "experiments.md (summary, no report kept)"`, carry the numbers as
+written there (with `kind` development or held-out) and no per-question data, so
+they are never used as a baseline. The git sha and the backend image on a line
+describe when it was added, not necessarily what produced the report.
+
 ## Rules for an honest measurement
 
 These exist because each of them was broken at least once.
