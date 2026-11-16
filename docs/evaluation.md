@@ -281,6 +281,12 @@ These exist because each of them was broken at least once.
    failing it.
 7. **Small differences are noise.** With 13 questions and three runs, one run
    is worth 2.6 points.
+8. **Know what the harness cannot reach.** `run` is stateless (no
+   `conversation_id`, no user), so it never goes through a path that needs a
+   conversation, such as clarification questions: a change there cannot move
+   these scores. Such a change needs its own protocol, written and frozen before
+   the runs. The one used for the option-to-database change is described in
+   E31 of [experiments.md](./experiments.md).
 
 ## Reference measurements
 

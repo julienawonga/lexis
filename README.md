@@ -243,54 +243,63 @@ curl -N http://localhost:3000/api/chat/completions \
 
 ## 🗺️ Roadmap
 
-Ordered by priority. Each step either unlocks the next or needs it, so the order is also the build order.
+What you can use today, what works but has limits, and what comes next. The numbered steps are in build
+order: each one unlocks the next. Everything has so far been tried on public test databases (Chinook, Pagila,
+LiveSQLBench), not on a company's own data; [docs/verification-status.md](./docs/verification-status.md)
+says, feature by feature, what was checked and how.
 
-**Done**
+### Available today
 
-- [x] Any OpenAI-compatible model provider
-- [x] Glass UI with light and dark themes, sidebar with Ctrl+K search
-- [x] Chat with folded reasoning and SQL, copy, suggestions from certified analyses
-- [x] Docker Official Images, digest-pinned
-- [x] Foreign keys declared on partitioned tables, and composite keys (Postgres)
-- [x] Agent SQL is read-only and row-capped, enforced by the database on six engines
-- [x] Internal service ports published on localhost only by default
-- [x] Evaluation harness for the text-to-SQL engine, with a held-out set on a second database (Chinook)
-- [x] Rebuild and health check of the semantic index
-- [x] Evaluation bench: a frozen held-out split, paired comparison against a noise band, measured on Chinook and on 180 LiveSQLBench questions
-- [x] Questions in any language: translated into the language each database's ontology is built in (measured on Chinook in French), with the ontology language chosen per connection
-- [x] Business Terms created and deleted through the API, and the relevant Terms' definitions given to SQL generation
-- [x] Load guards: caps on concurrent chats and model calls, back-off on rate limits, over-long runs cancelled, no connection held for idle databases
-- [x] Row limit setting and semantic index status in Settings
-- [x] Exploration map by database: one bubble per database, then its Term graph
-- [x] Exploration map by business domain: database, then business domain, then Terms. The model groups a database's Terms into named domains; a person can rename them, and edits survive regeneration. Reviewed line by line and fixed; measured by hand on Chinook, Pagila and a 95-Term database, but the names are not graded yet. See [docs/exploration-map.md](./docs/exploration-map.md).
+**Ask and get answers**
 
-**Built, being checked on a running instance**
+- Questions in plain language, in any language, answered with the result, a chart and the SQL, with the reasoning folded away
+- Any OpenAI-compatible model provider
+- Suggestions from certified analyses, copy buttons, search with Ctrl+K, light and dark themes
 
-1. [ ] Matching question values to stored values ("USA" for "United States", "Indai" for "India"), from an opt-in value index. First brick of entity resolution.
-2. [ ] Clarification questions in chat: when a term is unknown the agent asks what it means, with 2 to 4 options and a free answer, instead of guessing. Behind a setting, off by default.
-3. [ ] Authentication on the API itself (an internal token between the web app and the API), so it no longer depends on network placement. Off until a token is set.
-4. [ ] Semantic contract and governed proposals (draft pull request): an agent-neutral model of concepts, attributes and relations, reviewed by a person before it is certified, with an opt-in block that lets certified objects reach the SQL planner. Off by default; its accuracy gate (Chinook, flag off against flag on) has been started twice and not completed, see [docs/experiments.md](./docs/experiments.md) (E24).
+**Business knowledge**
 
-**Next, in this order**
+- Business Terms and metrics ("VIP customer"), created, edited and certified on the Terms page or through the API; the relevant definitions are given to the model when it writes the SQL
+- Exploration map by database, then by business domain (the model names the domains, a person can rename them; see [docs/exploration-map.md](./docs/exploration-map.md))
+- Row limit and semantic index status in Settings, with a rebuild and health check of the index
 
-5. [ ] Business metrics as verified, reusable definitions ("revenue", "VIP customer"), used by the chat. The mechanism exists (a Term plus a certified SQL attribute, created through the API, retrieved and shown to the model; checked on one Chinook metric, E28). The Terms page already lets you create, validate, edit and certify one. Missing: a measurement on real questions, and a check that the chat applies it reliably (one case so far). This is the mechanism a learned term will be written into, so it is proven before anything writes to it.
-6. [ ] Measure on real questions: your own questions on your own databases, and each feature above as it lands.
-7. [ ] See what each answer used: under every answer in the chat, the definitions, columns and values it relied on, each marked certified or not, and a reliable record of which ones the SQL actually applied (decided when the SQL is written, not guessed afterwards). Every answer already carries this list through the API, but the "used" mark is a text heuristic that is often undecided. A definition's track record is what makes a learned term safe to promote. In the chat, an answer of the current session now shows the result first, then one quiet line of the path that produced it (understood, knowledge with what the SQL used, the SQL, the rows) that opens into a timeline; the "used" mark is a text heuristic and says so. Still to do: keep it in the conversation history, and make the "used" mark reliable.
-8. [ ] Learned terms: the answer to a clarification becomes a draft definition in the asker's own scope, reused by the chat, with who said it and when (provenance and review status).
-9. [ ] Review and promotion: an owner promotes a draft for everyone; proposed changes with a diff, history and rollback; a human edit is never overwritten.
-10. [ ] Enterprise review: zones and groups, an audit log, a button in the interface for the index rebuild, re-ingestion to apply the new key extraction.
-11. [ ] Database-enforced read-only on the engines still relying on the parse-time guard (Snowflake, Databricks, Kyuubi, HeavyDB).
-12. [ ] Recorded-model evaluation in CI, and a measure of key detection against a known schema.
+**Safety and operations**
 
-**Later, in this order**
+- The SQL the agent writes is read-only and capped in rows, enforced by the database on six engines
+- Limits on concurrent chats and model calls, back-off when the model provider rate-limits, over-long runs cancelled
+- Internal ports published on localhost only by default; Docker official images pinned by digest
+- Foreign keys on partitioned tables and composite keys (Postgres)
 
-- [ ] Let a person move Terms between domains in the interface, and decide whether domains are also generated when the ontology is compiled
-- [ ] Data with mixed-language values
-- [ ] Verified queries: a certified question and its SQL, reused and parameterised, proposed from chat feedback and approved by a person
+**Quality tooling**
+
+- An evaluation harness and a frozen benchmark (Chinook and 180 LiveSQLBench questions) that every change to the SQL engine is measured against
+
+### Works, with limits
+
+1. **Matching values you type to stored values** ("USA" for "United States", "Indai" for "India"), from an opt-in index of the values. Tried on one database.
+2. **Clarification questions.** When a term is unknown, the chat asks what it means, with 2 to 4 options and a free answer, instead of guessing, and the option you pick decides which database answers. Off by default. Limits: the wording of the options changes from one conversation to the next, and it sometimes asks about a question that was already precise.
+3. **Authentication on the API itself**, with an internal token between the web app and the API, so it no longer depends on where the service runs on the network. Off until a token is set; not yet tried on a real deployment.
+4. **Semantic contract** (draft pull request): a shared model of concepts, attributes and relations that a person reviews before it is certified. Off by default and not merged: one measurement is still missing (see [docs/experiments.md](./docs/experiments.md)).
+
+### Next, in this order
+
+5. **Business metrics people can trust and reuse** ("revenue", "VIP customer"). You can already create and certify one on the Terms page, and the chat applies it. Next: make sure it holds on questions of your own.
+6. **Try Lexis on your own questions and databases.** This needs your questions; until then every result comes from public test data.
+7. **See what each answer used.** Under every answer: the definitions, columns and values it relied on, marked certified or not, with a reliable mark of which ones the SQL actually applied.
+8. **Learned terms.** The answer to a clarification becomes a draft definition in the asker's own space, reused by the chat, with who said it and when.
+9. **Review and approval.** An owner approves a draft for everyone; proposed changes show a diff, with history and rollback; a person's edit is never overwritten.
+10. **Team features.** Zones and groups, an audit log, a button in the interface to rebuild the index.
+11. **Database-enforced read-only on the remaining engines** (Snowflake, Databricks, Kyuubi, HeavyDB).
+12. **Automatic quality checks in CI** with a recorded model, and a check of key detection against a known schema.
+
+### Later, in this order
+
+- [ ] Move Terms between domains in the interface
+- [ ] Data with values in several languages
+- [ ] Verified queries: a certified question and its SQL, reused with parameters, proposed from chat feedback and approved by a person
 - [ ] Suggestions mined from query history: candidate terms, metrics and joins for a person to accept
-- [ ] Entity resolution for records: duplicate customers, products and companies
+- [ ] Duplicate detection for customers, products and companies
 - [ ] The rest of the per-question trace in the interface: repairs made, time and cost
-- [ ] A scheduled evaluation with a regression history, and a question set per customer database
+- [ ] A scheduled evaluation with a history, and a question set per customer database
 - [ ] Per-user database credentials and row-level security where the engine supports them
 - [ ] Rate limits and a model-spend budget per user
 - [ ] Export and import of the ontology between environments
@@ -299,9 +308,9 @@ Ordered by priority. Each step either unlocks the next or needs it, so the order
 - [ ] One-click deploy templates (Railway, Render)
 - [ ] Replace the remaining vendor UI components with open ones
 
-**Tried and not merged**
+### Tried and not merged
 
-- Value-anchor literal repair in the SQL engine: no gain over current `main` when measured against it (E26 in [docs/experiments.md](./docs/experiments.md)); the pull request was closed and the branch kept.
+- Repairing literal values in the SQL engine: no gain over the current `main` (E26 in [docs/experiments.md](./docs/experiments.md)); the pull request was closed and the branch kept.
 
 Have an idea? [Open an issue](https://github.com/julienawonga/lexis/issues/new): feature requests and
 feedback shape the roadmap.
