@@ -60,7 +60,7 @@ import httpx
 import yaml
 
 from auto_ontology.server.internal_auth import INTERNAL_TOKEN_ENV, INTERNAL_TOKEN_HEADER
-from dev_tools.evals import bench, conversation
+from dev_tools.evals import bench, conversation, history
 from dev_tools.evals.cases import (
     DEFAULT_CASES_DIR,
     Case,
@@ -80,6 +80,7 @@ from dev_tools.evals.lsb import (
     score_report,
     write_case_files,
 )
+from dev_tools.evals.paired import paired_evidence
 from dev_tools.evals.preflight import PreflightError, preflight
 from dev_tools.evals.provenance import check_comparable
 from dev_tools.evals.report import Report, Run, compare_reports, merge_reports
@@ -279,6 +280,7 @@ def _cmd_compare(args: argparse.Namespace) -> int:
         base, candidate, margin=args.margin, tolerance=args.tolerance
     )
     print(comparison.render())
+    print(paired_evidence(base, candidate).render())
     return 0 if comparison.accepted else 1
 
 
@@ -921,6 +923,7 @@ def build_parser() -> argparse.ArgumentParser:
     rep.add_argument("--allow-empty-index", action="store_true")
     rep.set_defaults(func=_cmd_replay)
     bench.add_parser(sub)
+    history.add_parser(sub)
     return parser
 
 
