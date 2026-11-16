@@ -60,6 +60,10 @@ def _format_kpi_value(value: Any) -> str:
     return str(cell)
 
 
+#: A KPI card shows at most this many tiles; the frontend rejects more.
+MAX_KPI_TILES = 4
+
+
 def _truncate_rows(
     rows: list[dict[str, Any]], y_keys: list[str], plot_type: str
 ) -> list[dict[str, Any]]:
@@ -118,10 +122,20 @@ def _build_kpi_spec(
         else ""
     )
 
-    kpis = [
-        {"label": str(col), "value": _format_kpi_value(row[col])}
-        for col in (measures or list(df.columns))[:4]
-    ]
+    tiled = measures or list(df.columns)
+    if len(tiled) > MAX_KPI_TILES:
+        # Four tiles is what the card shows. Keeping the first four would drop
+        # the rest without a trace (one such result hid its largest category),
+        # so decline and let the caller fall back to the table, which shows
+        # every column.
+        logger.info(
+            "build_chart_spec: %d values do not fit %d kpi tiles (%s)",
+            len(tiled),
+            MAX_KPI_TILES,
+            plot.title,
+        )
+        return None
+    kpis = [{"label": str(col), "value": _format_kpi_value(row[col])} for col in tiled]
     if not kpis:
         return None
     if context:
