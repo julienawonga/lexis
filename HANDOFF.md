@@ -65,43 +65,40 @@ owner's go-ahead at the end of each. **Phase 0 is done, phase 1 is in progress.*
   lists the limits of the engine (E1 to E9), operations (O1 to O9), the frontend
   (F1 to F15) and the evaluation (V1 to V7), each with evidence, severity and
   cost. Later phases refer to these ids.
-- **Phase 1 (operational), merged on 2026-11-16** (`main` green after each):
-  - #87: the internal API token tried live (E32). 401 without it, 200 with it,
-    on the API and the ingestion service.
-  - #88: frontend F1 to F3 (a refused chat turn is undone and the clarification
-    card reopened; an expired session gets a sentence, not raw JSON; agent
-    settings that failed to load cannot be saved over).
-  - #89: column order fixed in `fetch_database_link_candidates` (a flaky CI test).
-  - #90: [`docs/backup-restore.md`](./docs/backup-restore.md), with a dump
-    restored into a throwaway container and compared table by table.
-  - #91: `.env.example` no longer overrides the model settings with placeholders.
-  - #92: `GET /api/health/chat` (model settings, semantic index, optional calls
-    to the gateway with `?probe=true`).
-  - #85 and #86: this file, `GOAL.md` and the audit.
-- **Phase 1, open:**
-  - PR #93 (E33, the eight-chat load trial: 8 of 8 answered, at most 4 slots, no
-    error, memory back to idle). Green, waiting for the owner's OK to merge.
-  - Branch `ops-clear-errors`, pushed, **no PR yet**, one commit marked WIP: a
-    JSON 500 with an `error_id` that is also in the log (`server/errors.py`, both
-    services), `POST /ingest` refuses a connection with no database name (422),
-    the schema gate tells a rollback apart from a pending upgrade, and the chat
-    request log no longer holds the question text. 138 local tests pass.
-    Remaining: run `python -m dev_tools.generate_backend_openapi` (a route's
-    code changed), open the PR, wait for CI.
-- **Phase 1, not started:** a browser pass by the owner (sign in and ask one
-  question with the token on: the web app's proxy is the one path not tried);
-  an install from scratch on a clean compose project; rebuilding and
-  redeploying the images from `main`; a chat worker that fails at start (audit
-  O3, to reproduce); the cheap MEDIUM frontend items (F5, F7, F8, F11).
-- **The running stack is behind `main`.** Its images predate #88, #89 and #92.
-  It was restarted with `INTERNAL_API_TOKEN` passed from the shell, **not from
-  `.env`**: a `docker compose up` without that variable brings the API back
-  open. The value is in `HomeLab/lexis-evals/secrets/internal_api_token.txt`;
-  the owner adds the line to `.env`. Until then, pass the token to every call:
-  `-H "x-internal-token: ..."`, or `--token` for `dev_tools.evals`.
-- Rollback: images tagged `auto-ontology:pre-token` and
-  `auto-ontology-frontend:pre-token`; dump
-  `HomeLab/lexis-backups/auto_ontology-2026-11-16-avant-jeton.dump`.
+- **Phase 1 (operational): closed on 2026-11-16**, `main` green (4 workflows at
+  `0e6cc656`). Merged: #87 token tried live (E32); #88 and #96 frontend (refused
+  chat turn, expired session, agent settings that failed to load, a failed
+  conversation delete, a readiness check that could not be made); #89 flaky
+  column order; #90 [`docs/backup-restore.md`](./docs/backup-restore.md); #91
+  `.env.example` placeholders; #92 `GET /api/health/chat`; #93 eight chats at once
+  (E33); #95 JSON 500 with an `error_id`, `/ingest` 422, rollback message, no
+  question text in logs; #85, #86, #94 this file, `GOAL.md` and the audit. E34
+  records the install from scratch and the images rebuilt from `main`.
+- **Phase 1 gaps, stated plainly** (the owner chose to close the phase anyway):
+  the owner has not yet signed in to the web app and asked a question themselves
+  (the same path was tried by script in E34); a chat worker that fails at start
+  is still believed to end an answer with no error (audit O3, not reproduced);
+  the frontend items F4, F5, F6, F8 (list, select, rename), F9 to F14 of the
+  audit are open; the README's single `docker compose up -d --build` was not
+  tried; there is still no browser test; ingestion has no lock (O7) and the
+  Kumo prediction path still bypasses the SQL guard (O6, off by default).
+- **The stack runs on the rebuilt images** (backend and frontend from `0e6cc656`,
+  2026-11-16 evening). Rollback tags: `auto-ontology:pre-rebuild`,
+  `auto-ontology-frontend:pre-rebuild`; older: `pre-token`. A dump taken before
+  the token restart is in `HomeLab/lexis-backups/`. It was restarted with
+  `INTERNAL_API_TOKEN` passed from the shell, **not from `.env`**: a
+  `docker compose up` without that variable brings the API back open. The value
+  is in `HomeLab/lexis-evals/secrets/internal_api_token.txt`; the owner adds the
+  line to `.env`. Until then, pass the token to every call
+  (`-H "x-internal-token: ..."`, or `--token` for `dev_tools.evals`).
+- **Next: phase 2 (engine robustness)**, after the owner's go-ahead. The audit
+  says the first and worst limit is that the engine cannot refuse an unanswerable
+  question (E1); fixing it honestly needs a frozen unanswerable set and a
+  conversation-aware protocol in the repository first (phase 3, V1 and V2), so
+  the two are best planned together. Cheap, no-gate items from the audit that do
+  not change what the model sees: a structured `caveats` list on the answer (E3),
+  the row-cap notice in the interface (E4), the database used shown under each
+  answer (E5), "no rows found" (E6), the chart summing fix (E2).
 - **Parked:** PR #62 (semantic contract, draft, branch
   `codex/semantic-contract`: needs a measurement and an `alembic merge`). Branch
   `answerability` is pushed, not merged (E27, E29): it flags unanswerable

@@ -957,6 +957,52 @@ to interpret the entries is repeated.
   Script and raw result are kept outside the repository
   (`lexis-evals/load/`). `REAL-E2E`, manual.
 
+### E34 - Install from scratch, then the images rebuilt from `main` (2026-11-16)
+
+- **Question.** Does the documented path (README quickstart) bring up a working
+  Lexis from nothing, and does the stack run on images built from the merged
+  `main`? Until now CI built the images and never started them.
+- **Setup.** Images built locally from `main` at `0e6cc656` (backend about 5
+  minutes; frontend about 3, with the stack stopped as the build needs). A second
+  compose project, `lexis-install-test`, in its own folder: its own volumes,
+  container names and ports, a Postgres with nothing in it, a `.env` made from
+  `.env.example` by setting the values the README lists (fresh secrets and
+  passwords, the maintainer's gateway for the models), then the README steps in
+  order. Cost: one embedding pass of 102 rows and the compilation of one
+  database, a few dozen model calls, 25 minutes of waiting in total.
+- **Result.**
+  1. All five containers healthy; the migration jobs ran by themselves; health
+     `ok` at the head revision; the API refused requests without the token (401).
+  2. The first administrator was created from the `.env` values; signing in through
+     the web app worked, a wrong password answered 401.
+  3. Pagila loaded; the connection was created **through the web app with the
+     admin session**: the web app, the API and the ingestion service talked to each
+     other with the token (15 tables, 87 columns, 102 embedding rows in 3.8 s). The
+     same call with no session answered 401.
+  4. Compilation switched on through the web app: 80 of 80 index rows after about
+     70 s (the same 80 as on the long-running stack).
+  5. "What is our total revenue?" through the web app's chat route answered
+     `SUM(payment.amount)` = **2502.01**, the known value, with 22 steps and a
+     `result` event.
+  6. The test project was removed with `down -v` (its own volumes only); no
+     container or volume of it is left, the running stack was not touched.
+- **On the way.** The first poll of the compilation status failed because my own
+  cookie file had vanished, not the app: a fresh session worked and the cookie
+  lasts seven days. The running stack was restarted on the new images with the
+  token: the new chat health route answered `ok` with the real gateway (one
+  embedding call and one completion, 3 s), `POST /ingest` with an empty body
+  answered 422.
+- **Limits.** One run, on the maintainer's Windows machine with Docker Desktop and
+  its model gateway; not a clean machine, not Linux, not a first pull of the base
+  images. **What it does not test:** the README's single `docker compose up -d
+  --build` (the images were built by hand, one at a time, to stay inside the VM's
+  memory), the `docker compose up -d --wait postgres` first step, a model
+  provider other than the maintainer's, and Kubernetes (Helm). I changed the
+  compose copy's container names and ports (and dropped its build blocks) to avoid
+  clashing with the live stack, so that file is not the repository's. The one
+  question was answered correctly once: this is a "does it run" check, not an
+  accuracy measure. `REAL-E2E`, manual.
+
 ### Built but never run
 
 PR #44 (`bench split/run/score`) is tested with synthetic cases and fakes only;
@@ -1051,7 +1097,7 @@ Engineering findings without a score: E02 (empty index), E04 (FK extraction), E0
 E10 (connection exhaustion), E11 (host crash), E12 (429 storm), E17 (startup
 re-ingestion), E18 (trace), E19 (flaky test), E21 (Terms API), E23 (domain grouping, not scored),
 E24 (semantic contract review; the measurement was stopped twice and has no result),
-E25 (domain map review), E26 (value-anchor repair, not merged), E27 (unanswerable questions: baseline), E28 (certified metric, change not merged), E29 (rule on the SQL, exploration), E30 (value matching, live check), E31 (clarification choice and its database), E32 (internal API token, live), E33 (eight chats at once, live).
+E25 (domain map review), E26 (value-anchor repair, not merged), E27 (unanswerable questions: baseline), E28 (certified metric, change not merged), E29 (rule on the SQL, exploration), E30 (value matching, live check), E31 (clarification choice and its database), E32 (internal API token, live), E33 (eight chats at once, live), E34 (install from scratch, images rebuilt).
 
 ## 5. What is NOT yet measured
 
