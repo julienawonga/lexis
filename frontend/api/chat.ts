@@ -12,19 +12,11 @@ import type {
 	ErrorEvent,
 	ClarificationEvent,
 } from '@/types/chat';
+import { responseErrorMessage } from '@/lib/chatErrors';
 import { parseClarificationEvent } from '@/lib/clarification';
 
-const getResponseErrorMessage = async (res: Response): Promise<string> => {
-	const fallback = `Server responded with ${res.status}`;
-	const text = await res.text().catch(() => '');
-	if (!text) return fallback;
-
-	try {
-		const { detail } = JSON.parse(text) as { detail?: unknown };
-		if (typeof detail === 'string' && detail.trim()) return detail;
-	} catch {}
-	return text;
-};
+const getResponseErrorMessage = async (res: Response): Promise<string> =>
+	responseErrorMessage(res.status, await res.text().catch(() => ''));
 
 export type ChatEventCallbacks = {
 	onStep: (event: StepEvent) => void;
