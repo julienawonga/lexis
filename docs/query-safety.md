@@ -79,5 +79,13 @@ connectors read the whole result and are trimmed afterwards, so the limit
 bounds what the model and the interface receive but not the memory used to
 fetch it.
 
+The prediction path (Kumo, off unless `KUMO_RFM_API_KEY` is set) follows the
+same rules. SQL a model wrote there (the entity selection) goes through
+`execute_chat_sql`, so all three protections apply. SQL the package builds from
+quoted catalog identifiers (table loads, key lookups) runs read-only and is
+capped at `kumo_table_max_rows` (default 1,000,000, a placeholder not tuned on
+any dataset; between 1 and 100,000,000), or at `KUMO_MAX_ROWS_PER_TABLE` for
+table loads when that variable is set. A table that reaches the cap is logged.
+
 The existing SQL Query Timeout (Settings > Agent Settings, 30 seconds by
 default) still applies.

@@ -30,6 +30,7 @@ from typing import Any
 
 import pandas as pd
 
+from auto_ontology.infra.feature_flags import get_kumo_table_max_rows
 from auto_ontology.retrieval.kumo.budget import (
     Budget,
     RefusedForCapacity,
@@ -45,6 +46,7 @@ from auto_ontology.retrieval.kumo.graph_cache import (
     join_fingerprint,
 )
 from auto_ontology.retrieval.kumo.pql_gen import quote_ident
+from auto_ontology.retrieval.kumo.sql_exec import run_catalog_sql
 from auto_ontology.retrieval.kumo.kumo_model import key_columns
 from auto_ontology.retrieval.kumo.telemetry import (
     CACHE_DISABLED,
@@ -198,17 +200,22 @@ def _load_relevant_frames(
             str(t.get("database_name") or ""), default_connector
         )
         name = table if table not in frames else f"{schema}_{table}"
-        limit = f" LIMIT {_MAX_ROWS_PER_TABLE}" if _MAX_ROWS_PER_TABLE else ""
+        # The operator env var wins; otherwise the documented default cap
+        # applies, so a table is never read without a bound.
+        row_cap = _MAX_ROWS_PER_TABLE or get_kumo_table_max_rows()
+        limit = f" LIMIT {row_cap}"
         logger.info(
             "kumo: loading rows for %s.%s (limit=%s)...",
             schema,
             table,
-            _MAX_ROWS_PER_TABLE or "none",
+            row_cap,
         )
         t_start = time.perf_counter()
         try:
-            df = connector.execute(
-                f"SELECT {_projection(t)} FROM {_quote(schema, table)}{limit}"
+            df = run_catalog_sql(
+                connector,
+                f"SELECT {_projection(t)} FROM {_quote(schema, table)}{limit}",
+                max_rows=row_cap,
             )
         except Exception as error:
             logger.exception("kumo: failed to load rows for %s.%s", schema, table)
@@ -221,6 +228,14 @@ def _load_relevant_frames(
         if df is None or df.empty:
             logger.info("kumo: %s.%s returned 0 rows in %.2fs", schema, table, elapsed)
             continue
+        if len(df) >= row_cap:
+            logger.warning(
+                "kumo: %s.%s reached the %d-row cap, so the graph may hold only "
+                "part of the table",
+                schema,
+                table,
+                row_cap,
+            )
         logger.info(
             "kumo: loaded %d row(s) x %d col(s) from %s.%s in %.2fs",
             len(df),

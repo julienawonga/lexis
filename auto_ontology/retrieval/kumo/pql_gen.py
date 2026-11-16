@@ -38,6 +38,7 @@ from langchain_core.language_models import BaseChatModel
 from auto_ontology.connectors.base import SQLDatabase
 
 from auto_ontology.retrieval.kumo.budget import RefusedForCapacity
+from auto_ontology.retrieval.kumo.sql_exec import run_catalog_sql, run_model_sql
 from auto_ontology.retrieval.kumo.prompts import build_pql_prompt
 from auto_ontology.utils.llm_invoke import invoke_text
 
@@ -498,16 +499,17 @@ def aggregate_prediction_by(
     id_col = _entity_id_column(prediction, pk)
     value_col = _prediction_value_column(prediction, id_col=id_col)
     try:
-        dim = connector.execute(
+        dim = run_catalog_sql(
+            connector,
             f"SELECT {quote_ident(pk)}, {quote_ident(group_by)} "
             f"FROM {_sql_table(table, table_names)} "
-            f"WHERE {quote_ident(pk)} IS NOT NULL"
+            f"WHERE {quote_ident(pk)} IS NOT NULL",
         )
     except Exception as exc:  # noqa: BLE001 - turn an opaque warehouse error into an actionable group-by error
         try:
             valid = list(
-                connector.execute(
-                    f"SELECT * FROM {_sql_table(table, table_names)} LIMIT 1"
+                run_catalog_sql(
+                    connector, f"SELECT * FROM {_sql_table(table, table_names)} LIMIT 1"
                 ).columns
             )
         except Exception:  # noqa: BLE001 - best-effort column listing for the message
@@ -1154,9 +1156,10 @@ def _count_entities(connector: SQLDatabase, source: str, pk: str) -> int:
     let an answer over a slice be presented as an answer over everything.
     """
     try:
-        df = connector.execute(
+        df = run_catalog_sql(
+            connector,
             f"SELECT COUNT(DISTINCT {quote_ident(pk)}) FROM {source} "
-            f"WHERE {quote_ident(pk)} IS NOT NULL"
+            f"WHERE {quote_ident(pk)} IS NOT NULL",
         )
         return int(df.iloc[0, 0]) if not df.empty else 0
     except Exception:
@@ -1195,7 +1198,7 @@ def _resolve_indices(
         else None
     )
     if entity_sql:
-        df = connector.execute(_qualify_from_clauses(entity_sql, table_names))
+        df = run_model_sql(connector, _qualify_from_clauses(entity_sql, table_names))
         ids = df.iloc[:, 0].dropna().tolist() if not df.empty else []
         if available is not None:
             allowed = set(available)
@@ -1207,9 +1210,10 @@ def _resolve_indices(
             return [], 0
         table, pk = entity
         source = _sql_table(table, table_names)
-        df = connector.execute(
+        df = run_catalog_sql(
+            connector,
             f"SELECT DISTINCT {quote_ident(pk)} FROM {source} "
-            f"WHERE {quote_ident(pk)} IS NOT NULL LIMIT {int(max_entities)}"
+            f"WHERE {quote_ident(pk)} IS NOT NULL LIMIT {int(max_entities)}",
         )
         ids = df.iloc[:, 0].dropna().tolist() if not df.empty else []
         if len(ids) >= max_entities:
@@ -1309,9 +1313,10 @@ def _forecast_anchor(
     try:
         import pandas as pd
 
-        df = connector.execute(
+        df = run_catalog_sql(
+            connector,
             f"SELECT MAX({quote_ident(time_col)}) AS m "
-            f"FROM {_sql_table(anchor_table, table_names)}"
+            f"FROM {_sql_table(anchor_table, table_names)}",
         )
         data_max = (
             pd.Timestamp(df.iloc[0, 0])
@@ -1391,9 +1396,10 @@ def _resolve_single_index(
         return []
     safe = str(entity).replace("'", "''")
     string_type = "VARCHAR"
-    df = connector.execute(
+    df = run_catalog_sql(
+        connector,
         f"SELECT {quote_ident(pk)} FROM {_sql_table(table, table_names)} "
-        f"WHERE CAST({quote_ident(pk)} AS {string_type}) = '{safe}' LIMIT 1"
+        f"WHERE CAST({quote_ident(pk)} AS {string_type}) = '{safe}' LIMIT 1",
     )
     return df.iloc[:, 0].tolist() if not df.empty else []
 
