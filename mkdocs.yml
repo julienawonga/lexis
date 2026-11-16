@@ -48,6 +48,7 @@ nav:
       - Connections and credential storage: connections.md
       - Source-database connections: source-connections.md
       - Authentication, SSO, and API tokens: authentication.md
+      - Backup, restore and rollback: backup-restore.md
   - Using Lexis:
       - Conversation API: conversation-api.md
       - Business Terms API: terms-api.md
