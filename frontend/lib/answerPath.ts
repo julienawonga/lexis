@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { parseSqlResponse } from '@/lib/parseSqlResponse';
+import { hasValidationCaveat } from '@/lib/validationCaveat';
 import type { ChatMessage, PathStep, PathStepId } from '@/types/chat';
 
 /** Which engine nodes make up each step shown to the user. */
@@ -36,7 +37,12 @@ export const pathSteps = (message: ChatMessage): PathStep[] => {
 	const table = parseSqlResponse(message.result?.sqlResponse ?? message.sqlResponse);
 
 	let sqlSummary = '';
-	if (hasRun(message, 'sql') && (message.steps ?? []).some((s) => s.node === 'reconstruct_sql')) {
+	if (hasValidationCaveat(message.content)) {
+		sqlSummary = 'not fully validated';
+	} else if (
+		hasRun(message, 'sql') &&
+		(message.steps ?? []).some((s) => s.node === 'reconstruct_sql')
+	) {
 		sqlSummary = 'corrected';
 	} else if ((message.steps ?? []).length > 0) {
 		sqlSummary = '1 attempt';
