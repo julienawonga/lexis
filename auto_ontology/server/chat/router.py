@@ -117,6 +117,7 @@ from auto_ontology.server.chat.limits import (
 )
 from auto_ontology.server.chat.clarification import (
     ClarificationStateError,
+    answer_database,
     answer_text,
     definition_evidence,
 )
@@ -556,7 +557,9 @@ def _pump(slot: _Slot) -> None:
 
     persisted = False
 
-    def persist_event(event: dict) -> None:
+    def persist_event(
+        event: dict, option_databases: dict[str, str] | None = None
+    ) -> None:
         nonlocal persisted
         if persisted or slot.user_id is None or slot.analytics_id is None:
             return
@@ -569,13 +572,21 @@ def _pump(slot: _Slot) -> None:
             # that follows can be merged back into it.
             if slot.conversation_id is None:
                 return
+            databases = option_databases or {}
+            fields = {k: v for k, v in event.items() if k != "type"}
+            # The event the client gets has no database; each option regains its
+            # own here, so choosing it later can pin the answer to that database.
+            fields["options"] = [
+                {**option, "database": databases.get(option.get("id"))}
+                for option in fields.get("options", [])
+            ]
             try:
                 persist_clarification_message(
                     conversation_id=slot.conversation_id,
                     user_id=slot.user_id,
                     analytics_id=slot.analytics_id,
                     clarification=Clarification(
-                        **{k: v for k, v in event.items() if k != "type"},
+                        **fields,
                         original_question=slot.question,
                     ),
                 )
@@ -627,6 +638,12 @@ def _pump(slot: _Slot) -> None:
                 # in `_stream_slot` instead, so there's nothing to buffer.
                 continue
             event = item
+            option_databases: dict[str, str] | None = None
+            if event.get("type") == "clarification":
+                # Server-side only: the databases ride on the worker's event and
+                # are removed here, before the event is buffered for the client.
+                option_databases = event.get("option_databases")
+                event = {k: v for k, v in event.items() if k != "option_databases"}
             if event.get("type") == "step":
                 node_name = event.get("node", "")
                 event = {**event, "label": NODE_LABELS.get(node_name, node_name)}
@@ -634,7 +651,7 @@ def _pump(slot: _Slot) -> None:
                 # Streamed straight through for the live view; remembered so
                 # the failure paths above have something to persist.
                 slot.last_sql = str(event.get("sql") or "") or None
-            persist_event(event)
+            persist_event(event, option_databases)
             with slot.buffer_lock:
                 slot.buffer.append(event)
             if event.get("type") == "result" and not slot.cancelled.is_set():
@@ -913,6 +930,21 @@ async def chat_completions(
                 )
                 conversation_history = conversation_history[:-1]
                 slot.question = agent_question
+                # An option that names its database pins the answer to it, so the
+                # later database vote cannot pick another one. A caller-selected
+                # target_db always wins, and an unknown name is ignored.
+                chosen_db = answer_database(pending, request.clarification)
+                if target_db is None and chosen_db is not None:
+                    try:
+                        target_db = await asyncio.to_thread(
+                            _resolve_chat_target_db, chosen_db
+                        )
+                    except HTTPException:
+                        logger.warning(
+                            "Clarification option database %r is not in the catalog; "
+                            "falling back to the database vote",
+                            chosen_db,
+                        )
                 logger.info(
                     "Clarification %s answered for term %r",
                     pending.clarification_id,

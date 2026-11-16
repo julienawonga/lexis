@@ -420,3 +420,100 @@ def test_free_text_reply_check(monkeypatch: pytest.MonkeyPatch, fakes: _Fakes) -
     fakes.proposal = RuntimeError("down")
     assert is_clarification_answer(llm=object(), **kwargs) is True
     assert is_clarification_answer(llm=None, **kwargs) is True
+
+
+# -- options keep the database they came from ----------------------------------
+
+
+def _hit(database: str, text: str, score: float = 0.5) -> dict:
+    return {
+        "id": text,
+        "label": "ColumnAttribute",
+        "score": score,
+        "text": text,
+        "database_name": database,
+    }
+
+
+def _proposed(*pairs: tuple[str, str | None]) -> list[Any]:
+    return [module._ProposedOption(label=label, database=db) for label, db in pairs]
+
+
+def test_option_keeps_a_database_the_candidates_really_contain() -> None:
+    result = validate_options(
+        _proposed(("A", "alpha"), ("B", "Beta")), frozenset({"alpha", "beta"})
+    )
+
+    assert result is not None
+    assert [o.database for o in result] == ["alpha", "beta"]
+
+
+def test_option_drops_a_database_the_model_made_up() -> None:
+    result = validate_options(
+        _proposed(("A", "alpha"), ("B", "invented")), frozenset({"alpha"})
+    )
+
+    assert result is not None
+    assert [o.database for o in result] == ["alpha", None]
+
+
+def test_option_has_no_database_when_none_is_known() -> None:
+    result = validate_options(_proposed(("A", "alpha"), ("B", None)))
+
+    assert result is not None
+    assert [o.database for o in result] == [None, None]
+
+
+def test_database_never_reaches_the_client_event(fakes: _Fakes) -> None:
+    fakes.proposal = _proposal(
+        options=[
+            {"label": "A", "database": "alpha"},
+            {"label": "B", "database": "beta"},
+        ]
+    )
+    fakes.search = lambda *_a, **kw: (  # type: ignore[method-assign]
+        [_hit("alpha", "x.a"), _hit("beta", "y.b")]
+        if kw["label_filter"][0] == "ColumnAttribute"
+        else []
+    )
+    module.search_semantic_index = fakes.search  # type: ignore[assignment]
+
+    clarification = _detect().clarification
+
+    assert clarification is not None
+    assert [o.database for o in clarification.options] == ["alpha", "beta"]
+    assert all("database" not in o for o in clarification.event()["options"])
+
+
+def test_schema_hits_are_tagged_and_ordered_the_same_every_time() -> None:
+    hits = [_hit("beta", "b.col", 0.4), _hit("alpha", "a.col", 0.4)]
+
+    first = module._format_schema_hits(hits, "none")
+    second = module._format_schema_hits(list(reversed(hits)), "none")
+
+    assert first == second
+    assert first.index("database alpha") < first.index("database beta")
+
+
+def test_worker_event_carries_the_databases_the_client_event_hides(
+    fakes: _Fakes,
+) -> None:
+    fakes.proposal = _proposal(
+        options=[
+            {"label": "A", "database": "alpha"},
+            {"label": "B", "database": "beta"},
+            {"label": "C"},
+        ]
+    )
+    module.search_semantic_index = lambda *_a, **kw: (  # type: ignore[assignment]
+        [_hit("alpha", "x.a"), _hit("beta", "y.b")]
+        if kw["label_filter"][0] == "ColumnAttribute"
+        else []
+    )
+
+    clarification = _detect().clarification
+
+    assert clarification is not None
+    event = clarification.worker_event()
+    assert event.pop("option_databases") == {"opt-1": "alpha", "opt-2": "beta"}
+    assert event == clarification.event()

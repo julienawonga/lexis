@@ -114,6 +114,20 @@ def answer_text(
     return reply.strip()
 
 
+def answer_database(
+    pending: Clarification, answer: ClarificationAnswer | None
+) -> str | None:
+    """The database the chosen option lives in, or ``None`` when it names none.
+
+    Only a picked option carries one. Free text, or an option the detector could
+    not attach a database to, leaves the choice of database to the usual vote.
+    """
+    if answer is None or answer.option_id is None:
+        return None
+    option = _option(pending, answer.option_id)
+    return option.database if option is not None else None
+
+
 def definition_evidence(pending: Clarification, answer: str) -> str:
     """The answer as authoritative evidence for the question it belongs to.
 

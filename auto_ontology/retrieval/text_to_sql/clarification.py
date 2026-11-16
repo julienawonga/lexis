@@ -103,6 +103,10 @@ class ClarificationOption(BaseModel):
     id: str
     label: str
     description: str | None = None
+    # The database the reading lives in, when the candidates name one. Kept
+    # server-side: picking the option pins the answer to this database, so the
+    # later database vote cannot land somewhere else. Never sent to the client.
+    database: str | None = None
 
 
 class Clarification(BaseModel):
@@ -127,8 +131,25 @@ class Clarification(BaseModel):
             "clarification_id": self.clarification_id,
             "term": self.term,
             "question": self.question,
-            "options": [o.model_dump(exclude_none=True) for o in self.options],
+            "options": [
+                o.model_dump(exclude_none=True, exclude={"database"})
+                for o in self.options
+            ],
             "allow_other": self.allow_other,
+        }
+
+    def worker_event(self) -> dict[str, Any]:
+        """The event as the worker hands it to the server, before the client sees it.
+
+        It carries the database of each option under ``option_databases`` so the
+        server can store it with the question. The server removes the key before
+        the event is streamed: the client never sees a database name.
+        """
+        return {
+            **self.event(),
+            "option_databases": {
+                o.id: o.database for o in self.options if o.database is not None
+            },
         }
 
 
@@ -145,6 +166,7 @@ class ClarificationDecision:
 class _ProposedOption(BaseModel):
     label: str
     description: str | None = None
+    database: str | None = None
 
 
 class ClarificationProposalModel(BaseModel):
@@ -210,7 +232,9 @@ Do NOT ask when:
 When you do ask, write the question in the language of the user's question, about
 the business concept and never about tables or columns, and give 2 to 4 options.
 Each option is one concrete, different reading of the term that the schema below
-can express, with a short label and an optional one-line description. Never add
+can express, with a short label and an optional one-line description. When the
+column an option relies on is listed below with a database name, copy that exact
+database name into the option's database field; never invent one. Never add
 a vague option such as "other" or "something else": the interface adds its own
 free-text choice. When you do not ask, leave question and options empty.
 
@@ -242,15 +266,26 @@ User message: {reply}
 """
 
 
+def _known_database(name: str | None, known: dict[str, str]) -> str | None:
+    """The canonical name of *name* if the candidates really contain it."""
+    return known.get(" ".join((name or "").split()).casefold())
+
+
 def validate_options(
     proposed: list[_ProposedOption],
+    known_databases: frozenset[str] = frozenset(),
 ) -> list[ClarificationOption] | None:
     """Return 2 to 4 distinct, non-vague, bounded options, or ``None`` if unusable.
 
     Vague entries and duplicates are dropped rather than failing the whole
     proposal; a count outside 2..4 after that, or an over-long text, is not
     repaired because it means the model did not follow the contract.
+
+    An option keeps the database the model attached to it only when that name is
+    one of *known_databases*, the databases the retrieved candidates come from.
+    A name the model made up is dropped, and the option is then unpinned.
     """
+    known = {" ".join(name.split()).casefold(): name for name in known_databases}
     cleaned: list[ClarificationOption] = []
     seen: set[str] = set()
     for item in proposed:
@@ -268,7 +303,10 @@ def validate_options(
         seen.add(key)
         cleaned.append(
             ClarificationOption(
-                id=f"opt-{len(cleaned) + 1}", label=label, description=description
+                id=f"opt-{len(cleaned) + 1}",
+                label=label,
+                description=description,
+                database=_known_database(item.database, known),
             )
         )
     if not MIN_OPTIONS <= len(cleaned) <= MAX_OPTIONS:
@@ -309,6 +347,27 @@ def _format_hits(hits: list[dict], empty: str) -> str:
     return "\n".join(
         f"- [{h.get('label', '?')}, distance {_distance(h):.2f}] {_snippet(h)}"
         for h in hits
+    )
+
+
+def _hit_database(hit: dict) -> str:
+    return str(hit.get("database_name") or "").strip()
+
+
+def _format_schema_hits(hits: list[dict], empty: str) -> str:
+    """Schema hits in a fixed order, each tagged with the database it comes from.
+
+    The order is (distance, database, text) so that equal distances never reorder
+    between runs, which is what made the offered readings change from one
+    conversation to the next.
+    """
+    if not hits:
+        return empty
+    ordered = sorted(hits, key=lambda h: (_distance(h), _hit_database(h), _snippet(h)))
+    return "\n".join(
+        f"- [{h.get('label', '?')}, database {_hit_database(h) or 'unknown'}, "
+        f"distance {_distance(h):.2f}] {_snippet(h)}"
+        for h in ordered
     )
 
 
@@ -431,7 +490,7 @@ def _decide(
             HumanMessage(
                 content=_PROMPT.format(
                     definitions=_format_hits(related, "None found."),
-                    schema=_format_hits(schema, "None found."),
+                    schema=_format_schema_hits(schema, "None found."),
                     history=_format_history(history),
                     evidence=evidence.strip() or "None",
                     question=question.strip(),
@@ -463,7 +522,14 @@ def _decide(
 
     term = " ".join((proposal.term or "").split())
     text = " ".join((proposal.question or "").split())
-    options = validate_options(proposal.options)
+    known_databases = frozenset(name for name in map(_hit_database, schema) if name)
+    options = validate_options(proposal.options, known_databases)
+    logger.info(
+        "Clarification options: proposed=%s kept=%s known_databases=%s",
+        [(o.label, o.database) for o in proposal.options],
+        [(o.label, o.database) for o in options] if options else None,
+        sorted(known_databases),
+    )
     if (
         not term
         or len(term) > MAX_TERM_CHARS

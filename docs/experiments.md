@@ -808,6 +808,89 @@ to interpret the entries is repeated.
   ("Authenticated conversation required"), so the feature can only be checked
   through the web app by a signed-in user; that check was not done.
 
+### E31 - Does a clarification choice decide the database? (2026-11-16, PR #82)
+
+- **Question.** With no database selected, the clarification offers readings that
+  live in different databases. Does choosing one of them decide which database
+  answers, or does the later database vote override it?
+- **Finding 1 (before the change).** The chosen option reached the engine only as
+  text in the evidence. The vote (`_select_candidate_database`) then picked the
+  database alone. Live, same question twice on the stack: choosing a reading from
+  `mental` gave `mental`; choosing a reading from `disaster` gave `virtual`, a
+  database that holds a different satisfaction measure (aggregate distance 0.99,
+  one entity covered). Two trials, one wrong: a real defect, not a frequency.
+- **Change.** Each option keeps the database of the candidate it relies on (the
+  model copies it from the tagged candidates; a name not among the candidates is
+  dropped). Picking the option pins the answer to that database. Candidates are
+  listed in a fixed order. The database never reaches the client.
+- **Finding 2 (a wrong first fix).** The first deployment still failed live: the
+  databases were present after validation (logged) but missing from the stored
+  message, because the worker handed the server the client-facing event, which has
+  no databases, and the server rebuilt the clarification from it. Unit tests with
+  fakes did not catch it. Fixed by carrying the databases on an internal key that
+  the server stores and removes before streaming.
+- **Result after the fix (live, 15:10).** The same question, choosing the
+  `disaster` reading: the stored options carried their databases, the run went
+  with `target_db=disaster`, no database vote ran, and the SQL was anchored on the
+  `disaster` column. One live trial.
+- **Finding 3 (a separate defect, not fixed, on purpose).** A certified metric "VIP
+  Customer" at distance 0.61 (skip threshold `definition_max_distance` = 0.62) made
+  the detector skip the question for a satisfaction question, because both mention
+  "customer". Seen once live. Distances of the best SqlAttribute hit (this one
+  metric, Pagila), measured afterwards with embedding calls only: 5 questions about
+  VIP customers (one in French) 0.38 to 0.46; 7 questions unrelated to it 0.55 to
+  0.64, so the threshold sits inside the unrelated range (3 of the 7 are under it).
+  Consequence: a clarification is missed and the engine answers as it did before the
+  feature existed. It is not a wrong answer produced by the metric, so the severity
+  is low. The definition is still shown to the model up to 0.75 and the model has a
+  `covered_by_definition` field, so lowering the automatic skip (for example to
+  0.50) would move the decision in the grey zone to the model; that is the likely
+  design.
+  - **Why it was not changed.** The only evidence is 12 questions, one metric, and
+    questions seen before the number was chosen: a threshold fitted to the sample at
+    hand. The index holds 2 metrics and no saved analysis, public benchmark
+    databases only, and no real questions to validate on. A constant chosen this way
+    would look measured without being so. A change needs a frozen set of related and
+    unrelated questions written beforehand, ideally on real data, measured against
+    `main`.
+  - **Generalisation limit of everything in this entry.** All measurements here use
+    public benchmark databases (Chinook as a regression guard, Pagila, the
+    LiveSQLBench databases for the undefined terms). Frozen questions protect
+    against adjusting after seeing results; they do not show the behaviour holds on
+    a customer's data.
+- **Measurement (2026-11-16, 15:47 to 16:57 UTC).** The frozen cases run stateless
+  and can never reach the clarification path, so a purpose-built protocol was
+  written and frozen before any run (`lexis-evals/clarification/PREREGISTERED.txt`,
+  two amendments dated before the runs they concern, questions and script hashed).
+  Arms: `main` (0b326100) against this branch, same stack, flag on, authenticated
+  conversations, no database selected, turn 1 only for M3.
+  - **M2, the pin through the real path (gate 100%): 25 of 25 pass.** Every
+    answered option that carries a database ran with `target_db` equal to it and no
+    database vote. It is true by construction, so it is a wiring check, not a
+    quality measure; it is the check that an earlier deployment failed.
+  - **M3a, answerable Chinook questions, candidate asks <= main + 5: PASS.**
+    Candidate 6 of 60, main 7 of 60 (one timeout each side counted as not asked).
+  - **M3b, undefined terms, candidate asks >= main - 4: PASS.** 15 of 24 on both.
+  - **M1, how often main's vote contradicts the chosen option: 5 of 22 (23%).**
+    Concentrated: 3 of the 5 are the single question "overall engagement level",
+    so the 22 are not independent and 23% is not a stable rate.
+  - **M4, label stability (report only): not improved.** Distinct label sets over 20
+    runs: 14 on main, 12 on the candidate. The fixed candidate order did not make
+    the offered readings stable; temperature is still free.
+  - **A finding unrelated to the change.** On fully specified Chinook questions with
+    no database selected, "How much did we sell in 2023?" and "What are our top 5
+    countries by sales?" triggered a clarification in 3 of 3 runs on both arms
+    (14% of all 60 runs ask). "Sales" is arguably ambiguous, but it shows the
+    engine asks about answerable questions when no database is chosen. Not
+    investigated.
+  - **Limits.** 22 to 25 options from 8 questions on unrelated benchmark databases;
+    the option answered per run is chosen round-robin; two timeouts (300 s, one per
+    arm, different questions) are counted as not asked; M1 and M2 stop the run once
+    the database is in the log, so the SQL and its result were not checked; the
+    labels still vary; nothing here says the readings suit a real company. The
+    frozen eval cases were not rerun because they cannot reach this path.
+
+
 ### Built but never run
 
 PR #44 (`bench split/run/score`) is tested with synthetic cases and fakes only;

@@ -263,7 +263,7 @@ def _worker_loop(
                 if decision.clarification is not None:
                     # The turn ends with the question; ``finally`` sends DONE,
                     # so the stream closes like a finished answer.
-                    out_q.put((_TAG_EVENT, decision.clarification.event()))
+                    out_q.put((_TAG_EVENT, decision.clarification.worker_event()))
                     continue
             custom_prompts = fetch_custom_prompts()
 
