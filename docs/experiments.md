@@ -891,6 +891,43 @@ to interpret the entries is repeated.
     frozen eval cases were not rerun because they cannot reach this path.
 
 
+### E32 - The internal API token, tried live (2026-11-16)
+
+- **Question.** README item 3: does the shared token really close the API and the
+  ingestion service on a running stack? Until now only unit tests said so, and an
+  audit the same day found the stack answering anyone (`GET /api/connections`
+  returned the 20 registered connections with no credentials).
+- **Setup.** The local compose stack, same images, restarted with
+  `INTERNAL_API_TOKEN` set for the API, the ingestion service and the web app (a
+  64-character random value kept outside the repository). A dump of the catalog
+  database and rollback image tags were taken first. No question was sent to the
+  model.
+- **Result.** Both services log "requires the internal API token on every
+  request". With no token, with a wrong token, and with a forged user header and
+  no token: 401 `{"detail":"Unauthorized"}` on `GET /api/connections`,
+  `GET /api/terms`, `/openapi.json`, `/docs`, `POST /api/chat/completions`,
+  `POST /api/semantic-compilation/reset` and the ingestion service's
+  `POST /ingest`; each refusal is logged with its method and path. With the
+  token: 200. `/api/health` and the ingestion `/health` stay open, as designed.
+  From inside the web app's container, using the token it was given, the API
+  answers 200 over the compose network and 401 without it.
+- **Found on the way.**
+  1. `POST /ingest` with the token and an empty JSON body answers 202 "accepted"
+     and then logs "Ingest skipped: no loaded connector for database" with an
+     empty name. Nothing was ingested, but the caller is told the opposite. The
+     probe was mine and was meant to be refused: I expected a 422.
+  2. A restart is not free: the semantic scheduler's start-up pass visited the 20
+     databases and made 14 embedding calls and 13 chat calls in 43 s to compile
+     one table. The data pass skipped all 20 (the skip of PR #36, seen live).
+  3. The token reaches compose from the shell or from `.env`. Started from a
+     shell without it, the stack comes back open, with only the start-up warning
+     to say so.
+- **Limits.** One stack, one trial. Not tried: a signed-in user's request through
+  the web app's proxy routes (needs a browser session), the API's own calls to
+  the ingestion service (creating a connection, a reset), a real
+  `dev_tools.evals run --token`, and Helm. `REAL-E2E` for the 401 and 200 paths
+  above only.
+
 ### Built but never run
 
 PR #44 (`bench split/run/score`) is tested with synthetic cases and fakes only;
@@ -985,7 +1022,7 @@ Engineering findings without a score: E02 (empty index), E04 (FK extraction), E0
 E10 (connection exhaustion), E11 (host crash), E12 (429 storm), E17 (startup
 re-ingestion), E18 (trace), E19 (flaky test), E21 (Terms API), E23 (domain grouping, not scored),
 E24 (semantic contract review; the measurement was stopped twice and has no result),
-E25 (domain map review), E26 (value-anchor repair, not merged), E27 (unanswerable questions: baseline), E28 (certified metric, change not merged), E29 (rule on the SQL, exploration), E30 (value matching, live check).
+E25 (domain map review), E26 (value-anchor repair, not merged), E27 (unanswerable questions: baseline), E28 (certified metric, change not merged), E29 (rule on the SQL, exploration), E30 (value matching, live check), E31 (clarification choice and its database), E32 (internal API token, live).
 
 ## 5. What is NOT yet measured
 
