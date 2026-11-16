@@ -145,6 +145,11 @@
       "value": "India",
       "path": "auto_ontology/server/semantic_compilation/router.py",
       "reason": "Development example quoted in documentation. Reviewed 2026-11-11: in this file the value appears only inside docstrings and comments that explain what the lookup does (checked with the parser: no executable line contains it), so no code path depends on it. Scoped to this file; a copy of this value elsewhere is still detected."
+    },
+    {
+      "value": "credit card",
+      "path": "auto_ontology/pii_detection/rules.py",
+      "reason": "Common phrase (decoded payment method label, accepted answer of rentals.received_by_method, which the case's own evidence defines). Reviewed 2026-11-16: the only hit is the PII detector's rule description for credit card numbers, not a copied answer."
     }
   ]
 }
