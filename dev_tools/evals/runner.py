@@ -23,6 +23,11 @@ import httpx
 from auto_ontology.server.internal_auth import INTERNAL_TOKEN_HEADER
 from dev_tools.evals.cases import Case
 from dev_tools.evals.compare import compare_any
+from dev_tools.evals.refusal import (
+    EXPECT_REFUSAL,
+    has_refusal_marker,
+    score_refusal,
+)
 from dev_tools.evals.report import CaseResult, Report, Run, new_meta
 
 CHAT_PATH = "/api/chat/completions"
@@ -59,6 +64,8 @@ class Answer:
     question_language: str | None = None
     question_translated: str | None = None
     ontology_language: str | None = None
+    # The answer carried the explicit refusal marker (see dev_tools.evals.refusal).
+    refusal_marker: bool = False
 
 
 def retry_after_s(response: httpx.Response) -> float:
@@ -139,6 +146,7 @@ def answer_from_events(events: Iterable[dict[str, Any]]) -> Answer:
             out.question_translated = english if isinstance(english, str) else None
             onto = payload.get("ontology_language")
             out.ontology_language = onto if isinstance(onto, str) else None
+            out.refusal_marker = has_refusal_marker(payload)
         elif kind == "error":
             out.error = event.get("message") or "error"
     return out
@@ -206,8 +214,39 @@ def ask(
         return answer
 
 
-def score(case: Case, answer: Answer) -> Run:
-    """Score one answer against a case's accepted results."""
+def score_refusal_run(case: Case, answer: Answer, *, strict: bool = False) -> Run:
+    """Score one answer to a question the database cannot answer."""
+    verdict = score_refusal(
+        rows=answer.rows,
+        text=answer.text,
+        marker=answer.refusal_marker,
+        error=answer.error,
+        strict=strict,
+    )
+    return Run(
+        passed=verdict.passed,
+        reason=verdict.reason,
+        sql=answer.sql,
+        rows=None if answer.rows is None else len(answer.rows),
+        seconds=round(answer.seconds, 2),
+        error=answer.error,
+        actual=None if answer.rows is None else answer.rows[:MAX_STORED_ROWS],
+        question_language=answer.question_language,
+        question_translated=answer.question_translated,
+        ontology_language=answer.ontology_language,
+        text=answer.text,
+        refusal_marker=answer.refusal_marker,
+    )
+
+
+def score(case: Case, answer: Answer, *, strict: bool = False) -> Run:
+    """Score one answer against a case's accepted results.
+
+    *strict* only matters for a refusal case (see ``dev_tools.evals.refusal``);
+    answerable cases are strict through ``rescore``.
+    """
+    if case.expect == EXPECT_REFUSAL:
+        return score_refusal_run(case, answer, strict=strict)
     if answer.error and answer.rows is None:
         return Run(
             False,
@@ -370,7 +409,7 @@ def run_cases(
     report.meta["busy_retries"] = len(busy_waits)
     report.meta["busy_wait_s"] = round(sum(busy_waits), 1)
     for case in cases:
-        report.cases[case.id] = CaseResult(case.question)
+        report.cases[case.id] = CaseResult(case.question, expect=case.expect)
     for job, run in zip(jobs, runs):
         report.cases[job.case.id].runs.append(run)
     return report
@@ -395,7 +434,7 @@ def rescore(report: Report, cases: list[Case], *, strict: bool = False) -> Repor
             case = replace(case, allow_extra_columns=False, allow_missing_columns=False)
         runs: list[Run] = []
         for run in result.runs:
-            if run.error and run.actual is None:
+            if run.error and run.actual is None and case.expect != EXPECT_REFUSAL:
                 runs.append(run)  # the run itself failed; nothing to re-score
                 continue
             if run.actual is None and run.rows is not None:
@@ -409,7 +448,9 @@ def rescore(report: Report, cases: list[Case], *, strict: bool = False) -> Repor
                 question_language=run.question_language,
                 question_translated=run.question_translated,
                 ontology_language=run.ontology_language,
+                text=run.text,
+                refusal_marker=bool(run.refusal_marker),
             )
-            runs.append(score(case, answer))
-        out.cases[cid] = CaseResult(result.question, runs)
+            runs.append(score(case, answer, strict=strict))
+        out.cases[cid] = CaseResult(result.question, runs, case.expect)
     return out

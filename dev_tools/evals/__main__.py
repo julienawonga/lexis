@@ -64,6 +64,8 @@ from dev_tools.evals import bench, conversation, history
 from dev_tools.evals.cases import (
     DEFAULT_CASES_DIR,
     Case,
+    control_files,
+    load_controls,
     load_many,
     snapshot_file,
 )
@@ -119,6 +121,21 @@ def _is_conversation_file(path: Path) -> bool:
 def _hash_cases(paths: list[Path]) -> str | list[str]:
     hashes = sorted(file_cases_sha256(p) for p in paths)
     return hashes[0] if len(hashes) == 1 else hashes
+
+
+def _with_controls(
+    cases: list[Case], paths: list[Path]
+) -> tuple[list[Case], list[Path]]:
+    """Add the answerable controls the case files name, and the files they come from."""
+    seen = {c.id for c in cases}
+    hashed = list(paths)
+    for path in paths:
+        for control in load_controls(path):
+            if control.id not in seen:
+                seen.add(control.id)
+                cases.append(control)
+        hashed += [p for p in control_files(path) if p not in hashed]
+    return cases, hashed
 
 
 def _preflight_all(
@@ -204,6 +221,9 @@ def _cmd_run(args: argparse.Namespace) -> int:
     except ValueError as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 2
+    hashed = paths
+    if args.with_controls:
+        cases, hashed = _with_controls(cases, paths)
     if args.only:
         cases = [c for c in cases if any(t in c.id for t in args.only)]
     for case in cases:
@@ -222,7 +242,7 @@ def _cmd_run(args: argparse.Namespace) -> int:
         return 2
     for problem in provenance.get("ontology_index_problems", []):
         print(f"WARNING (--allow-empty-index): {problem}", file=sys.stderr)
-    provenance["cases_sha256"] = _hash_cases(paths)
+    provenance["cases_sha256"] = _hash_cases(hashed)
     provenance["cases_file"] = (
         paths[0].name if len(paths) == 1 else [p.name for p in paths]
     )
@@ -255,6 +275,9 @@ def _cmd_run(args: argparse.Namespace) -> int:
     print(
         f"\nscore {report.score:.1%} over {len(report.cases)} questions -> {args.out}"
     )
+    no_answer = sum(c.no_answer for c in report.cases.values())
+    if no_answer:
+        print(f"{no_answer} run(s) had no answer (timeout or error): not in the score")
     return 0
 
 
@@ -694,6 +717,12 @@ def build_parser() -> argparse.ArgumentParser:
     run.add_argument("--label", default="run")
     run.add_argument("--out", default="eval-report.json")
     run.add_argument("--only", nargs="*", help="run only case ids containing these")
+    run.add_argument(
+        "--with-controls",
+        action="store_true",
+        help="also run the answerable controls a case file names under "
+        "`controls` (unanswerable.json), to measure false refusals",
+    )
     run.add_argument(
         "--allow-empty-index",
         action="store_true",

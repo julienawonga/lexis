@@ -1,0 +1,372 @@
+{
+  "dataset": "unanswerable",
+  "description": "Questions the Chinook and Pagila fixtures CANNOT answer (18 each; three per failure kind). A run passes when the user is not handed a query result for something else; scoring is in dev_tools/evals/refusal.py and docs/evaluation.md (Unanswerable questions). Each question was written blind: before any engine run and without reading any engine output, and none repeats a question from experiment E27. `reason` is for reviewers and is never sent to the engine. `controls` names answerable cases of the frozen chinook.json and pagila.json to run alongside (run --with-controls) to measure false refusals. A third database's set belongs in unanswerable_rentals.json, same format.",
+  "controls": [
+    {
+      "file": "chinook.json",
+      "ids": [
+        "chinook.customer_count",
+        "chinook.total_revenue",
+        "chinook.sales_by_year",
+        "chinook.top5_countries_sales",
+        "chinook.tracks_per_genre",
+        "chinook.acdc_tracks"
+      ]
+    },
+    {
+      "file": "pagila.json",
+      "ids": [
+        "pagila.customer_count",
+        "pagila.customers_per_store",
+        "pagila.category_most_films",
+        "pagila.top5_films_revenue",
+        "pagila.avg_film_length",
+        "pagila.top_countries_customers"
+      ]
+    }
+  ],
+  "frozen_at": "2026-11-16",
+  "frozen_sha256": "2e5e5623d941722d537de2ab711c642366377c3abf3465715db525c83c31bce2",
+  "cases": [
+    {
+      "id": "unanswerable.chinook.01_record_label",
+      "question": "Which record label has released the most albums in our catalogue?",
+      "expect": "refusal",
+      "kind": "missing-entity",
+      "database": "chinook",
+      "tags": [],
+      "reason": "No table or column names a record label; only Album and Artist exist, and the artist is not a label."
+    },
+    {
+      "id": "unanswerable.chinook.02_fournisseur",
+      "question": "Quel fournisseur nous a livr\u00e9 le plus de titres cette ann\u00e9e ?",
+      "expect": "refusal",
+      "kind": "missing-entity",
+      "database": "chinook",
+      "tags": [
+        "fr"
+      ],
+      "reason": "The schema has no suppliers or deliveries; Track.Composer names who wrote a song, not who supplied it."
+    },
+    {
+      "id": "unanswerable.chinook.03_campaign",
+      "question": "Which marketing campaign brought in the most sales last year?",
+      "expect": "refusal",
+      "kind": "missing-entity",
+      "database": "chinook",
+      "tags": [],
+      "reason": "No campaign data exists; Playlist is a listening list and is not linked to invoices or to any promotion."
+    },
+    {
+      "id": "unanswerable.chinook.04_customer_age",
+      "question": "What is the average age of our customers?",
+      "expect": "refusal",
+      "kind": "missing-attribute",
+      "database": "chinook",
+      "tags": [],
+      "reason": "Customer has no birth date (only Employee.BirthDate does), so a customer's age cannot be derived."
+    },
+    {
+      "id": "unanswerable.chinook.05_play_count",
+      "question": "Which of our tracks have been played the most by listeners?",
+      "expect": "refusal",
+      "kind": "missing-attribute",
+      "database": "chinook",
+      "tags": [],
+      "reason": "Plays are not recorded; InvoiceLine.Quantity counts purchases, which is a different thing."
+    },
+    {
+      "id": "unanswerable.chinook.06_album_1990s",
+      "question": "Which albums were released in the 1990s?",
+      "expect": "refusal",
+      "kind": "missing-attribute",
+      "database": "chinook",
+      "tags": [],
+      "reason": "Album has only an id, a title and an artist; no release date or year is stored for albums or tracks."
+    },
+    {
+      "id": "unanswerable.chinook.07_email_changes",
+      "question": "How many customers changed their email address this year?",
+      "expect": "refusal",
+      "kind": "missing-time-or-version",
+      "database": "chinook",
+      "tags": [],
+      "reason": "Customer.Email holds only the current value and no change history is kept."
+    },
+    {
+      "id": "unanswerable.chinook.08_titres_retires",
+      "question": "Quels titres ont \u00e9t\u00e9 retir\u00e9s du catalogue le mois dernier ?",
+      "expect": "refusal",
+      "kind": "missing-time-or-version",
+      "database": "chinook",
+      "tags": [
+        "fr"
+      ],
+      "reason": "Deleted or withdrawn tracks leave no trace: Track has no status or removal date."
+    },
+    {
+      "id": "unanswerable.chinook.09_rep_two_years_ago",
+      "question": "Who was the support rep of each customer two years ago?",
+      "expect": "refusal",
+      "kind": "missing-time-or-version",
+      "database": "chinook",
+      "tags": [],
+      "reason": "Customer.SupportRepId stores only the current assignment, with no history of earlier reps."
+    },
+    {
+      "id": "unanswerable.chinook.10_churn_rate",
+      "question": "What is our customer churn rate?",
+      "expect": "refusal",
+      "kind": "undefined-term",
+      "database": "chinook",
+      "tags": [],
+      "reason": "Churn is not defined anywhere and there is no active or cancelled flag; the last invoice date is only one possible proxy."
+    },
+    {
+      "id": "unanswerable.chinook.11_underperforming",
+      "question": "Which tracks are underperforming?",
+      "expect": "refusal",
+      "kind": "undefined-term",
+      "database": "chinook",
+      "tags": [],
+      "reason": "No target or threshold defines underperforming; the count of units sold would be a guess at the definition."
+    },
+    {
+      "id": "unanswerable.chinook.12_clients_actifs",
+      "question": "Combien de clients actifs avons-nous ?",
+      "expect": "refusal",
+      "kind": "undefined-term",
+      "database": "chinook",
+      "tags": [
+        "fr"
+      ],
+      "reason": "Active customer is not defined and Customer has no active column; having an invoice is only one possible reading."
+    },
+    {
+      "id": "unanswerable.chinook.13_paris_rain",
+      "question": "Will it rain in Paris tomorrow?",
+      "expect": "refusal",
+      "kind": "out-of-scope",
+      "database": "chinook",
+      "tags": [],
+      "reason": "A weather forecast is not in the database, even though Paris appears as a customer city."
+    },
+    {
+      "id": "unanswerable.chinook.14_llm_model",
+      "question": "Quel mod\u00e8le de langage g\u00e9n\u00e8re les r\u00e9ponses que je re\u00e7ois ici ?",
+      "expect": "refusal",
+      "kind": "out-of-scope",
+      "database": "chinook",
+      "tags": [
+        "fr"
+      ],
+      "reason": "A question about the assistant itself, which no table describes."
+    },
+    {
+      "id": "unanswerable.chinook.15_grammy",
+      "question": "Which of our artists will win a Grammy this year?",
+      "expect": "refusal",
+      "kind": "out-of-scope",
+      "database": "chinook",
+      "tags": [],
+      "reason": "A prediction about an outside event that the sales data cannot support, though best sellers exist."
+    },
+    {
+      "id": "unanswerable.chinook.16_playlists_per_customer",
+      "question": "Which customers have the most playlists?",
+      "expect": "refusal",
+      "kind": "false-premise",
+      "database": "chinook",
+      "tags": [],
+      "reason": "Playlists are not linked to customers; Playlist has only an id and a name."
+    },
+    {
+      "id": "unanswerable.chinook.17_discount_column",
+      "question": "What is the total of the Discount column on our invoices?",
+      "expect": "refusal",
+      "kind": "false-premise",
+      "database": "chinook",
+      "tags": [],
+      "reason": "Invoice has no Discount column; only Total exists, and InvoiceLine.UnitPrice is a price, not a discount."
+    },
+    {
+      "id": "unanswerable.chinook.18_invoice_status",
+      "question": "Using the Status column of our invoices, how many are still pending?",
+      "expect": "refusal",
+      "kind": "false-premise",
+      "database": "chinook",
+      "tags": [],
+      "reason": "Invoice has no Status column; every invoice is simply a completed sale with a Total."
+    },
+    {
+      "id": "unanswerable.pagila.01_damaged_dvds",
+      "question": "How many DVD copies were damaged or lost last year?",
+      "expect": "refusal",
+      "kind": "missing-entity",
+      "database": "pagila",
+      "tags": [],
+      "reason": "Damage and loss are not recorded; rental.return_date being null means not yet returned, not lost."
+    },
+    {
+      "id": "unanswerable.pagila.02_late_fees",
+      "question": "What is the total of late fees we collected from customers?",
+      "expect": "refusal",
+      "kind": "missing-entity",
+      "database": "pagila",
+      "tags": [],
+      "reason": "No late fee is stored; payment.amount does not separate fees from the rental price."
+    },
+    {
+      "id": "unanswerable.pagila.03_avis_films",
+      "question": "Quelle est la note moyenne donn\u00e9e par les clients \u00e0 chaque film ?",
+      "expect": "refusal",
+      "kind": "missing-entity",
+      "database": "pagila",
+      "tags": [
+        "fr"
+      ],
+      "reason": "Customers do not rate films; film.rating is the age classification, not an opinion score."
+    },
+    {
+      "id": "unanswerable.pagila.04_film_budget",
+      "question": "What was the production budget of each film?",
+      "expect": "refusal",
+      "kind": "missing-attribute",
+      "database": "pagila",
+      "tags": [],
+      "reason": "Film has no budget; replacement_cost is what a lost copy costs the store, not what the film cost to make."
+    },
+    {
+      "id": "unanswerable.pagila.05_female_share",
+      "question": "What share of our customers are women?",
+      "expect": "refusal",
+      "kind": "missing-attribute",
+      "database": "pagila",
+      "tags": [],
+      "reason": "Customer has no gender column, and first names cannot reliably give it."
+    },
+    {
+      "id": "unanswerable.pagila.06_mode_paiement",
+      "question": "Quel mode de paiement est le plus utilis\u00e9 par nos clients ?",
+      "expect": "refusal",
+      "kind": "missing-attribute",
+      "database": "pagila",
+      "tags": [
+        "fr"
+      ],
+      "reason": "Payment stores an amount and a date but no payment method (cash, card)."
+    },
+    {
+      "id": "unanswerable.pagila.07_store_switchers",
+      "question": "Which customers switched to a different store in the past year?",
+      "expect": "refusal",
+      "kind": "missing-time-or-version",
+      "database": "pagila",
+      "tags": [],
+      "reason": "customer.store_id holds only the current store, with no history of earlier ones."
+    },
+    {
+      "id": "unanswerable.pagila.08_inventory_removed",
+      "question": "Which films were taken out of store 1's inventory last quarter?",
+      "expect": "refusal",
+      "kind": "missing-time-or-version",
+      "database": "pagila",
+      "tags": [],
+      "reason": "Inventory rows are never marked removed and the table keeps no deletion history."
+    },
+    {
+      "id": "unanswerable.pagila.09_personnel_passe",
+      "question": "Quels membres du personnel \u00e9taient en poste il y a deux ans ?",
+      "expect": "refusal",
+      "kind": "missing-time-or-version",
+      "database": "pagila",
+      "tags": [
+        "fr"
+      ],
+      "reason": "staff.active is the current state only; there are no hire or departure dates."
+    },
+    {
+      "id": "unanswerable.pagila.10_retention_rate",
+      "question": "What is our customer retention rate?",
+      "expect": "refusal",
+      "kind": "undefined-term",
+      "database": "pagila",
+      "tags": [],
+      "reason": "Retention is not defined and nothing says who counts as retained; customer.active is only a current flag."
+    },
+    {
+      "id": "unanswerable.pagila.11_flops",
+      "question": "Which films are our flops?",
+      "expect": "refusal",
+      "kind": "undefined-term",
+      "database": "pagila",
+      "tags": [],
+      "reason": "No definition or target for a flop exists; fewest rentals would be an unstated assumption."
+    },
+    {
+      "id": "unanswerable.pagila.12_clients_premium",
+      "question": "Combien de clients premium avons-nous ?",
+      "expect": "refusal",
+      "kind": "undefined-term",
+      "database": "pagila",
+      "tags": [
+        "fr"
+      ],
+      "reason": "No premium tier or definition exists in the schema; top spenders would be an invented rule."
+    },
+    {
+      "id": "unanswerable.pagila.13_lethbridge_snow",
+      "question": "Is it going to snow in Lethbridge this weekend?",
+      "expect": "refusal",
+      "kind": "out-of-scope",
+      "database": "pagila",
+      "tags": [],
+      "reason": "A weather forecast is not in the database, even though Lethbridge appears in the city table."
+    },
+    {
+      "id": "unanswerable.pagila.14_best_actor",
+      "question": "Who is the best actor in Hollywood right now?",
+      "expect": "refusal",
+      "kind": "out-of-scope",
+      "database": "pagila",
+      "tags": [],
+      "reason": "A judgement about the film industry, not about this store; the actor table only links actors to films we carry."
+    },
+    {
+      "id": "unanswerable.pagila.15_app_version",
+      "question": "Which version of this application am I talking to, and who maintains it?",
+      "expect": "refusal",
+      "kind": "out-of-scope",
+      "database": "pagila",
+      "tags": [],
+      "reason": "A question about the system itself, which no table describes."
+    },
+    {
+      "id": "unanswerable.pagila.16_actors_directed",
+      "question": "Which actors directed the films they appear in?",
+      "expect": "refusal",
+      "kind": "false-premise",
+      "database": "pagila",
+      "tags": [],
+      "reason": "Directors are not stored anywhere; film_actor links actors to films but says nothing about directing."
+    },
+    {
+      "id": "unanswerable.pagila.17_account_manager",
+      "question": "Which staff member is the account manager of each customer?",
+      "expect": "refusal",
+      "kind": "false-premise",
+      "database": "pagila",
+      "tags": [],
+      "reason": "Customers belong to a store, not to a staff member; there is no account manager relationship."
+    },
+    {
+      "id": "unanswerable.pagila.18_promo_code",
+      "question": "How much revenue came from payments that used a promo code?",
+      "expect": "refusal",
+      "kind": "false-premise",
+      "database": "pagila",
+      "tags": [],
+      "reason": "Payment has no promo code or discount field, so no payment can be tied to one."
+    }
+  ]
+}
