@@ -928,6 +928,35 @@ to interpret the entries is repeated.
   `dev_tools.evals run --token`, and Helm. `REAL-E2E` for the 401 and 200 paths
   above only.
 
+### E33 - Eight chats at once on the local stack (2026-11-16)
+
+- **Question.** Does the stack hold the local load limit (8 concurrent chats)
+  with the final code? The slot cap of PR #35 and the connection caps of PR #34
+  had only been checked with fakes or before later changes.
+- **Setup.** The local compose stack on `main` (images of 2026-11-16, internal
+  token on, `CHAT_MAX_CONCURRENT` 4). Eight different plain questions about
+  Chinook, written for this trial and not taken from an evaluation set, sent at
+  the same instant to `POST /api/chat/completions` with `target_db=chinook`, no
+  conversation, no retry on a refusal. A sampler read `/api/health`, the
+  backend's memory (`docker stats`) and its process count every 5 s. Cost: 8
+  questions' worth of model calls, 100 s. Machine otherwise idle, no build
+  running.
+- **Result.** 8 of 8 answered: HTTP 200, a `result` event with SQL and rows, the
+  stream closed with `[DONE]`, no `error` event, no 503. Slots in use peaked at 4
+  of 4. The four that waited got their first event after 42 to 54 s, the others
+  after 4 to 12 s; totals ran from 42 to 100 s, 100 s for the whole batch.
+  Backend memory: 467 MiB idle, 1,136 MiB at the peak, 491 MiB twelve seconds
+  after the end. Processes in the container: 7 idle, 10 at the peak, 7 after.
+  `/api/health` answered `ok` in all 13 samples; no container restarted.
+- **Limits.** One batch, one database, easy questions (the longest run was 100 s,
+  so nothing came near the 120 s slot wait or the 300 s run limit: the 503 path
+  and the run-limit path were **not** exercised). Answers were not scored: this
+  is a hold test, not an accuracy measure. Stateless requests only, so the
+  conversation path and the web app's proxy were not under load. The sampler's
+  5 s period can miss a short peak. Nothing here says what happens at 9 or more.
+  Script and raw result are kept outside the repository
+  (`lexis-evals/load/`). `REAL-E2E`, manual.
+
 ### Built but never run
 
 PR #44 (`bench split/run/score`) is tested with synthetic cases and fakes only;
@@ -1022,7 +1051,7 @@ Engineering findings without a score: E02 (empty index), E04 (FK extraction), E0
 E10 (connection exhaustion), E11 (host crash), E12 (429 storm), E17 (startup
 re-ingestion), E18 (trace), E19 (flaky test), E21 (Terms API), E23 (domain grouping, not scored),
 E24 (semantic contract review; the measurement was stopped twice and has no result),
-E25 (domain map review), E26 (value-anchor repair, not merged), E27 (unanswerable questions: baseline), E28 (certified metric, change not merged), E29 (rule on the SQL, exploration), E30 (value matching, live check), E31 (clarification choice and its database), E32 (internal API token, live).
+E25 (domain map review), E26 (value-anchor repair, not merged), E27 (unanswerable questions: baseline), E28 (certified metric, change not merged), E29 (rule on the SQL, exploration), E30 (value matching, live check), E31 (clarification choice and its database), E32 (internal API token, live), E33 (eight chats at once, live).
 
 ## 5. What is NOT yet measured
 
