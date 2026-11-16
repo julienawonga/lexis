@@ -91,14 +91,30 @@ owner's go-ahead at the end of each. **Phase 0 is done, phase 1 is in progress.*
   is in `HomeLab/lexis-evals/secrets/internal_api_token.txt`; the owner adds the
   line to `.env`. Until then, pass the token to every call
   (`-H "x-internal-token: ..."`, or `--token` for `dev_tools.evals`).
-- **Next: phase 2 (engine robustness)**, after the owner's go-ahead. The audit
-  says the first and worst limit is that the engine cannot refuse an unanswerable
-  question (E1); fixing it honestly needs a frozen unanswerable set and a
-  conversation-aware protocol in the repository first (phase 3, V1 and V2), so
-  the two are best planned together. Cheap, no-gate items from the audit that do
-  not change what the model sees: a structured `caveats` list on the answer (E3),
-  the row-cap notice in the interface (E4), the database used shown under each
-  answer (E5), "no rows found" (E6), the chart summing fix (E2).
+- **Phase 2 (engine robustness), first part merged on 2026-11-16** (`main` green
+  at `eef2c54b`): #98 chart from the rows returned; #99 the database shown; #100
+  a chat worker that cannot start fails loudly; #101 row-cut and no-rows notices;
+  #102 error screens and interface states; #103 proxy 502/504, `Retry-After`,
+  safe login redirect; #104 Kumo SQL guard and one ingest per database; #105
+  structured `caveats`. Status per audit finding: the table in
+  [`docs/audit-2026-11-16.md`](./docs/audit-2026-11-16.md).
+  None of it changes what the model sees, so none went through the evaluation
+  gate. The stack runs these images (E35: eight chats, 0 caveats on 8 answers,
+  and a failing worker start answers 503 with its cause). Rollback tags:
+  `auto-ontology:pre-phase2`, `auto-ontology-frontend:pre-phase2`.
+- **Owed after phase 2's first part:** the owner's click-through (sign in, ask a
+  question, look at the database line, the notes and the error screens); a
+  measured false-alarm rate for caveats on answerable questions (8 answers, 0
+  caveats is not a rate); the vote path behind `database` (no database named).
+- **Next: the rest of phase 2 needs the evaluation gate.** E1 (the engine cannot
+  refuse an unanswerable question) first needs a frozen set of unanswerable
+  questions (audit V2) and the conversation-aware protocol in the repository
+  (V1), so phase 3's first two items come before it. E7 (time budgets that add up
+  past the 300 s limit) changes engine behaviour and goes through the gate too.
+  Medium items still open: E8 (empty retrieval answered from the raw schema,
+  Term definitions dropped without a trace, the rewritten question not shown,
+  sampling). Frontend items still open: F6, F8 (list, select, rename), F14,
+  F15 and the browser test.
 - **Parked:** PR #62 (semantic contract, draft, branch
   `codex/semantic-contract`: needs a measurement and an `alembic merge`). Branch
   `answerability` is pushed, not merged (E27, E29): it flags unanswerable
