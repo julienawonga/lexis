@@ -674,6 +674,48 @@ to interpret the entries is repeated.
   messy-value set. Three repeats per question; no confidence interval. One
   machine. `REAL-E2E`, manual.
 
+### E27 - What the engine does when the database cannot answer (2026-11-16)
+
+- **Question.** When a question cannot be answered from the schema, does the engine
+  say so, or does it return a result for something else?
+- **Setup.** Chinook, through the chat API as the web app calls it, no
+  conversation. Two small sets written by hand before any answer was read: a
+  development set (8 unanswerable questions, for example salary of each employee,
+  revenue per store, returns last month, units in stock, profit margin, and the
+  French "Combien a rapporté chaque boutique ? CA") with 4 controls that do have
+  an answer, then a held-out set (6 unanswerable, 3 controls) written after
+  the first and frozen before its run. Two runs per question. Reports and the
+  frozen scripts are kept outside the repository.
+- **Result, 28 runs of unanswerable questions on `main` (no signal yet).** Clean
+  refusal ("SQL can't be constructed from the data"): 4 (14%), all on two
+  questions of the first set. A result for a different question: 21 (75%), of
+  which 11 carried the engine's "not fully validated" note and 10 did not (only
+  the model's own prose said the data lacked something). Timeout at 300 s: 3.
+  Controls: all 14 completed with a sensible query and no warning.
+- **What the substitutions looked like.** A `Salary` column filled with NULL or
+  with the text "Unavailable"; a column named `units_in_stock` that counts
+  tracks; total revenue returned for revenue per store; an estimated "shipping
+  cost" computed as a remainder; and "CA" read as the US state California
+  rather than chiffre d'affaires, in both runs of the French question.
+- **Consequence.** The visible warning added in #73 only covers the runs that carry
+  the validation note (11 of 21). A structured signal is needed. A branch adds two
+  optional fields to the SQL generation output (`answers_question`: fully, partly
+  or no; `limitation`: one sentence), passes them through as `answer_limitation`,
+  and shows a notice. It is **not merged**.
+- **Gate for the branch, frozen before it ran (file dated 2026-11-16).** At
+  least 80% of the completed unanswerable runs flagged or refused; no flag on any
+  of the 14 control runs; no Chinook regression; and, added before any candidate
+  run because the change touches every generation, no significant regression on
+  the 180 LiveSQLBench tasks (official metric, McNemar) and a flag rate under 10%
+  on those answerable tasks.
+- **Status.** Nothing measured on the candidate yet. A first attempt to run the
+  probes was stopped after one minute for lack of time and its partial files were
+  deleted. The Chinook and LiveSQLBench runs need a few hours of idle machine.
+- **Limits.** Two small hand-made sets on a database the model knows well; the
+  development set shaped the design, so only the held-out set counts as unseen;
+  two runs per question; the classification is read by the maintainer's
+  assistant, not by an independent reviewer. `REAL-E2E`, manual.
+
 ### Built but never run
 
 PR #44 (`bench split/run/score`) is tested with synthetic cases and fakes only;
@@ -768,7 +810,7 @@ Engineering findings without a score: E02 (empty index), E04 (FK extraction), E0
 E10 (connection exhaustion), E11 (host crash), E12 (429 storm), E17 (startup
 re-ingestion), E18 (trace), E19 (flaky test), E21 (Terms API), E23 (domain grouping, not scored),
 E24 (semantic contract review; the measurement was stopped twice and has no result),
-E25 (domain map review), E26 (value-anchor repair, not merged).
+E25 (domain map review), E26 (value-anchor repair, not merged), E27 (unanswerable questions: baseline).
 
 ## 5. What is NOT yet measured
 
@@ -794,6 +836,8 @@ E25 (domain map review), E26 (value-anchor repair, not merged).
   reference answers.
 - **The semantic contract's effect on accuracy** (E24): no result yet; the isolated
   environment must be rebuilt with the Chinook schema `public` first.
+- **The "answers the question" signal** (E27): designed and gated, not yet measured on
+  the candidate; needs the held-out probes, Chinook and the 180 LiveSQLBench tasks.
 - **Value-anchor literal repair (PR #58):** measured (E26), no gain on current `main`,
   not merged. No held-out set of messy values exists to test it harder.
 - **Domain names** (E23): not graded by anyone.
