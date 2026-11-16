@@ -769,6 +769,23 @@ to interpret the entries is repeated.
   independent review. `REAL-E2E` for the retrieval and the answers, `FAKES` for
   the unit test.
 
+### E29 - Could a rule on the SQL replace the model's self-assessment? (2026-11-16, exploration)
+
+- **Question.** After E27 (the model's own "partly" fails the false-alarm ceiling),
+  does a deterministic rule on the generated SQL catch substituted answers?
+- **Setup.** No model call: the 42 recorded `main` runs of E27 (25 unanswerable
+  runs that produced SQL, 14 controls). Rule: the SQL selects a typed `NULL` as a
+  column, or a string literal such as "unavailable" as a value.
+- **Result.** The rule fired on 9 of the 25 unanswerable runs (36%) and on none of
+  the 14 controls. It misses the substitutions that are semantically wrong but
+  syntactically ordinary (total revenue returned for revenue per store, a
+  "remainder" computed as shipping cost, tracks counted as stock).
+- **Limits.** The rule was written after reading these outputs, so 36% is an upper
+  illustration, not a measurement; it has not been run on unseen questions or on the
+  180 answerable LiveSQLBench tasks (its false-alarm rate there is unknown). A usable
+  design would need a check of the question's entities against the schema, which is
+  not built. `REAL` data, analysis only.
+
 ### Built but never run
 
 PR #44 (`bench split/run/score`) is tested with synthetic cases and fakes only;
@@ -863,7 +880,7 @@ Engineering findings without a score: E02 (empty index), E04 (FK extraction), E0
 E10 (connection exhaustion), E11 (host crash), E12 (429 storm), E17 (startup
 re-ingestion), E18 (trace), E19 (flaky test), E21 (Terms API), E23 (domain grouping, not scored),
 E24 (semantic contract review; the measurement was stopped twice and has no result),
-E25 (domain map review), E26 (value-anchor repair, not merged), E27 (unanswerable questions: baseline), E28 (certified metric, change not merged).
+E25 (domain map review), E26 (value-anchor repair, not merged), E27 (unanswerable questions: baseline), E28 (certified metric, change not merged), E29 (rule on the SQL, exploration).
 
 ## 5. What is NOT yet measured
 
