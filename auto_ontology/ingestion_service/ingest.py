@@ -164,9 +164,30 @@ def run_ingest(connector: SQLDatabase) -> None:
     )
 
 
-def trigger_ingest(connection: dict[str, Any]) -> None:
-    """Run ingest for a newly created connection without blocking the caller."""
+# Databases with an API-triggered ingest in flight, by casefolded name. Every
+# ingest re-embeds every row (paid), so a second trigger for the same database
+# is refused rather than run in parallel.
+_in_flight: set[str] = set()
+_in_flight_lock = threading.Lock()
+
+
+def trigger_ingest(connection: dict[str, Any]) -> bool:
+    """Run ingest for a newly created connection without blocking the caller.
+
+    At most one ingest per database runs at a time. Returns ``True`` when a run
+    was started and ``False`` when one is already in flight for that database,
+    in which case nothing is started.
+    """
     database_name = str(connection.get("database") or "")
+    flight_key = database_name.strip().casefold()
+    with _in_flight_lock:
+        if flight_key in _in_flight:
+            logger.info(
+                "Ingest already running for database %s; not starting another",
+                database_name,
+            )
+            return False
+        _in_flight.add(flight_key)
 
     def _run() -> None:
         try:
@@ -204,12 +225,21 @@ def trigger_ingest(connection: dict[str, Any]) -> None:
                 "Background ingest failed for database %s",
                 database_name,
             )
+        finally:
+            with _in_flight_lock:
+                _in_flight.discard(flight_key)
 
-    threading.Thread(
-        target=_run,
-        daemon=True,
-        name=f"ingest-{database_name}",
-    ).start()
+    try:
+        threading.Thread(
+            target=_run,
+            daemon=True,
+            name=f"ingest-{database_name}",
+        ).start()
+    except BaseException:
+        with _in_flight_lock:
+            _in_flight.discard(flight_key)
+        raise
+    return True
 
 
 def trigger_delete_ingest(database_name: str | None = None) -> None:

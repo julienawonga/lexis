@@ -14,6 +14,7 @@ import pytest
 from auto_ontology.infra import feature_flags
 from auto_ontology.infra.feature_flags import (
     get_sql_query_timeout_seconds,
+    get_kumo_table_max_rows,
     get_sql_result_max_rows,
     is_clarification_enabled,
     is_distinct_value_probing_enabled,
@@ -227,6 +228,18 @@ def test_sql_result_max_rows_ignores_unusable_values(
 ) -> None:
     with _patched(monkeypatch, (stored,)):
         assert get_sql_result_max_rows() == 10_000
+
+
+def test_kumo_table_max_rows_default_and_stored_value(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    with _patched(monkeypatch, None):
+        assert get_kumo_table_max_rows() == 1_000_000
+    with _patched(monkeypatch, ("5000",)) as cursor:
+        assert get_kumo_table_max_rows() == 5000
+    assert cursor.executed[0][1] == ("kumo_table_max_rows",)
+    with _patched(monkeypatch, ("0",)):
+        assert get_kumo_table_max_rows() == 1_000_000
 
 
 def test_clarification_defaults_to_disabled(

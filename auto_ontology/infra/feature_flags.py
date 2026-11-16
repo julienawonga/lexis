@@ -66,6 +66,16 @@ DEFAULT_SQL_RESULT_MAX_ROWS = 10_000
 MIN_SQL_RESULT_MAX_ROWS = 1
 MAX_SQL_RESULT_MAX_ROWS = 1_000_000
 
+# How many rows one SQL statement of the prediction (Kumo) path may read. That
+# path loads whole tables to build a graph, so it needs a far larger cap than a
+# chat answer, but never none: a table is read through a read-only, capped call
+# like every other SQL. The default is a conservative PLACEHOLDER, not tuned on
+# any dataset; an operator can raise or lower it in the configuration table.
+KUMO_TABLE_MAX_ROWS_KEY = "kumo_table_max_rows"
+DEFAULT_KUMO_TABLE_MAX_ROWS = 1_000_000
+MIN_KUMO_TABLE_MAX_ROWS = 1
+MAX_KUMO_TABLE_MAX_ROWS = 100_000_000
+
 
 def _read_configuration_row(key: str) -> tuple[object, ...] | None:
     """Return the ``(value,)`` row for *key*, or ``None`` if it is absent."""
@@ -200,6 +210,20 @@ def get_sql_query_timeout_seconds() -> int:
         default=DEFAULT_SQL_QUERY_TIMEOUT_SECONDS,
         minimum=MIN_SQL_QUERY_TIMEOUT_SECONDS,
         maximum=MAX_SQL_QUERY_TIMEOUT_SECONDS,
+    )
+
+
+def get_kumo_table_max_rows() -> int:
+    """Row cap for each statement the prediction path issues itself.
+
+    Same fallbacks as :func:`get_sql_result_max_rows`, with
+    :data:`DEFAULT_KUMO_TABLE_MAX_ROWS` as the default.
+    """
+    return read_configuration_int(
+        KUMO_TABLE_MAX_ROWS_KEY,
+        default=DEFAULT_KUMO_TABLE_MAX_ROWS,
+        minimum=MIN_KUMO_TABLE_MAX_ROWS,
+        maximum=MAX_KUMO_TABLE_MAX_ROWS,
     )
 
 
