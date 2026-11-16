@@ -14,12 +14,18 @@ from __future__ import annotations
 import datetime as dt
 import json
 import sqlite3
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from decimal import Decimal
 from pathlib import Path
 from typing import Any, Sequence
 
 from dev_tools.evals.compare import compare_rows
+from dev_tools.evals.refusal import (
+    EXPECT_REFUSAL,
+    EXPECT_ROWS,
+    EXPECTS,
+    validate_refusal_case,
+)
 
 DEFAULT_CASES_DIR = Path(__file__).parent / "cases"
 
@@ -47,9 +53,16 @@ class Case:
     # The catalog database the question is asked of, for a file that mixes
     # databases. An explicit ``--target-db`` on the command line wins.
     target_db: str = ""
+    # "refusal": the database cannot answer it; there is no gold and the run is
+    # scored by dev_tools.evals.refusal. ``kind`` and ``reason`` describe it.
+    expect: str = EXPECT_ROWS
+    kind: str = ""
+    reason: str = ""
 
     def accepted(self) -> dict[str, list[list[Any]]]:
         """Label -> expected rows for every accepted answer."""
+        if self.expect == EXPECT_REFUSAL:
+            return {}
         missing = [g.label for g in self.gold if g.expected is None]
         if missing:
             raise ValueError(
@@ -60,10 +73,15 @@ class Case:
 
 
 def parse_case(raw: dict[str, Any]) -> Case:
+    expect = raw.get("expect", EXPECT_ROWS)
+    if expect not in EXPECTS:
+        raise ValueError(f"{raw.get('id')}: expect must be one of {EXPECTS}")
+    if expect == EXPECT_REFUSAL:
+        validate_refusal_case(raw)
     gold = tuple(
-        GoldAnswer(g["label"], g["sql"], g.get("expected")) for g in raw["gold"]
+        GoldAnswer(g["label"], g["sql"], g.get("expected")) for g in raw.get("gold", [])
     )
-    if not gold:
+    if not gold and expect == EXPECT_ROWS:
         raise ValueError(f"{raw.get('id')}: a case needs at least one gold answer")
     labels = [g.label for g in gold]
     if len(set(labels)) != len(labels):
@@ -79,7 +97,37 @@ def parse_case(raw: dict[str, Any]) -> Case:
         description=raw.get("description", ""),
         evidence=str(raw.get("evidence") or ""),
         target_db=str(raw.get("database") or ""),
+        expect=expect,
+        kind=str(raw.get("kind") or ""),
+        reason=str(raw.get("reason") or ""),
     )
+
+
+def load_controls(path: Path) -> list[Case]:
+    """The answerable cases a file names under ``controls``, loaded from their files.
+
+    ``controls`` is ``[{"file": "chinook.json", "ids": [...]}]``, paths relative
+    to *path*. They are run with the refusal cases to measure false refusals; an
+    id that is missing, or that is itself a refusal case, raises.
+    """
+    raw = json.loads(path.read_text(encoding="utf-8"))
+    out: list[Case] = []
+    for entry in raw.get("controls", []):
+        source = path.parent / entry["file"]
+        dataset = json.loads(source.read_text(encoding="utf-8")).get("dataset", "")
+        by_id = {c.id: c for c in load_cases(source)}
+        for cid in entry["ids"]:
+            case = by_id.get(cid)
+            if case is None or case.expect != EXPECT_ROWS:
+                raise ValueError(f"{path.name}: control {cid} not in {source.name}")
+            out.append(replace(case, target_db=case.target_db or dataset))
+    return out
+
+
+def control_files(path: Path) -> list[Path]:
+    """The case files a file's ``controls`` point to."""
+    raw = json.loads(path.read_text(encoding="utf-8"))
+    return [path.parent / e["file"] for e in raw.get("controls", [])]
 
 
 def load_many(paths: Sequence[Path]) -> list[Case]:
@@ -153,6 +201,8 @@ def snapshot_file(path: Path, dsn: str, *, check: bool = False) -> list[str]:
     raw = json.loads(path.read_text(encoding="utf-8"))
     drifted: list[str] = []
     for case in raw["cases"]:
+        if case.get("expect", EXPECT_ROWS) == EXPECT_REFUSAL:
+            continue  # nothing to snapshot: the database cannot answer it
         for gold in case["gold"]:
             rows = run_gold(dsn, gold["sql"])
             if check:

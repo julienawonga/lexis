@@ -40,16 +40,33 @@ class Run:
     question_language: str | None = None
     question_translated: str | None = None
     ontology_language: str | None = None
+    # Kept so a refusal run can be re-scored strict or tolerant (see
+    # dev_tools.evals.refusal): the answer text and whether it carried the
+    # explicit refusal marker. None for reports written before the field.
+    text: str | None = None
+    refusal_marker: bool | None = None
 
 
 @dataclass
 class CaseResult:
     question: str
     runs: list[Run] = field(default_factory=list)
+    # "rows" (answerable) or "refusal" (the database cannot answer it).
+    expect: str = "rows"
+
+    @property
+    def scored_runs(self) -> list[Run]:
+        """Runs that count: a ``no_answer`` run (timeout, infrastructure) does not."""
+        return [r for r in self.runs if r.reason != "no_answer"]
+
+    @property
+    def no_answer(self) -> int:
+        return len(self.runs) - len(self.scored_runs)
 
     @property
     def pass_rate(self) -> float:
-        return sum(r.passed for r in self.runs) / len(self.runs) if self.runs else 0.0
+        scored = self.scored_runs
+        return sum(r.passed for r in scored) / len(scored) if scored else 0.0
 
 
 @dataclass
@@ -60,9 +77,10 @@ class Report:
     @property
     def score(self) -> float:
         """Mean pass rate over questions (each question counts once)."""
-        if not self.cases:
+        counted = [c for c in self.cases.values() if c.scored_runs]
+        if not counted:
             return 0.0
-        return sum(c.pass_rate for c in self.cases.values()) / len(self.cases)
+        return sum(c.pass_rate for c in counted) / len(counted)
 
     def to_json(self) -> dict[str, Any]:
         return {
@@ -71,6 +89,7 @@ class Report:
                 cid: {
                     "question": c.question,
                     "pass_rate": round(c.pass_rate, 4),
+                    **({"expect": c.expect} if c.expect != "rows" else {}),
                     "runs": [r.__dict__ for r in c.runs],
                 }
                 for cid, c in self.cases.items()
@@ -80,7 +99,11 @@ class Report:
     @classmethod
     def from_json(cls, data: dict[str, Any]) -> Report:
         cases = {
-            cid: CaseResult(c["question"], [Run(**r) for r in c["runs"]])
+            cid: CaseResult(
+                c["question"],
+                [Run(**r) for r in c["runs"]],
+                c.get("expect", "rows"),
+            )
             for cid, c in data["cases"].items()
         }
         return cls(meta=data["meta"], cases=cases)
@@ -183,6 +206,12 @@ class Comparison:
     only_in_candidate: list[str]
     margin: float
     tolerance: float
+    # Mean pass rate per kind of case when a report mixes answerable ("rows") and
+    # unanswerable ("refusal") questions: {expect: (base, candidate, questions)}.
+    by_expect: dict[str, tuple[float, float, int]] = field(default_factory=dict)
+    # Questions left out of the scores because a side has no scored run
+    # (every run a ``no_answer``).
+    unscored: list[str] = field(default_factory=list)
 
     @property
     def delta(self) -> float:
@@ -203,6 +232,13 @@ class Comparison:
             f"  improved {len(self.improvements)}  regressed {len(self.regressions)}"
             f"  unchanged {self.unchanged}",
         ]
+        if len(self.by_expect) > 1:
+            for expect, (b, c, n) in sorted(self.by_expect.items()):
+                lines.append(f"  {expect:8s} {b:6.1%} -> {c:6.1%}  ({n} questions)")
+        if self.unscored:
+            lines.append(
+                f"not scored (no run with an answer on a side): {len(self.unscored)}"
+            )
         for title, items in (
             ("REGRESSIONS", self.regressions),
             ("improvements", self.improvements),
@@ -237,7 +273,11 @@ def compare_reports(
     more than *tolerance*; with three runs per question a tolerance of 0.34 lets
     one flaky run through but catches a real drop.
     """
-    shared = sorted(base.cases.keys() & candidate.cases.keys())
+    both = sorted(base.cases.keys() & candidate.cases.keys())
+    shared = [
+        c for c in both if base.cases[c].scored_runs and candidate.cases[c].scored_runs
+    ]
+    unscored = [c for c in both if c not in shared]
     regressions: list[Change] = []
     improvements: list[Change] = []
     unchanged = 0
@@ -262,6 +302,14 @@ def compare_reports(
             else 0.0
         )
 
+    by_expect: dict[str, tuple[float, float, int]] = {}
+    for expect in sorted({base.cases[c].expect for c in shared}):
+        ids = [c for c in shared if base.cases[c].expect == expect]
+        by_expect[expect] = (
+            sum(base.cases[c].pass_rate for c in ids) / len(ids),
+            sum(candidate.cases[c].pass_rate for c in ids) / len(ids),
+            len(ids),
+        )
     return Comparison(
         base_score=mean(base),
         candidate_score=mean(candidate),
@@ -272,4 +320,6 @@ def compare_reports(
         only_in_candidate=sorted(candidate.cases.keys() - base.cases.keys()),
         margin=margin,
         tolerance=tolerance,
+        by_expect=by_expect,
+        unscored=unscored,
     )

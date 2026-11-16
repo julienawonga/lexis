@@ -197,6 +197,75 @@ reason; each entry is reviewed like code, and one without a reason is rejected.
 See [verification-status.md](./verification-status.md) for what has and has not
 been verified for real.
 
+### Unanswerable questions
+
+`dev_tools/evals/cases/unanswerable.json` holds 36 questions the database
+**cannot** answer (18 on Chinook, 18 on Pagila), written and frozen before any
+engine run and without reading any engine output. They measure whether the
+engine hands the user a result for something else (E1 of the audit; 21 of 28
+runs did in E27). A case has `"expect": "refusal"`, a `kind`, a one-sentence
+`reason` (for reviewers, never sent to the engine), a `database`, and no gold
+SQL, so `snapshot` skips it.
+
+Kinds, three per database each: `missing-entity`, `missing-attribute`,
+`missing-time-or-version`, `undefined-term`, `out-of-scope`, `false-premise`.
+Eight questions (`fr` tag) are in French. Each is written to be tempting: a
+nearby column exists that a careless model could substitute.
+
+`controls` names 12 answerable cases of the frozen `chinook.json` and
+`pagila.json` (6 each, by id, nothing copied). `run --with-controls` adds them,
+so one report holds both the refusals and the false refusals:
+
+```bash
+python -m dev_tools.evals run --cases dev_tools/evals/cases/unanswerable.json \
+  --with-controls --label candidate --out candidate.json
+python -m dev_tools.evals rescore candidate.json --strict --out candidate-strict.json \
+  --cases dev_tools/evals/cases/unanswerable.json dev_tools/evals/cases/chinook.json \
+  dev_tools/evals/cases/pagila.json
+```
+
+The scoring does not depend on how a refusal is produced
+(`dev_tools/evals/refusal.py`). One run of an unanswerable question is:
+
+- **FAIL** when it returned executed rows, even with a note beside them
+  (including a single row of NULLs: the user was handed a result);
+- **PASS (explicit marker)** when the answer carries `answer.refusal` (an
+  object) or `answer.caveats` containing the code `unanswerable` (the bare string
+  or `{"code": "unanswerable"}`), and returned no rows. The backend does not
+  produce this marker yet; only the scorer accepts it;
+- **PASS (tolerant)** when it returned no rows at all (no SQL ran, or a query
+  returned zero rows);
+- **PASS (strict)** only through the marker, or no rows **and** an answer text
+  that says the question cannot be answered. "Says" is the fixed pattern list
+  `CANNOT_ANSWER_PATTERNS` (English and French); a test pins its hash, so
+  changing it is a visible act, like re-freezing a case file;
+- **`no_answer`** on a timeout or an infrastructure error with no rows: neither
+  pass nor fail. It leaves the denominator (a question with no scored run is
+  left out of the score and of `compare`) and `run`, `compare` print the count.
+  Consequence: an `error` event that carries a clean refusal message is also
+  `no_answer`, so it cannot inflate the score, only hide a refusal.
+
+`run` scores tolerant; `rescore --strict` gives the strict score from the same
+runs (the text and marker are stored in the report). Report both, as for every
+measurement.
+
+The gate for a change that adds a refusal path: the refusal score must go up
+and the controls must not refuse more. `compare` pairs the questions as usual, so
+a control that regresses rejects the candidate, and it prints the mean per kind
+(`refusal`, `rows`) when a report holds both. A control counts as refused when
+it returns no rows, since its gold has rows.
+
+**Next database.** The rentals database (a later pull request) gets its own
+`dev_tools/evals/cases/unanswerable_rentals.json` in the same format (dataset
+`unanswerable_rentals`, ids `unanswerable_rentals.*`, `database` set, its own
+`controls` pointing at that database's frozen answerable file). It is not
+created here; freeze it before running it.
+
+What this set is not: it was written by one author and has not been reviewed by
+a person, some `undefined-term` questions (a business word with a plausible
+proxy) are arguable by nature, and the `controls` list is not covered by the
+frozen hash (the `cases` are).
+
 ## Bench
 
 `python -m dev_tools.evals bench` is the one-command workflow that applies the
