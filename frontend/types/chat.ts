@@ -21,9 +21,39 @@ export type ChatMessage = {
 	sqlResponse?: string;
 	thoughts?: string;
 	knowledgeTrace?: KnowledgeTraceEntry[];
+	/**
+	 * The agent steps this answer went through, kept when the answer lands. Live
+	 * answers only: it is not stored with the conversation.
+	 */
+	steps?: GraphStep[];
+	/**
+	 * The result bubble (table or charts) of the same answer, folded into the
+	 * message that carries the SQL so the thread can show the result first. Built
+	 * for display only (`groupAnswerTurns`); never stored.
+	 */
+	result?: AnswerResult;
 	/** Set when this assistant turn is a clarification question rather than an answer. */
 	clarification?: ClarificationPart;
 	timestamp: number;
+};
+
+/** The result half of an answer: a chart fence in `content`, or the raw rows. */
+export type AnswerResult = {
+	content: string;
+	sqlResponse?: string;
+};
+
+/** One entry of the path shown under an answer: what the agent did, in plain words. */
+export type PathStepId = 'understood' | 'knowledge' | 'sql' | 'run';
+
+export type PathStep = {
+	id: PathStepId;
+	/** "Understood the question", "Found knowledge", "Wrote the SQL", "Checked and ran it". */
+	title: string;
+	/** Short summary shown beside the title: "12 offered · 1 used", "1,000 rows". */
+	summary: string;
+	/** Whether the thread has what it needs to say anything about this step. */
+	known: boolean;
 };
 
 export type ChatRequest = {

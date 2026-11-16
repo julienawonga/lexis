@@ -65,6 +65,13 @@ const applyStepEvent = (prev: GraphStep[], event: StepEvent): GraphStep[] => {
 export const useChat = () => {
 	const [messages, setMessages] = useState<ChatMessage[]>([]);
 	const [steps, setSteps] = useState<GraphStep[]>([]);
+	// Mirrors `steps` for the answer bubble: `appendSqlAnswerMessage` reads the
+	// ref when the answer lands so the message keeps the steps of the run that
+	// produced it, without re-creating that callback on every step event.
+	const stepsRef = useRef<GraphStep[]>([]);
+	useEffect(() => {
+		stepsRef.current = steps;
+	}, [steps]);
 	// The validated query the running agent is executing, rendered inside the
 	// thinking bubble so the user can read it while it runs instead of only
 	// seeing it arrive with the answer. Replaced in place if execution fails
@@ -118,6 +125,7 @@ export const useChat = () => {
 				sqlResponse?: string;
 				thoughts?: string;
 				knowledgeTrace?: KnowledgeTraceEntry[];
+				steps?: GraphStep[];
 			},
 		) => {
 			const assistantMsg: ChatMessage = {
@@ -128,6 +136,7 @@ export const useChat = () => {
 				sqlResponse: extras?.sqlResponse,
 				thoughts: extras?.thoughts,
 				knowledgeTrace: extras?.knowledgeTrace,
+				steps: extras?.steps,
 				timestamp: Date.now(),
 			};
 			setMessages((prev) => [...prev, assistantMsg]);
@@ -146,6 +155,7 @@ export const useChat = () => {
 					sql: msg.sql,
 					thoughts: msg.thoughts,
 					knowledgeTrace: msg.knowledgeTrace,
+					steps: stepsRef.current,
 				});
 		},
 		[appendAssistantMessage],
