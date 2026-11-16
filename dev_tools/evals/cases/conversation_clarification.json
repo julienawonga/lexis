@@ -1,0 +1,54 @@
+{
+  "dataset": "conversation_clarification",
+  "kind": "conversation",
+  "description": "Questions of the conversation protocol in docs/conversation-protocol.md (PR #82, clarification). Not scored by `run`: these cases have no gold SQL and are driven by `python -m dev_tools.evals conversation`. Group `undefined` is the 8 questions of the original questions.json (sha256 of that file, recorded before any run: 418bb48a25809180096b4b7367594d3ee67737e77187ac28b9123f549fbace81), wording unchanged. Group `label_stability` is the one M4 question, which the original probe.py held as a literal. The answerable set (M3a) is the questions of chinook.json. Do not edit a case after seeing a result.",
+  "frozen_at": "2026-11-16",
+  "frozen_sha256": "302a41dc65f716b88ca38e6f3a2fb8f6c20612274b0e5084c6b157582ac5efa5",
+  "cases": [
+    {
+      "id": "conversation_clarification.undefined_1",
+      "group": "undefined",
+      "question": "What is our overall satisfaction score?"
+    },
+    {
+      "id": "conversation_clarification.undefined_2",
+      "group": "undefined",
+      "question": "What is our customer satisfaction score?"
+    },
+    {
+      "id": "conversation_clarification.undefined_3",
+      "group": "undefined",
+      "question": "How many high-risk cases do we have?"
+    },
+    {
+      "id": "conversation_clarification.undefined_4",
+      "group": "undefined",
+      "question": "What is our retention rate?"
+    },
+    {
+      "id": "conversation_clarification.undefined_5",
+      "group": "undefined",
+      "question": "Who are our best performing operations?"
+    },
+    {
+      "id": "conversation_clarification.undefined_6",
+      "group": "undefined",
+      "question": "What is our average response time?"
+    },
+    {
+      "id": "conversation_clarification.undefined_7",
+      "group": "undefined",
+      "question": "How many premium users do we have?"
+    },
+    {
+      "id": "conversation_clarification.undefined_8",
+      "group": "undefined",
+      "question": "What is our overall engagement level?"
+    },
+    {
+      "id": "conversation_clarification.label_stability",
+      "group": "label_stability",
+      "question": "What is our overall satisfaction score?"
+    }
+  ]
+}

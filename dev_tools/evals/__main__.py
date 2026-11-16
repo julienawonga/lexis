@@ -37,6 +37,10 @@ python -m dev_tools.evals wiki-extract --wiki alien.md --db alien --out alien.te
 python -m dev_tools.evals wiki-load --file alien.terms.yaml --db alien --dry-run   # --apply / --remove
 python -m dev_tools.evals wiki-score-extraction --extracted alien.terms.yaml --kb-dir kb --db alien
 
+# conversation-aware measurements (clarification): docs/conversation-protocol.md
+python -m dev_tools.evals conversation run m3 --arm cand --url http://localhost:3001 --out m3.jsonl
+python -m dev_tools.evals conversation report --m3 m3.jsonl --m12 m12.jsonl
+
 # the one-command bench: split once, run a slice, score with a paired verdict
 python -m dev_tools.evals bench split --cases lsb --out ~/split --seed 7
 python -m dev_tools.evals bench run --split ~/split --slice dev --label main
@@ -56,7 +60,7 @@ import httpx
 import yaml
 
 from auto_ontology.server.internal_auth import INTERNAL_TOKEN_ENV, INTERNAL_TOKEN_HEADER
-from dev_tools.evals import bench
+from dev_tools.evals import bench, conversation
 from dev_tools.evals.cases import (
     DEFAULT_CASES_DIR,
     Case,
@@ -93,8 +97,22 @@ def _case_paths(values: list[str]) -> list[Path]:
     paths: list[Path] = []
     for value in values:
         path = Path(value)
-        paths += sorted(path.glob("*.json")) if path.is_dir() else [path]
+        paths += (
+            [p for p in sorted(path.glob("*.json")) if not _is_conversation_file(p)]
+            if path.is_dir()
+            else [path]
+        )
     return paths
+
+
+def _is_conversation_file(path: Path) -> bool:
+    """A conversation-protocol case file has no gold SQL: ``run`` cannot score it."""
+    try:
+        return (
+            json.loads(path.read_text(encoding="utf-8")).get("kind") == "conversation"
+        )
+    except (OSError, ValueError):
+        return False
 
 
 def _hash_cases(paths: list[Path]) -> str | list[str]:
@@ -718,6 +736,45 @@ def build_parser() -> argparse.ArgumentParser:
     merge.add_argument("--label", default="merged")
     merge.add_argument("--out", required=True)
     merge.set_defaults(func=_cmd_merge)
+
+    conv = sub.add_parser(
+        "conversation",
+        help="conversation-aware measurements (clarification), see "
+        "docs/conversation-protocol.md",
+    )
+    csub = conv.add_subparsers(dest="conversation_command", required=True)
+    crun = csub.add_parser("run", help="run a measurement (resumable)")
+    crun.add_argument(
+        "measure", choices=["m3", "m12"], help="m3: M3a, M3b, M4; m12: M1, M2"
+    )
+    crun.add_argument(
+        "--out", required=True, help="JSON Lines file (resumed if it exists)"
+    )
+    crun.add_argument("--user", default=conversation.DEFAULT_USER, help="test user id")
+    crun.add_argument(
+        "--token",
+        help=f"backend internal token, if it requires one (or {INTERNAL_TOKEN_ENV})",
+    )
+    crun.add_argument("--arm", help="m3: arm name, `main` or `cand`")
+    crun.add_argument("--url", help="m3: backend base URL")
+    crun.add_argument("--workers", type=int, default=conversation.M3_WORKERS)
+    crun.add_argument("--cand-url", help="m12: candidate backend URL")
+    crun.add_argument(
+        "--cand-container", help="m12: candidate backend container (docker logs)"
+    )
+    crun.add_argument("--main-url", help="m12: main backend URL")
+    crun.add_argument(
+        "--main-container", help="m12: main backend container (docker logs)"
+    )
+    crun.add_argument("--postgres-container", default="postgres")
+    crun.add_argument("--db-user", default="postgres")
+    crun.add_argument("--db-name", default="auto_ontology")
+    crun.set_defaults(func=conversation.cmd_run)
+    crep = csub.add_parser("report", help="metrics and gates from the run files")
+    crep.add_argument("--m3", help="JSON Lines file of `run m3` (both arms)")
+    crep.add_argument("--m12", help="JSON Lines file of `run m12`")
+    crep.add_argument("--out", help="also write the report as JSON")
+    crep.set_defaults(func=conversation.cmd_report)
 
     build = sub.add_parser(
         "lsb-build",

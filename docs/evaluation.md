@@ -285,8 +285,12 @@ These exist because each of them was broken at least once.
    `conversation_id`, no user), so it never goes through a path that needs a
    conversation, such as clarification questions: a change there cannot move
    these scores. Such a change needs its own protocol, written and frozen before
-   the runs. The one used for the option-to-database change is described in
-   E31 of [experiments.md](./experiments.md).
+   the runs. The one used for the option-to-database change (E31 of
+   [experiments.md](./experiments.md)) is in the repository:
+   [conversation-protocol.md](./conversation-protocol.md), run with
+   `python -m dev_tools.evals conversation run|report` (authenticated
+   conversations, turn by turn, frozen questions in
+   `cases/conversation_clarification.json`).
 
 ## Reference measurements
 
