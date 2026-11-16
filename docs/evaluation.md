@@ -144,6 +144,49 @@ Conventions: a ranking question expects the item and its value; a person's
 name may be one column or two, and both are accepted as separate gold answers.
 A case `description` states what the question means where that is not obvious.
 
+### The Rentals set (held out)
+
+`dev_tools/evals/cases/rentals.json` holds 24 answerable questions over an
+invented equipment-rental company, a third database that is not a public
+dataset, so a model cannot have memorised it. The fixture
+`dev_tools/fixtures/sql/rentals.sql` has 12 tables and about 500 explicit,
+deterministic rows, and is written to look like a real, slightly messy system:
+abbreviated column names, a coded status with a lookup table, another coded
+status with no lookup, a junction table, soft-deleted rows, meaningful NULLs, a
+date stored as text (`DD/MM/YYYY`), look-alike columns (a due date against an
+actual return date, a retired date against a deleted timestamp) and an unrelated
+table.
+
+The questions cover counts, joins over two to four tables, coded statuses, soft
+deletes that must be excluded, rankings with the value, ratios, date ranges on
+the text date, the junction, and readings that are ambiguous (both answers are
+accepted). Cases tagged `needs-definition` need a business definition that is
+not in the schema; it is supplied as `evidence` (code meanings and the
+definition of a measure, never an answer or a number the answer contains).
+
+It was written and frozen **before any measurement** and has **never been run
+through the engine**. The same person wrote the data and the answers, and no one
+else has reviewed them. Do not edit a case, a gold query or an expected row
+after seeing a result; if one is found to be wrong, say so in the report and
+score every run under the corrected file.
+
+The SQL file is in the portable subset that SQLite and PostgreSQL both accept.
+Expected rows come from the SQLite build. To verify them:
+
+```bash
+python -c "import sqlite3; sqlite3.connect('rentals.sqlite').executescript(open('dev_tools/fixtures/sql/rentals.sql', encoding='utf-8').read())"
+python -m dev_tools.evals snapshot --check --cases dev_tools/evals/cases/rentals.json --dsn sqlite:///rentals.sqlite
+```
+
+To measure it on the stack, load the same file into an empty PostgreSQL
+database named `rentals` (no conversion is needed, unlike Chinook), register and
+ingest it, compile the semantic layer, then:
+
+```bash
+psql "postgresql://USER:PASSWORD@HOST:5432/rentals" -f dev_tools/fixtures/sql/rentals.sql
+python -m dev_tools.evals run --cases dev_tools/evals/cases/rentals.json --target-db rentals --label main --out rentals-main.json
+```
+
 ### The French Chinook set
 
 `dev_tools/evals/cases/chinook_fr.json` is `chinook.json` with only the question
@@ -342,8 +385,12 @@ These exist because each of them was broken at least once.
    `conversation_id`, no user), so it never goes through a path that needs a
    conversation, such as clarification questions: a change there cannot move
    these scores. Such a change needs its own protocol, written and frozen before
-   the runs. The one used for the option-to-database change is described in
-   E31 of [experiments.md](./experiments.md).
+   the runs. The one used for the option-to-database change (E31 of
+   [experiments.md](./experiments.md)) is in the repository:
+   [conversation-protocol.md](./conversation-protocol.md), run with
+   `python -m dev_tools.evals conversation run|report` (authenticated
+   conversations, turn by turn, frozen questions in
+   `cases/conversation_clarification.json`).
 
 ## Reference measurements
 

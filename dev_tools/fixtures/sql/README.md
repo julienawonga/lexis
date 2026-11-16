@@ -22,6 +22,7 @@ fixture from scratch, drop the database first; for SQLite, delete the
 | `pagila` | Postgres | [devrimgunduz/pagila] `pagila-v3.1.0`, trimmed | MIT |
 | `pagila_analytics` | Postgres | Lexis-authored addendum to `pagila` | — |
 | `chinook` | SQLite | [lerocha/chinook-database], unmodified | MIT |
+| `rentals` | SQLite and Postgres | Lexis-authored synthetic database, portable SQL; see `docs/evaluation.md` | Apache-2.0 |
 
 [devrimgunduz/pagila]: https://github.com/devrimgunduz/pagila
 [lerocha/chinook-database]: https://github.com/lerocha/chinook-database

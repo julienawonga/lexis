@@ -1,0 +1,687 @@
+{
+  "dataset": "rentals",
+  "description": "Held-out questions over the Rentals fixture, an invented equipment-rental company (SQLite, built from dev_tools/fixtures/sql/rentals.sql; the same file loads into PostgreSQL). Written and frozen before any measurement and never run through the engine: do not edit a case after seeing a result. The data and the answers were written by the same author and have not been reviewed by anyone else. Gold SQL is the source of truth; `expected` rows are a snapshot of it (python -m dev_tools.evals snapshot --dsn sqlite:///...). Rentals start 2024-01-08..2025-06-25; maintenance jobs are dated 2024-01-15..2025-06-05.",
+  "frozen_at": "2026-11-16",
+  "frozen_sha256": "4cf37192faa439ab2596e068bcf3b5df0cfc167bcdb332271e9a09fde2c1ed9a",
+  "cases": [
+    {
+      "id": "rentals.branch_count",
+      "question": "How many branches do we have?",
+      "description": "One branch has a closing date. Either every branch on record or only the branches still open is accepted.",
+      "tags": [
+        "count",
+        "null",
+        "ambiguous"
+      ],
+      "gold": [
+        {
+          "label": "all_branches",
+          "sql": "SELECT COUNT(*) FROM branch",
+          "expected": [
+            [
+              5
+            ]
+          ]
+        },
+        {
+          "label": "open_branches",
+          "sql": "SELECT COUNT(*) FROM branch WHERE closed_on IS NULL",
+          "expected": [
+            [
+              4
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "id": "rentals.customer_count",
+      "question": "How many customers do we have?",
+      "description": "Customers whose record is soft-deleted (deleted_at filled) are not customers any more.",
+      "tags": [
+        "count",
+        "soft-delete"
+      ],
+      "gold": [
+        {
+          "label": "primary",
+          "sql": "SELECT COUNT(*) FROM customer WHERE deleted_at IS NULL",
+          "expected": [
+            [
+              32
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "id": "rentals.business_customers",
+      "question": "How many of our customers are businesses rather than private individuals?",
+      "description": "Private individuals have no company name. Soft-deleted customers are excluded.",
+      "tags": [
+        "count",
+        "null",
+        "soft-delete"
+      ],
+      "gold": [
+        {
+          "label": "primary",
+          "sql": "SELECT COUNT(*) FROM customer WHERE co_name IS NOT NULL AND deleted_at IS NULL",
+          "expected": [
+            [
+              23
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "id": "rentals.units_per_category",
+      "question": "How many pieces of equipment do we have in each category?",
+      "description": "One row per category. Units whose record is soft-deleted are not counted; units retired from service still are (they are still owned records).",
+      "tags": [
+        "group-by",
+        "join",
+        "soft-delete"
+      ],
+      "gold": [
+        {
+          "label": "primary",
+          "sql": "SELECT ec.cat_nm, COUNT(*) AS units FROM equip_category ec JOIN equip_unit u ON u.cat_id = ec.cat_id WHERE u.deleted_at IS NULL GROUP BY ec.cat_id, ec.cat_nm",
+          "expected": [
+            [
+              "Excavators",
+              6
+            ],
+            [
+              "Scaffolding",
+              6
+            ],
+            [
+              "Generators",
+              6
+            ],
+            [
+              "Pressure Washers",
+              6
+            ],
+            [
+              "Aerial Lifts",
+              5
+            ],
+            [
+              "Concrete Mixers",
+              5
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "id": "rentals.cancelled_rentals",
+      "question": "How many rentals were cancelled?",
+      "description": "The status is stored as a one-letter code; the lookup table gives its meaning. Soft-deleted rentals are excluded.",
+      "tags": [
+        "count",
+        "join",
+        "coded-status",
+        "soft-delete"
+      ],
+      "gold": [
+        {
+          "label": "primary",
+          "sql": "SELECT COUNT(*) FROM rental r JOIN rental_status s ON s.stat_cd = r.stat_cd WHERE s.stat_cd = 'X' AND r.deleted_at IS NULL",
+          "expected": [
+            [
+              8
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "id": "rentals.rentals_out_now",
+      "question": "How many rentals are currently out with customers?",
+      "description": "Currently out means the rental status is Active (the equipment has not been returned yet).",
+      "tags": [
+        "count",
+        "join",
+        "coded-status",
+        "soft-delete"
+      ],
+      "gold": [
+        {
+          "label": "primary",
+          "sql": "SELECT COUNT(*) FROM rental r JOIN rental_status s ON s.stat_cd = r.stat_cd WHERE s.stat_cd = 'A' AND r.deleted_at IS NULL",
+          "expected": [
+            [
+              8
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "id": "rentals.completed_by_branch",
+      "question": "How many rentals has each branch completed?",
+      "description": "Completed means status Closed (returned and settled). The branch is the one that handled the rental. Soft-deleted rentals are excluded.",
+      "tags": [
+        "group-by",
+        "join",
+        "coded-status",
+        "soft-delete"
+      ],
+      "gold": [
+        {
+          "label": "primary",
+          "sql": "SELECT b.br_name, COUNT(*) AS completed FROM branch b JOIN rental r ON r.branch_id = b.branch_id JOIN rental_status s ON s.stat_cd = r.stat_cd WHERE s.stat_cd = 'C' AND r.deleted_at IS NULL GROUP BY b.branch_id, b.br_name",
+          "expected": [
+            [
+              "Northgate Depot",
+              14
+            ],
+            [
+              "Harbour Yard",
+              14
+            ],
+            [
+              "Millbrook Site",
+              14
+            ],
+            [
+              "Eastcliff Hub",
+              15
+            ],
+            [
+              "Southvale Depot",
+              14
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "id": "rentals.most_rentals_customer",
+      "question": "Which customer has rented from us the most times?",
+      "description": "The customer and the number of rentals. A cancelled booking may or may not be counted as a rental, so both readings are accepted (the top customer is the same, the count differs by one). Soft-deleted rentals never count. No tie in either reading (10 against 9, 11 against 9). Extra columns such as the contact or the reference are accepted.",
+      "tags": [
+        "ranking",
+        "join",
+        "count",
+        "soft-delete",
+        "ambiguous"
+      ],
+      "allow_extra_columns": true,
+      "gold": [
+        {
+          "label": "excluding_cancelled",
+          "sql": "SELECT c.co_name, COUNT(*) AS rentals FROM customer c JOIN rental r ON r.cust_id = c.cust_id JOIN rental_status s ON s.stat_cd = r.stat_cd WHERE r.deleted_at IS NULL AND s.stat_cd <> 'X' GROUP BY c.cust_id, c.co_name ORDER BY rentals DESC LIMIT 1",
+          "expected": [
+            [
+              "Ironbridge Fabrication",
+              10
+            ]
+          ]
+        },
+        {
+          "label": "including_cancelled",
+          "sql": "SELECT c.co_name, COUNT(*) AS rentals FROM customer c JOIN rental r ON r.cust_id = c.cust_id WHERE r.deleted_at IS NULL GROUP BY c.cust_id, c.co_name ORDER BY rentals DESC LIMIT 1",
+          "expected": [
+            [
+              "Ironbridge Fabrication",
+              11
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "id": "rentals.top3_units_income",
+      "question": "Which 3 pieces of equipment have brought in the most rental money?",
+      "description": "Each unit is identified by its serial number and ranked by the sum of its rental line amounts, leaving out soft-deleted rentals. Extra descriptive columns (model) are accepted. No tie at the cut-off.",
+      "tags": [
+        "ranking",
+        "join",
+        "sum",
+        "junction",
+        "soft-delete"
+      ],
+      "ordered": true,
+      "allow_extra_columns": true,
+      "gold": [
+        {
+          "label": "primary",
+          "sql": "SELECT u.serial_no, SUM(ri.line_amt) AS income FROM equip_unit u JOIN rental_item ri ON ri.unit_id = u.unit_id JOIN rental r ON r.rental_id = ri.rental_id WHERE r.deleted_at IS NULL GROUP BY u.unit_id, u.serial_no ORDER BY income DESC LIMIT 3",
+          "expected": [
+            [
+              "SN-14888",
+              13950
+            ],
+            [
+              "SN-14222",
+              7750
+            ],
+            [
+              "SN-14000",
+              6290
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "id": "rentals.top_category_income",
+      "question": "Which equipment category earns us the most from rentals?",
+      "description": "The category and the sum of rental line amounts of its units, leaving out soft-deleted rentals. No tie.",
+      "tags": [
+        "ranking",
+        "join",
+        "multi-hop",
+        "sum",
+        "junction",
+        "soft-delete"
+      ],
+      "ordered": true,
+      "gold": [
+        {
+          "label": "primary",
+          "sql": "SELECT ec.cat_nm, SUM(ri.line_amt) AS income FROM equip_category ec JOIN equip_unit u ON u.cat_id = ec.cat_id JOIN rental_item ri ON ri.unit_id = u.unit_id JOIN rental r ON r.rental_id = ri.rental_id WHERE r.deleted_at IS NULL GROUP BY ec.cat_id, ec.cat_nm ORDER BY income DESC LIMIT 1",
+          "expected": [
+            [
+              "Excavators",
+              44315
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "id": "rentals.late_returns",
+      "question": "How many rentals were returned late?",
+      "description": "Late means the actual return date is after the agreed return date (due date). Rentals not yet returned have no return date and are not late. Soft-deleted rentals are excluded.",
+      "tags": [
+        "count",
+        "comparison",
+        "null",
+        "soft-delete"
+      ],
+      "gold": [
+        {
+          "label": "primary",
+          "sql": "SELECT COUNT(*) FROM rental WHERE deleted_at IS NULL AND ret_dt > due_dt",
+          "expected": [
+            [
+              28
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "id": "rentals.late_share",
+      "question": "What percentage of finished rentals came back late?",
+      "description": "Finished means status Closed. Share of those whose return date is after the due date, over all closed rentals that are not soft-deleted. Either the percentage or the fraction is accepted.",
+      "tags": [
+        "ratio",
+        "coded-status",
+        "comparison",
+        "soft-delete"
+      ],
+      "gold": [
+        {
+          "label": "percent",
+          "sql": "SELECT ROUND(100.0 * SUM(CASE WHEN ret_dt > due_dt THEN 1 ELSE 0 END) / COUNT(*), 2) FROM rental WHERE deleted_at IS NULL AND stat_cd = 'C'",
+          "expected": [
+            [
+              39.44
+            ]
+          ]
+        },
+        {
+          "label": "fraction",
+          "sql": "SELECT ROUND(1.0 * SUM(CASE WHEN ret_dt > due_dt THEN 1 ELSE 0 END) / COUNT(*), 4) FROM rental WHERE deleted_at IS NULL AND stat_cd = 'C'",
+          "expected": [
+            [
+              0.3944
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "id": "rentals.customer_reference",
+      "question": "What is the customer reference of Orchard Lane Builders?",
+      "description": "The reference is stored in the abbreviated column cust_ref.",
+      "tags": [
+        "lookup",
+        "cryptic-name"
+      ],
+      "gold": [
+        {
+          "label": "primary",
+          "sql": "SELECT cust_ref FROM customer WHERE co_name = 'Orchard Lane Builders'",
+          "expected": [
+            [
+              "RC-1004"
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "id": "rentals.jobs_2024",
+      "question": "How many maintenance jobs did we carry out in 2024?",
+      "description": "The job date is stored as text in the form DD/MM/YYYY.",
+      "tags": [
+        "count",
+        "date-filter",
+        "text-date"
+      ],
+      "gold": [
+        {
+          "label": "primary",
+          "sql": "SELECT COUNT(*) FROM maint_job WHERE SUBSTR(job_dt, 7, 4) = '2024'",
+          "expected": [
+            [
+              28
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "id": "rentals.maintenance_spend_spring_2025",
+      "question": "How much did we spend on maintenance between 1 March and 31 May 2025, both days included?",
+      "description": "The job date is text in the form DD/MM/YYYY. Jobs with no cost (covered by warranty) are empty and add nothing.",
+      "tags": [
+        "sum",
+        "date-range",
+        "text-date",
+        "null"
+      ],
+      "gold": [
+        {
+          "label": "primary",
+          "sql": "SELECT SUM(cost) FROM maint_job WHERE SUBSTR(job_dt, 7, 4) || SUBSTR(job_dt, 4, 2) || SUBSTR(job_dt, 1, 2) BETWEEN '20250301' AND '20250531'",
+          "expected": [
+            [
+              1304.0
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "id": "rentals.jobs_per_technician",
+      "question": "How many maintenance jobs has each technician done?",
+      "description": "One row per technician with the number of jobs. A technician who has since left (soft-deleted staff record) still did the jobs, so is included.",
+      "tags": [
+        "group-by",
+        "join",
+        "soft-delete"
+      ],
+      "gold": [
+        {
+          "label": "primary",
+          "sql": "SELECT s.full_nm, COUNT(*) AS jobs FROM staff s JOIN maint_job m ON m.tech_id = s.staff_id GROUP BY s.staff_id, s.full_nm",
+          "expected": [
+            [
+              "Hettie Prowse",
+              15
+            ],
+            [
+              "Ugo Fenwick",
+              12
+            ],
+            [
+              "Rhea Lindqvist",
+              13
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "id": "rentals.multi_unit_rentals",
+      "question": "How many rentals included more than one piece of equipment?",
+      "description": "Equipment is linked to rentals through the rental item table. Soft-deleted rentals are excluded; cancelled bookings may or may not count as rentals, so both counts are accepted.",
+      "tags": [
+        "count",
+        "junction",
+        "soft-delete",
+        "ambiguous"
+      ],
+      "gold": [
+        {
+          "label": "excluding_cancelled",
+          "sql": "SELECT COUNT(*) FROM (SELECT ri.rental_id FROM rental_item ri JOIN rental r ON r.rental_id = ri.rental_id WHERE r.deleted_at IS NULL AND r.stat_cd <> 'X' GROUP BY ri.rental_id HAVING COUNT(*) > 1) t",
+          "expected": [
+            [
+              30
+            ]
+          ]
+        },
+        {
+          "label": "including_cancelled",
+          "sql": "SELECT COUNT(*) FROM (SELECT ri.rental_id FROM rental_item ri JOIN rental r ON r.rental_id = ri.rental_id WHERE r.deleted_at IS NULL GROUP BY ri.rental_id HAVING COUNT(*) > 1) t",
+          "expected": [
+            [
+              33
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "id": "rentals.equipment_for_customer",
+      "question": "Which equipment has Cinder Road Motors rented?",
+      "description": "The units rented, through customer, rental, rental item and equipment unit (four tables). Soft-deleted and cancelled rentals are left out. Listing the serial numbers with the models, or just the distinct models, is accepted.",
+      "tags": [
+        "join",
+        "multi-hop",
+        "junction",
+        "name-match",
+        "soft-delete"
+      ],
+      "gold": [
+        {
+          "label": "serial_and_model",
+          "sql": "SELECT DISTINCT u.serial_no, u.model_nm FROM customer c JOIN rental r ON r.cust_id = c.cust_id JOIN rental_item ri ON ri.rental_id = r.rental_id JOIN equip_unit u ON u.unit_id = ri.unit_id WHERE c.co_name = 'Cinder Road Motors' AND r.deleted_at IS NULL AND r.stat_cd <> 'X'",
+          "expected": [
+            [
+              "SN-44555",
+              "Jetline J150"
+            ],
+            [
+              "SN-34962",
+              "Voltaire V20"
+            ]
+          ]
+        },
+        {
+          "label": "model_only",
+          "sql": "SELECT DISTINCT u.model_nm FROM customer c JOIN rental r ON r.cust_id = c.cust_id JOIN rental_item ri ON ri.rental_id = r.rental_id JOIN equip_unit u ON u.unit_id = ri.unit_id WHERE c.co_name = 'Cinder Road Motors' AND r.deleted_at IS NULL AND r.stat_cd <> 'X'",
+          "expected": [
+            [
+              "Jetline J150"
+            ],
+            [
+              "Voltaire V20"
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "id": "rentals.never_rented_units",
+      "question": "How many pieces of equipment have never been rented out?",
+      "description": "Units whose record is soft-deleted are not counted. Rentals that are soft-deleted or cancelled do not count as a rental of the unit (every reading gives the same number here).",
+      "tags": [
+        "count",
+        "anti-join",
+        "soft-delete"
+      ],
+      "gold": [
+        {
+          "label": "primary",
+          "sql": "SELECT COUNT(*) FROM equip_unit u WHERE u.deleted_at IS NULL AND NOT EXISTS (SELECT 1 FROM rental_item ri JOIN rental r ON r.rental_id = ri.rental_id WHERE ri.unit_id = u.unit_id AND r.deleted_at IS NULL AND r.stat_cd <> 'X')",
+          "expected": [
+            [
+              2
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "id": "rentals.unpaid_invoices",
+      "question": "How many invoices are still waiting to be paid?",
+      "description": "Waiting to be paid means open (not yet paid in full). Void invoices are not waiting for payment.",
+      "evidence": "Invoice payment status codes (pay_stat): P = paid in full, O = open (not yet paid in full), V = void (cancelled, never collected).",
+      "tags": [
+        "count",
+        "coded-status",
+        "needs-definition"
+      ],
+      "gold": [
+        {
+          "label": "primary",
+          "sql": "SELECT COUNT(*) FROM invoice WHERE pay_stat = 'O'",
+          "expected": [
+            [
+              16
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "id": "rentals.amount_owed",
+      "question": "How much money do customers still owe us on open invoices?",
+      "description": "Owed = total of the open invoices minus the live payments received against them.",
+      "evidence": "Invoice payment status codes (pay_stat): P = paid in full, O = open (not yet paid in full), V = void (cancelled, never collected). The amount still owed on open invoices is the invoice totals (inv_ttl) minus the payments received against them. Payment rows with deleted_at filled were reversed entries and are not money received.",
+      "tags": [
+        "sum",
+        "coded-status",
+        "soft-delete",
+        "needs-definition"
+      ],
+      "gold": [
+        {
+          "label": "primary",
+          "sql": "SELECT ROUND(SUM(i.inv_ttl) - (SELECT COALESCE(SUM(p.amt), 0) FROM payment p JOIN invoice i2 ON i2.inv_id = p.inv_id WHERE i2.pay_stat = 'O' AND p.deleted_at IS NULL), 2) FROM invoice i WHERE i.pay_stat = 'O'",
+          "expected": [
+            [
+              17079.15
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "id": "rentals.net_revenue_2025",
+      "question": "What was our net rental revenue in 2025?",
+      "description": "Net revenue is the sum of invoice subtotals (before tax) of non-void invoices, by invoice date.",
+      "evidence": "Invoice payment status codes (pay_stat): P = paid in full, O = open (not yet paid in full), V = void (cancelled, never collected). Net rental revenue is the sum of invoice subtotals before tax (inv_sub), leaving out void invoices, for invoices dated in the period.",
+      "tags": [
+        "sum",
+        "date-range",
+        "coded-status",
+        "needs-definition"
+      ],
+      "gold": [
+        {
+          "label": "primary",
+          "sql": "SELECT ROUND(SUM(inv_sub), 2) FROM invoice WHERE pay_stat <> 'V' AND inv_dt >= '2025-01-01' AND inv_dt < '2026-01-01'",
+          "expected": [
+            [
+              25324.0
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "id": "rentals.received_by_method",
+      "question": "How much have we received through each payment method?",
+      "description": "Payments with deleted_at filled are reversed entries and are excluded. The methods may be shown by code or by decoded name.",
+      "evidence": "Payment method codes (method_cd): CC = credit card, BT = bank transfer, CH = cheque. Payments marked as deleted were reversed entries and are not money received.",
+      "tags": [
+        "group-by",
+        "sum",
+        "coded-status",
+        "soft-delete",
+        "needs-definition"
+      ],
+      "gold": [
+        {
+          "label": "by_code",
+          "sql": "SELECT method_cd, ROUND(SUM(amt), 2) FROM payment WHERE deleted_at IS NULL GROUP BY method_cd",
+          "expected": [
+            [
+              "BT",
+              23205.38
+            ],
+            [
+              "CC",
+              30779.1
+            ],
+            [
+              "CH",
+              19292.57
+            ]
+          ]
+        },
+        {
+          "label": "by_label",
+          "sql": "SELECT CASE method_cd WHEN 'CC' THEN 'credit card' WHEN 'BT' THEN 'bank transfer' WHEN 'CH' THEN 'cheque' END, ROUND(SUM(amt), 2) FROM payment WHERE deleted_at IS NULL GROUP BY method_cd",
+          "expected": [
+            [
+              "bank transfer",
+              23205.38
+            ],
+            [
+              "credit card",
+              30779.1
+            ],
+            [
+              "cheque",
+              19292.57
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "id": "rentals.average_credit_limit",
+      "question": "What is the average credit limit we give our customers?",
+      "description": "Customers with no credit limit (empty) pay up front. Either the average over customers who have a limit, or over all customers counting no limit as zero, is accepted. Soft-deleted customers are excluded.",
+      "tags": [
+        "average",
+        "null",
+        "soft-delete",
+        "ambiguous"
+      ],
+      "gold": [
+        {
+          "label": "customers_with_limit",
+          "sql": "SELECT ROUND(AVG(credit_lmt), 2) FROM customer WHERE deleted_at IS NULL",
+          "expected": [
+            [
+              12666.67
+            ]
+          ]
+        },
+        {
+          "label": "all_customers_zero",
+          "sql": "SELECT ROUND(SUM(COALESCE(credit_lmt, 0)) * 1.0 / COUNT(*), 2) FROM customer WHERE deleted_at IS NULL",
+          "expected": [
+            [
+              5937.5
+            ]
+          ]
+        }
+      ]
+    }
+  ]
+}
