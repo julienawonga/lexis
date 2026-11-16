@@ -13,6 +13,9 @@ export type KnowledgeTraceEntry = {
 	matched: string[];
 };
 
+/** A structured mark the engine puts on an answer when a check did not fully hold. */
+export type AnswerCaveat = { code: string; message: string };
+
 export type ChatMessage = {
 	id: string;
 	role: 'user' | 'assistant';
@@ -21,6 +24,8 @@ export type ChatMessage = {
 	sqlResponse?: string;
 	thoughts?: string;
 	knowledgeTrace?: KnowledgeTraceEntry[];
+	/** Live answers only: not stored with the conversation. */
+	caveats?: AnswerCaveat[];
 	/**
 	 * The agent steps this answer went through, kept when the answer lands. Live
 	 * answers only: it is not stored with the conversation.
@@ -111,6 +116,7 @@ export type ResultEvent = {
 		sql_response_from_db?: SqlResult;
 		thoughts?: string;
 		knowledge_trace?: KnowledgeTraceEntry[] | null;
+		caveats?: AnswerCaveat[] | null;
 	};
 };
 

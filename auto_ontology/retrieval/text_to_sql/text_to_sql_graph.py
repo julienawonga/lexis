@@ -64,7 +64,11 @@ from auto_ontology.retrieval.text_to_sql.agents.sql_parse_validation import (
     INTENT_VALIDATION_SKIPPED_AFTER,
     SQLValidationAgent,
 )
-from auto_ontology.retrieval.text_to_sql.base import agent_wrapper
+from auto_ontology.retrieval.text_to_sql.base import (
+    SOFT_CHECKS_SKIPPED_CAVEAT,
+    add_caveat,
+    agent_wrapper,
+)
 from auto_ontology.retrieval.text_to_sql.db_probe.config import (
     is_db_probe_proactive,
     is_db_probe_jsonb_path_check,
@@ -158,6 +162,9 @@ def _make_soft_check_router(check_name: str):
             logger.info(
                 f"Skipping {check_name} after {failed_attempt_count} reconstructions"
             )
+            # Routers return a branch name, not a state update; the run's
+            # path_state is shared, so the mark is made in place.
+            add_caveat(state["path_state"], *SOFT_CHECKS_SKIPPED_CAVEAT)
             return "valid_sql"
         return "invalid_sql"
 

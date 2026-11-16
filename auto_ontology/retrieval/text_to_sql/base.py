@@ -123,6 +123,10 @@ class BaseAgent(ABC):
         result: Dict[str, Any] = {"path_state": path_state}
         if self.failure_decision is not None:
             result["decision"] = self.failure_decision
+        else:
+            # No failure transition: the earlier routing decision stays in
+            # place, so the step's check never took effect. Say so.
+            add_caveat(path_state, *STEP_FAILED_CAVEAT)
         return result
 
     def log_execution_start(self, state: AgentState) -> None:
@@ -163,6 +167,38 @@ def record_thought(
     log.append({"node": node_name, "text": text})
     path_state["thoughts_log"] = log
     return path_state
+
+
+VALIDATION_SKIPPED_CAVEAT = (
+    "validation_skipped",
+    "An automatic check could not run, so this answer was not fully checked. "
+    "Check the SQL before relying on it.",
+)
+STEP_FAILED_CAVEAT = VALIDATION_SKIPPED_CAVEAT
+SOFT_CHECKS_SKIPPED_CAVEAT = (
+    "soft_checks_skipped",
+    "Some automatic checks stopped being enforced after repeated failed "
+    "attempts, so this query may not satisfy all of them.",
+)
+VALIDATION_UNRESOLVED_CODE = "validation_unresolved"
+FALLBACK_SQL_CAVEAT = (
+    "fallback_sql",
+    "Validation rejected every version of this query, so the last version "
+    "that was valid SQL is shown instead. Check it before relying on it.",
+)
+
+
+def add_caveat(path_state: Dict[str, Any], code: str, message: str) -> None:
+    """Record a structured caveat on the run, once per *code*.
+
+    ``path_state["caveats"]`` becomes ``caveats`` on the final answer: a list of
+    ``{"code", "message"}`` so the client can show where validation fell short.
+    """
+    caveats = list(path_state.get("caveats") or [])
+    if any(c.get("code") == code for c in caveats):
+        return
+    caveats.append({"code": code, "message": message})
+    path_state["caveats"] = caveats
 
 
 class AgentExecutionError(Exception):
