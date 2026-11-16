@@ -337,6 +337,7 @@ Read the [published documentation](https://julienawonga.github.io/lexis/); previ
 | Matching question wording to stored values | [docs/value-linking.md](./docs/value-linking.md) |
 | What is verified for real, and what is not | [docs/verification-status.md](./docs/verification-status.md) |
 | MCP server | [docs/mcp.md](./docs/mcp.md) |
+| Backup, restore and rollback | [docs/backup-restore.md](./docs/backup-restore.md) |
 | Kubernetes with Helm | [DEPLOYMENT.md](./DEPLOYMENT.md) |
 | REST API (OpenAPI) | [docs/openapi/auto-ontology-api.json](./docs/openapi/auto-ontology-api.json) |
 | What this fork changed | [FORK.md](./FORK.md) |
