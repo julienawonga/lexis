@@ -11,11 +11,20 @@ import {
 	parseRetryAfterSeconds,
 	retryAfterHeader,
 	upstreamFailure,
+	STREAM_HEADERS_TIMEOUT_MS,
 } from './upstream';
 
 afterEach(() => {
 	vi.unstubAllGlobals();
 	vi.useRealTimers();
+});
+
+describe('the streaming header timeout', () => {
+	it('is longer than the backend waits for a slot and then for a cold worker', () => {
+		// CHAT_WAIT_S (120) + CHAT_WORKER_READY_S (120): the API sends no header
+		// before then, so a shorter limit would turn a queued question into a 504.
+		expect(STREAM_HEADERS_TIMEOUT_MS).toBeGreaterThanOrEqual(240_000);
+	});
 });
 
 describe('upstreamFailure', () => {

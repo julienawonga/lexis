@@ -10,8 +10,16 @@ export const UPSTREAM_TIMEOUT = 'The API did not answer in time.';
 
 /** Time allowed for a plain request/response call, body included. */
 export const PROXY_TIMEOUT_MS = 60_000;
-/** Time allowed for a streaming call to start answering (headers only). */
-export const STREAM_HEADERS_TIMEOUT_MS = 30_000;
+/**
+ * Time allowed for a streaming call to start answering (headers only).
+ *
+ * The chat API sends its headers only once it has a worker: it waits up to
+ * CHAT_WAIT_S (120 s) for a free slot, then up to CHAT_WORKER_READY_S (120 s)
+ * for a cold worker, before streaming. A shorter limit here turned a queued
+ * question into a 504 (four of eight concurrent questions waited 42 to 54 s in
+ * the 2026-11-16 load trial). So this only guards a backend that hangs outright.
+ */
+export const STREAM_HEADERS_TIMEOUT_MS = 300_000;
 
 const isTimeout = (err: unknown): boolean =>
 	err instanceof Error && (err.name === 'TimeoutError' || err.name === 'AbortError');
