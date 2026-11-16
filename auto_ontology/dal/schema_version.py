@@ -123,7 +123,7 @@ def head_revision() -> str | None:
 
 
 @lru_cache(maxsize=1)
-def known_revisions() -> frozenset[str] | None:
+def _known_revisions() -> frozenset[str] | None:
     """Every revision in this build's migration scripts, or ``None`` if unreadable."""
     try:
         from alembic.config import Config
@@ -181,7 +181,7 @@ def schema_state() -> SchemaState:
         expected=head_revision(),
         applied=applied,
         unreachable=unreachable,
-        known=known_revisions(),
+        known=_known_revisions(),
     )
 
 

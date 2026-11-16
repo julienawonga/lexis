@@ -74,7 +74,7 @@ def test_a_database_behind_a_build_that_knows_its_revision_is_told_to_upgrade() 
 
 
 def test_known_revisions_contain_the_head() -> None:
-    known = sv.known_revisions()
+    known = sv._known_revisions()
     assert known is not None and sv.head_revision() in known
 
 
