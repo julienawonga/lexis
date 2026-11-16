@@ -9,6 +9,7 @@ from __future__ import annotations
 import logging
 from typing import Any
 
+import pandas as pd
 from langchain_core.language_models import BaseChatModel
 from langchain_core.messages import HumanMessage, SystemMessage
 
@@ -28,6 +29,51 @@ from auto_ontology.utils.llm_invoke import invoke_with_structured_output
 
 logger = logging.getLogger(__name__)
 
+MAX_CHART_CATEGORIES = 30  # a categorical axis longer than this is unreadable
+MAX_CHART_COLUMNS = 6  # a wide result is a listing, not a chart
+MAX_CHART_POINTS = 200  # even a time series beyond this is a table
+
+_DATE_NAME_TOKENS = ("date", "time", "day", "month", "year", "week")
+_DATE_PROBE_ROWS = 50
+
+
+def _looks_like_datetime_column(column: pd.Series) -> bool:
+    """Return True when *column* plausibly holds datetimes (dtype or name probe)."""
+    if pd.api.types.is_datetime64_any_dtype(column):
+        return True
+    if pd.api.types.is_numeric_dtype(column):
+        return False
+    name = "".join(ch for ch in str(column.name).lower() if ch.isalpha())
+    if not any(token in name for token in _DATE_NAME_TOKENS):
+        return False
+    sample = column.dropna().head(_DATE_PROBE_ROWS)
+    if sample.empty:
+        return False
+    try:
+        pd.to_datetime(sample, errors="raise")
+    except (ValueError, TypeError, OverflowError, pd.errors.OutOfBoundsDatetime):
+        return False
+    return True
+
+
+def _must_be_table(df: pd.DataFrame) -> str | None:
+    """Deterministic render guard: reason string if df must be a table, else None."""
+    if len(df.columns) > MAX_CHART_COLUMNS:
+        return "wide result"
+
+    has_datetime = any(_looks_like_datetime_column(df[col]) for col in df.columns)
+    has_non_numeric = any(
+        not pd.api.types.is_numeric_dtype(df[col])
+        and not _looks_like_datetime_column(df[col])
+        for col in df.columns
+    )
+    if not has_datetime and has_non_numeric and len(df) > MAX_CHART_CATEGORIES:
+        return "too many categories"
+
+    if len(df) > MAX_CHART_POINTS:
+        return "too many points"
+    return None
+
 
 def analyze_and_visualize(
     llm: BaseChatModel,
@@ -44,6 +90,14 @@ def analyze_and_visualize(
         df = parse_sql_response_to_dataframe(sql_response_from_db)
         if df is None or df.empty:
             logger.info("analyze_and_visualize: no tabular data — skip")
+            return None
+
+        # Deterministic guardrails first: some shapes are unreadable as charts
+        # no matter what the model thinks (a 1,000-bar categorical chart, a
+        # 20-column listing, an endless time series). Skip the model entirely.
+        forced_reason = _must_be_table(df)
+        if forced_reason is not None:
+            logger.info("analyze_and_visualize: table forced (%s)", forced_reason)
             return None
 
         # Decide before building a chart: a detail/listing question often has a
