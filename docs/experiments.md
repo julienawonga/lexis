@@ -714,9 +714,18 @@ to interpret the entries is repeated.
   Chinook 20x3, `main` against the candidate, same cases: 98.3% for both, 0 improved,
   0 regressed, verdict ACCEPT (Chinook is at its ceiling, so this cannot show a small
   loss). The first report script summed the refusals of both engines in criterion 1
-  (ratio 1.167); fixed to count the candidate's own (24/24). Criteria 4 (LiveSQLBench
-  180, McNemar) and 5 (flag rate under 10% on the answerable tasks, the real
-  false-alarm check) are **not measured**, so nothing is merged. The candidate image
+  (ratio 1.167); fixed to count the candidate's own (24/24). Criterion 5 (flag rate
+  under 10% on answerable tasks, the real false-alarm check) was run on 4 of the 18
+  LiveSQLBench databases (solar, alien, credit, museum: 40 tasks, frozen oracle
+  cases, one run each, candidate against `main` alternating by database):
+  **21 of 40 runs carried a limitation (52%, 20 "partly", 1 "no")**. That fails the
+  10% ceiling by a wide margin, so criterion 5 FAILS and the signal is **not merged**.
+  The 18-database run and criterion 4 (McNemar) were not run, as the result cannot
+  change the verdict. On those 40 tasks the harness pass count was 7 for `main` and 6
+  for the candidate (a tolerant count, not the official metric, and not significant).
+  Reading: on real answerable questions the model's own "partly" is a near coin flip,
+  so the field cannot be used as an alarm. A different design is needed (for example
+  a check against the schema made by code, not the model's self-assessment). The candidate image
   was built on a `main` a little older (only the "Understood" sentence differs).
 - **Limits.** Two small hand-made sets on a database the model knows well; the
   development set shaped the design, so only the held-out set counts as unseen;
