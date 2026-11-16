@@ -210,7 +210,7 @@
     "fetch_sql_attribute_docs": "(attr_id: 'str') -> 'list[dict[str, Any]]'",
     "fetch_sql_attributes_by_term_id": "(term_id: 'str', zone_ids: 'list[str] | None' = None, *, skip: 'int' = 0, limit: 'int | None' = None) -> 'list[dict[str, Any]]'",
     "fetch_sql_attributes_with_sql": "(attr_ids: 'list[str]') -> 'list[dict[str, str]]'",
-    "fetch_tables_from_sql_attributes": "(attr_ids: 'list[str]') -> 'list[dict[str, Any]]'",
+    "fetch_tables_from_sql_attributes": "(attr_ids: 'list[str]', *, certified_only: 'bool' = False) -> 'list[dict[str, Any]]'",
     "find_attr_by_expression": "(*, term_id: 'str', expression: 'str', exclude_id: 'str | None') -> 'dict[str, str] | None'",
     "find_attr_by_name": "(name: 'str', exclude_id: 'str | None') -> 'dict[str, str] | None'",
     "get_full_sql_attribute_by_id": "(attr_id: 'str', zone_ids: 'list[str] | None' = None) -> 'dict[str, Any] | None'",
