@@ -164,22 +164,39 @@ def _aggregate(
     x_col: str,
     y_col: str,
     hue_col: str | None,
-) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
-    """Aggregate the result set down to the (rows, series) a chart draws.
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]], int]:
+    """Shape the result set into the (rows, series, unplotted) a chart draws.
 
     Returns empty lists when there is nothing to plot — including when ``y_col``
     holds no numeric measure. Such a result is a listing, and counting its rows
     to have something to draw would chart a question nobody asked.
+
+    The chart draws the rows the query returned. It never sums them: a result
+    that repeats a category (an average per category and month, drawn by
+    category) would otherwise show a total of averages, a number no query
+    produced. Such a result is declined and the table, which shows every row, is
+    the answer. ``unplotted`` counts the rows left out for holding an empty
+    value in a plotted column, so the caller can say so.
     """
-    work = df[[c for c in {x_col, y_col, hue_col} if c]].dropna(how="any").copy()
+    columns = [c for c in dict.fromkeys([x_col, y_col, hue_col]) if c]
+    work = df[columns].dropna(how="any").copy()
+    unplotted = len(df) - len(work)
     if work.empty:
-        return [], []
+        return [], [], 0
 
     y_numeric = pd.to_numeric(work[y_col], errors="coerce")
     if not bool(y_numeric.notna().all()):
         logger.info("aggregate: %r holds no numeric measure — skip", y_col)
-        return [], []
+        return [], [], 0
     work[y_col] = y_numeric
+
+    keys = [x_col, hue_col] if hue_col else [x_col]
+    if bool(work.duplicated(subset=keys).any()):
+        logger.info(
+            "aggregate: %s repeats within the result — not summed, left to the table",
+            " / ".join(keys),
+        )
+        return [], [], 0
 
     if hue_col:
         pivot = (
@@ -218,9 +235,9 @@ def _aggregate(
             }
             for i, (safe, label) in enumerate(zip(safe_keys, series_keys))
         ]
-        return data, series
+        return data, series, unplotted
 
-    grouped = work.groupby(x_col, dropna=False)[y_col].sum()
+    grouped = work.set_index(x_col)[y_col].sort_index()
     data = [
         {x_col: _to_cell(idx), y_col: _to_cell(val)} for idx, val in grouped.items()
     ]
@@ -231,7 +248,7 @@ def _aggregate(
             "color": CHART_COLORS[0],
         }
     ]
-    return data, series
+    return data, series, unplotted
 
 
 def build_chart_spec(
@@ -277,7 +294,7 @@ def build_chart_spec(
         # delta only supports one series
         hue_col = None
 
-    rows, series = _aggregate(df, x_col, y_col, hue_col)
+    rows, series, unplotted = _aggregate(df, x_col, y_col, hue_col)
     if not rows or not series:
         logger.info("build_chart_spec: empty aggregation for %s — skip", plot.title)
         return None
@@ -301,6 +318,8 @@ def build_chart_spec(
         return None
 
     notes: list[str] = []
+    if unplotted:
+        notes.append(f"{unplotted} rows with an empty value not drawn")
     data = _truncate_rows(rows, [str(s["key"]) for s in series], plot_type)
     if len(data) < len(rows):
         # Say which rows were dropped, otherwise the chart reads as the whole
