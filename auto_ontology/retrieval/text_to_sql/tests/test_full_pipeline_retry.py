@@ -201,6 +201,7 @@ def test_stream_retries_once_then_returns_success(
                 "response": "Success.",
                 "sql_code": "SELECT 42",
                 "knowledge_trace": [],
+                "database": "test_db",
             },
         }
     ]

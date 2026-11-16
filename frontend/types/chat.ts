@@ -21,6 +21,8 @@ export type ChatMessage = {
 	sqlResponse?: string;
 	thoughts?: string;
 	knowledgeTrace?: KnowledgeTraceEntry[];
+	/** The database that answered. Live answers only: it is not stored with the conversation. */
+	database?: string;
 	/**
 	 * The agent steps this answer went through, kept when the answer lands. Live
 	 * answers only: it is not stored with the conversation.
@@ -111,6 +113,7 @@ export type ResultEvent = {
 		sql_response_from_db?: SqlResult;
 		thoughts?: string;
 		knowledge_trace?: KnowledgeTraceEntry[] | null;
+		database?: string | null;
 	};
 };
 

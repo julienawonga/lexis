@@ -28,6 +28,7 @@ export type AgentAnswer = {
 	sql_response_from_db?: unknown;
 	thoughts?: string | null;
 	knowledge_trace?: KnowledgeTraceEntry[] | null;
+	database?: string | null;
 };
 
 export type AnswerMessage = {
@@ -36,6 +37,7 @@ export type AnswerMessage = {
 	sqlResponse?: string;
 	thoughts?: string;
 	knowledgeTrace?: KnowledgeTraceEntry[];
+	database?: string;
 };
 
 const hasChartFence = (content: string): boolean =>
@@ -73,6 +75,7 @@ export const buildSqlAnswerMessage = (answer: AgentAnswer): AnswerMessage | null
 			sql: sqlCode ?? undefined,
 			thoughts: thoughts ?? undefined,
 			knowledgeTrace: trace,
+			database: answer.database || undefined,
 		};
 	}
 

@@ -481,6 +481,18 @@ def _attach_question_language(answer: object, final_state: dict) -> None:
     answer.update(answer_fields(final_state.get("path_state")))
 
 
+def _attach_database(answer: object, final_state: dict) -> None:
+    """Add ``database``: the database that answered, ``None`` when unknown.
+
+    ``target_db`` is the explicit, pinned or voted database (the retrieval step
+    writes it back whichever way it was decided), so the answer can name it.
+    """
+    if not isinstance(answer, dict):
+        return
+    database = (final_state.get("path_state") or {}).get("target_db")
+    answer["database"] = database if isinstance(database, str) and database else None
+
+
 def stream_agent_response(
     payload: TextToSQLPayload,
 ) -> Generator[dict, None, None]:
@@ -595,6 +607,7 @@ def stream_agent_response(
             answer["thoughts"] = thoughts_summary
         _attach_knowledge_trace(answer, final_state)
         _attach_question_language(answer, final_state)
+        _attach_database(answer, final_state)
         elapsed = time.perf_counter() - t0
         logger.debug("Final answer (%.2fs):\n%s", elapsed, answer)
         yield {"type": "result", "answer": answer}
@@ -676,6 +689,7 @@ def get_agent_response_with_state(payload: TextToSQLPayload) -> dict:
     else:
         result = {"response": str(answer)}
     _attach_question_language(result, final_state)
+    _attach_database(result, final_state)
     result["path_state"] = merged_path_state
     return result
 

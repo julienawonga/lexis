@@ -102,4 +102,28 @@ describe('AnswerPath', () => {
 		expect(textOf(html)).toContain("Model's description of the query");
 		expect(html).toContain('Here is the sales analysis you requested.');
 	});
+
+	it('names the database that answered, only when it is known', () => {
+		const withDb = renderToStaticMarkup(
+			<AnswerPath message={{ ...fullMessage, database: 'sales_db' }} />,
+		);
+		expect(textOf(withDb)).toContain('Answered from database: sales_db');
+		const without = renderToStaticMarkup(<AnswerPath message={fullMessage} />);
+		expect(textOf(without)).not.toContain('Answered from database');
+	});
+
+	it('shows the database even when no path step is known', () => {
+		const html = renderToStaticMarkup(
+			<AnswerPath
+				message={{
+					id: 'm',
+					role: 'assistant',
+					content: 'x',
+					timestamp: 1,
+					database: 'db1',
+				}}
+			/>,
+		);
+		expect(textOf(html)).toContain('Answered from database: db1');
+	});
 });
