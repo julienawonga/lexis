@@ -2,6 +2,8 @@
 // All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
+import type { LearnedTerm } from '@/types/knowledge';
+
 export type KnowledgeTraceEntry = {
 	kind: 'term' | 'sql_attribute' | 'column_attribute' | 'custom_analysis';
 	id: string;
@@ -28,6 +30,8 @@ export type ChatMessage = {
 	caveats?: AnswerCaveat[];
 	/** The database that answered. Live answers only: it is not stored with the conversation. */
 	database?: string;
+	/** The draft definition this answer's clarification became. Live answers only. */
+	learnedTerm?: LearnedTerm;
 	/**
 	 * The agent steps this answer went through, kept when the answer lands. Live
 	 * answers only: it is not stored with the conversation.
@@ -120,6 +124,7 @@ export type ResultEvent = {
 		knowledge_trace?: KnowledgeTraceEntry[] | null;
 		caveats?: AnswerCaveat[] | null;
 		database?: string | null;
+		learned_term?: LearnedTerm | null;
 	};
 };
 

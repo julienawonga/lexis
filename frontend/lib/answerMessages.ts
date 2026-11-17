@@ -16,7 +16,9 @@
 // regardless of whether any browser tab stuck around to watch.
 
 import { stringifySqlResponse } from '@/lib/sqlResponse';
+import { parseLearnedTerm } from '@/lib/knowledge';
 import type { AnswerCaveat, KnowledgeTraceEntry } from '@/types/chat';
+import type { LearnedTerm } from '@/types/knowledge';
 
 export const GENERIC_ANSWER_ERROR =
 	'Something went wrong. Please try again, and if the issue persists, contact our support';
@@ -30,6 +32,7 @@ export type AgentAnswer = {
 	knowledge_trace?: KnowledgeTraceEntry[] | null;
 	caveats?: AnswerCaveat[] | null;
 	database?: string | null;
+	learned_term?: unknown;
 };
 
 export type AnswerMessage = {
@@ -40,6 +43,7 @@ export type AnswerMessage = {
 	knowledgeTrace?: KnowledgeTraceEntry[];
 	caveats?: AnswerCaveat[];
 	database?: string;
+	learnedTerm?: LearnedTerm;
 };
 
 const hasChartFence = (content: string): boolean =>
@@ -82,6 +86,7 @@ export const buildSqlAnswerMessage = (answer: AgentAnswer): AnswerMessage | null
 					? answer.caveats
 					: undefined,
 			database: answer.database || undefined,
+			learnedTerm: parseLearnedTerm(answer.learned_term),
 		};
 	}
 

@@ -5,6 +5,7 @@
 'use client';
 
 import { useId, useMemo, useState } from 'react';
+import Link from 'next/link';
 import type { ChatMessage, ClarificationReply } from '@/types/chat';
 import { CopyButton } from '@/common/Button';
 import { formatDate } from '@/common/date';
@@ -13,6 +14,7 @@ import { parseSqlResponse, type ParsedTable } from '@/lib/parseSqlResponse';
 import { NO_ROWS_MESSAGE, isEmptyResult, splitResultNotice } from '@/lib/resultNotice';
 import { hasValidationCaveat } from '@/lib/validationCaveat';
 import { extraCaveats } from '@/lib/answerCaveats';
+import { KNOWLEDGE_PATH, learnedTermLine } from '@/lib/knowledge';
 import {
 	SqlBlock,
 	codeHeaderClass,
@@ -200,6 +202,17 @@ export const MessageBubble = ({
 								))}
 							</ul>
 						</div>
+					)}
+					{message.learnedTerm && (
+						<p className="mb-3 text-xs text-secondary dark:text-zinc-400">
+							{learnedTermLine(message.learnedTerm)}.{' '}
+							<Link
+								href={KNOWLEDGE_PATH}
+								className="font-medium text-primary hover:underline dark:text-primary-soft"
+							>
+								Review it
+							</Link>
+						</p>
 					)}
 					{resultNotice && (
 						<div

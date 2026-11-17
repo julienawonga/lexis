@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import asyncio
 import uuid
+from datetime import UTC, datetime
 from types import SimpleNamespace
 from typing import Any
 
@@ -69,6 +70,8 @@ class _Harness:
         self.flag_reads = 0
         self.is_answer = True
         self.released: list[str] = []
+        self.captured: list[dict[str, Any]] = []
+        self.capture_error: Exception | None = None
 
         pool = SimpleNamespace(
             acquire=lambda cancel=None: self.worker,
@@ -91,12 +94,19 @@ class _Harness:
         monkeypatch.setattr(
             router, "create_stateless_analytics", lambda **kw: "stateless"
         )
+        monkeypatch.setattr(router, "capture_clarification_answer", self._capture)
 
     def _prepare(self, **kwargs: Any) -> PreparedConversation:
         self.prepare_kwargs = kwargs
         if self.prepare_error is not None:
             raise self.prepare_error
         return self.prepared
+
+    def _capture(self, **kwargs: Any) -> dict[str, str] | None:
+        self.captured.append(kwargs)
+        if self.capture_error is not None:
+            raise self.capture_error
+        return {"id": "k-1", "name": kwargs["term"]}
 
     def _read_flag(self) -> bool:
         self.flag_reads += 1
@@ -294,3 +304,140 @@ def test_an_answer_without_a_conversation_is_a_422(harness: _Harness) -> None:
         )
 
     assert caught.value.status_code == 422
+
+
+# -- learning a term from the answer ------------------------------------------
+
+
+def _wait_for(predicate: Any) -> None:
+    import time
+
+    deadline = time.monotonic() + 2
+    while not predicate() and time.monotonic() < deadline:
+        time.sleep(0.01)
+
+
+def test_an_option_answer_is_captured_once_with_who_and_when(
+    harness: _Harness,
+) -> None:
+    asked = datetime(2026, 11, 17, 9, 0, tzinfo=UTC)
+    harness.prepared = PreparedConversation(
+        history=[EARLIER, CLARIFICATION_TURN],
+        analytics_id="a",
+        pending_clarification=PENDING,
+        pending_asked_at=asked,
+    )
+
+    sent = harness.post(
+        question="Top 10% by payments",
+        conversation_id=CONVERSATION,
+        target_db=None,
+        clarification={
+            "clarification_id": PENDING.clarification_id,
+            "option_id": "opt-2",
+        },
+    )
+    _wait_for(lambda: harness.captured)
+
+    assert len(harness.captured) == 1
+    captured = harness.captured[0]
+    assert captured["user_id"] == "user"
+    assert captured["conversation_id"] == CONVERSATION
+    assert captured["clarification_id"] == PENDING.clarification_id
+    assert captured["term"] == "VIP customers"
+    assert captured["definition"] == "Top 10% by payments"
+    assert captured["option_id"] == "opt-2"
+    assert captured["asked_at"] == asked
+    # What the model receives is exactly what it was before this slice.
+    assert (
+        sent["evidence"] == 'The user defined "VIP customers" as: Top 10% by payments'
+    )
+
+
+def test_a_free_text_answer_is_captured_without_an_option(harness: _Harness) -> None:
+    _pending_conversation(harness)
+
+    harness.post(
+        question="the top ten percent",
+        conversation_id=CONVERSATION,
+        clarification={
+            "clarification_id": PENDING.clarification_id,
+            "text": "the top ten percent",
+        },
+    )
+    _wait_for(lambda: harness.captured)
+
+    assert harness.captured[0]["option_id"] is None
+    assert harness.captured[0]["definition"] == "the top ten percent"
+
+
+def test_a_message_that_is_not_an_answer_captures_nothing(harness: _Harness) -> None:
+    _pending_conversation(harness)
+    harness.is_answer = False
+
+    harness.post(question="How many stores are there?", conversation_id=CONVERSATION)
+    import time
+
+    time.sleep(0.1)
+
+    assert harness.captured == []
+
+
+def test_a_normal_question_captures_nothing(harness: _Harness) -> None:
+    harness.post(question=ORIGINAL, conversation_id=CONVERSATION)
+    import time
+
+    time.sleep(0.1)
+
+    assert harness.captured == []
+
+
+def test_a_capture_that_raises_does_not_fail_the_turn(
+    harness: _Harness, caplog: pytest.LogCaptureFixture
+) -> None:
+    _pending_conversation(harness)
+    harness.capture_error = RuntimeError("the knowledge store is down")
+
+    sent = harness.post(
+        question="Top 10% by payments",
+        conversation_id=CONVERSATION,
+        clarification={
+            "clarification_id": PENDING.clarification_id,
+            "option_id": "opt-2",
+        },
+    )
+    _wait_for(lambda: harness.captured)
+
+    # The question still went to the worker and the slot was handed back.
+    assert sent["question"] == ORIGINAL
+    assert "Learned-term capture failed" in caplog.text
+    assert router._active_slots == {}
+
+
+def test_a_slow_capture_does_not_delay_the_turn(
+    harness: _Harness, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import threading
+    import time
+
+    _pending_conversation(harness)
+    release = threading.Event()
+
+    def slow(**kwargs: Any) -> None:
+        release.wait(5)
+
+    monkeypatch.setattr(router, "capture_clarification_answer", slow)
+    started = time.monotonic()
+    sent = harness.post(
+        question="Top 10% by payments",
+        conversation_id=CONVERSATION,
+        clarification={
+            "clarification_id": PENDING.clarification_id,
+            "option_id": "opt-2",
+        },
+    )
+    elapsed = time.monotonic() - started
+    release.set()
+
+    assert sent["question"] == ORIGINAL
+    assert elapsed < 2

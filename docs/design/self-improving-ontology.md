@@ -688,6 +688,27 @@ panel. Evidence lives on the events (`provenance.evidence`, required when a draf
 created) instead of in its own table, and an event carries the full content snapshot, so
 the version table is not needed yet.
 
+**Status (2026-11-17), second slice: API, capture and review page.** Built, behind
+`knowledge_items_enabled` (off by default; off, every route answers 404 and the page and
+the sidebar entry are hidden): routes under `/api/knowledge-items` (list with the scope
+filter, status, kind and database filters and keyset pagination; get one with its history;
+create a personal `term` or `synonym` draft; edit a draft; submit, approve, reject,
+request changes, deprecate, withdraw, promote scope), each calling the transition function
+and mapping its refusals to 403, 404, 409 and 422; the optimistic lock (`expected_version`,
+checked inside the transition under the row lock, so a person's edit is never
+overwritten); audit rows `knowledge.*` with only the item id, kind and status or scope
+change; capture of a clarification answer as a personal draft (4.1), once per
+(conversation, clarification), best effort and off the request path; and the review page
+(My drafts, To review). Decisions where the design was silent: `approve` on a personal
+item that is in review shares it first (an explicit `promote_scope` event) and then
+certifies it, and it is refused, changing nothing, when the caller may not approve;
+`withdraw` is `deprecate` by the owner; a reviewer asking for changes or rejecting must
+write a comment; an item the caller may not see answers 404, not 403. Still not built, and
+not visible to the model: personal drafts are **not** retrieved at answer time (slice 3,
+which needs the evaluation gate), a certified item is **not** materialised into `term` or
+`sql_attribute`, there is no screen to write a draft by hand (the route exists), and
+`synonym` drafts cannot be edited from the page.
+
 Each phase is independently shippable behind a setting and has a measured acceptance
 criterion. Effort is the author's estimate for one engineer who knows the repo [I]; read
 it as order of magnitude.

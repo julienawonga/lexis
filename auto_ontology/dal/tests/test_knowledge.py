@@ -730,3 +730,107 @@ def test_the_content_hash_ignores_key_order() -> None:
         {"b": 2, "a": 1}
     )
     assert knowledge.content_hash({"a": 1}) != knowledge.content_hash({"a": 2})
+
+
+# --- slice 2: optimistic lock, keyset cursor, allowed actions ----------------
+
+
+def test_a_stale_expected_version_is_refused_and_nothing_changes(world: dict) -> None:
+    item = _draft(world)["item"]
+    knowledge.transition(
+        item["id"], "edit", OWNER, content={"name": "VIP", "definition": "v2"}
+    )
+    before = knowledge.get_item(item["id"])
+    events = _event_count(item["id"])
+    with pytest.raises(knowledge.VersionConflict) as caught:
+        knowledge.transition(
+            item["id"],
+            "edit",
+            OWNER,
+            content={"name": "VIP", "definition": "overwrites v2"},
+            expected_version=1,
+        )
+    assert caught.value.current == 2
+    assert knowledge.get_item(item["id"]) == before
+    assert _event_count(item["id"]) == events
+
+
+def test_the_current_expected_version_lets_the_edit_through(world: dict) -> None:
+    item = _draft(world)["item"]
+    done = knowledge.transition(
+        item["id"],
+        "edit",
+        OWNER,
+        content={"name": "VIP", "definition": "v2"},
+        expected_version=1,
+    )
+    assert done["item"]["current_version"] == 2
+
+
+def test_a_retry_is_recognised_before_the_version_check(world: dict) -> None:
+    item = _draft(world)["item"]
+    content = {"name": "VIP", "definition": "v2"}
+    knowledge.transition(
+        item["id"], "edit", OWNER, content=content, request_id="r-1", expected_version=1
+    )
+    again = knowledge.transition(
+        item["id"], "edit", OWNER, content=content, request_id="r-1", expected_version=1
+    )
+    assert again["applied"] is False
+
+
+def test_a_refusal_wins_over_a_version_conflict(world: dict) -> None:
+    item = _draft(world)["item"]
+    with pytest.raises(knowledge.PermissionDenied):
+        knowledge.transition(
+            item["id"],
+            "edit",
+            OTHER,
+            content={"name": "x", "definition": "y"},
+            expected_version=99,
+        )
+
+
+def test_the_keyset_cursor_walks_the_listing_without_repeats(
+    world: dict, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(knowledge, "is_knowledge_admin_audit_enabled", lambda: False)
+    ids = {_draft(world)["item"]["id"] for _ in range(5)}
+    seen: list[str] = []
+    after = None
+    while True:
+        page = knowledge.list_items(
+            OWNER, database_id=world["database_id"], limit=2, after=after
+        )
+        if not page:
+            break
+        seen.extend(item["id"] for item in page)
+        after = (page[-1]["created"], page[-1]["id"])
+    assert len(seen) == len(set(seen)) == 5
+    assert set(seen) == ids
+
+
+def test_allowed_actions_follow_the_rules(
+    world: dict, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(knowledge, "is_knowledge_admin_audit_enabled", lambda: False)
+    item_id = _draft(world)["item"]["id"]
+    draft = knowledge.get_item(item_id)
+    assert knowledge.allowed_actions(OWNER, draft) == [
+        "edit",
+        "submit",
+        "deprecate",
+    ]
+    assert knowledge.allowed_actions(OTHER, draft) == []
+    knowledge.transition(item_id, "submit", OWNER)
+    review = knowledge.get_item(item_id)
+    # The owner proposed it: no approve for them, and the admin may share-and-approve.
+    assert "approve" not in knowledge.allowed_actions(OWNER, review)
+    assert knowledge.allowed_actions(DOMAIN_OWNER, review) == [
+        "approve",
+        "reject",
+        "request_changes",
+        "deprecate",
+        "promote_scope",
+    ]
+    assert knowledge.allowed_actions(AGENT, review) == []

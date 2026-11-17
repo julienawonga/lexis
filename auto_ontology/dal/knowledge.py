@@ -12,7 +12,8 @@ The event table is the truth and ``knowledge_item`` is derived from it:
 and the tests assert that this equals the stored row after any sequence of
 transitions.
 
-Nothing here is wired into answer-time retrieval, and no route exposes it yet.
+Nothing here is wired into answer-time retrieval. ``server/knowledge`` exposes it
+behind the ``knowledge_items_enabled`` flag.
 Certifying does not materialise into ``term`` or ``sql_attribute`` yet:
 ``target_table`` and ``target_id`` stay null.
 """
@@ -25,7 +26,7 @@ import uuid
 from datetime import UTC, datetime
 from typing import Any
 
-from sqlalchemy import select, update
+from sqlalchemy import and_, or_, select, update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from auto_ontology.dal import groups as groups_dal
@@ -81,6 +82,19 @@ class InvalidTransition(KnowledgeError):
 
 class PermissionDenied(KnowledgeError):
     """The actor is not allowed to take this action."""
+
+
+class VersionConflict(KnowledgeError):
+    """The item changed since the caller loaded it (optimistic lock)."""
+
+    def __init__(self, item_id: str, expected: int, current: int) -> None:
+        self.item_id = item_id
+        self.expected = expected
+        self.current = current
+        super().__init__(
+            f"Knowledge item {item_id!r} changed since it was loaded "
+            f"(you saw version {expected}, it is now version {current})"
+        )
 
 
 class InvalidDraft(KnowledgeError):
@@ -317,6 +331,7 @@ def transition(
     comment: str | None = None,
     content: dict[str, Any] | None = None,
     request_id: str | None = None,
+    expected_version: int | None = None,
 ) -> dict[str, Any]:
     """Apply *action* to the item: the one place ``status`` and ``scope`` change.
 
@@ -331,6 +346,12 @@ def transition(
     when the caller sent one, otherwise when the item's latest event is this
     same action by this same actor and the item is already where the action
     leads. ``edit`` takes the new *content*.
+
+    *expected_version* is an optimistic lock: when given and the item's
+    ``current_version`` differs, :class:`VersionConflict` is raised under the
+    row lock and nothing changes, so a person's edit is never overwritten by a
+    caller who had not seen it. It is checked after the permission and
+    lifecycle checks, and not for a retry that already happened.
     """
     with write_transaction():
         row = _get_row(item_id, lock=True)
@@ -348,6 +369,9 @@ def transition(
         reason = lifecycle_refusal(action, facts)
         if reason is not None:
             raise InvalidTransition(reason)
+
+        if expected_version is not None and expected_version != row["current_version"]:
+            raise VersionConflict(item_id, expected_version, row["current_version"])
 
         to_status, to_scope = destination(action, facts)
         values: dict[str, Any] = {
@@ -476,11 +500,16 @@ def list_items(
     kind: str | None = None,
     scope: str | None = None,
     limit: int = 200,
+    after: tuple[datetime, str] | None = None,
 ) -> list[dict[str, Any]]:
     """The items *viewer* may see, newest first, filtered by the arguments.
 
     The scope filter lives here, not in the caller: see :func:`can_view`. The
     audit setting is read once per call and fails closed.
+
+    *after* is a keyset cursor, the ``(created, id)`` of the last item of the
+    previous page: the page starts after it, so it never shifts when items
+    arrive.
     """
     statement = select(s.knowledge_item).order_by(
         s.knowledge_item.c.created.desc(), s.knowledge_item.c.id
@@ -493,6 +522,17 @@ def list_items(
     ):
         if value is not None:
             statement = statement.where(column == value)
+    if after is not None:
+        created, last_id = after
+        statement = statement.where(
+            or_(
+                s.knowledge_item.c.created < created,
+                and_(
+                    s.knowledge_item.c.created == created,
+                    s.knowledge_item.c.id > last_id,
+                ),
+            )
+        )
     audit = (
         viewer.actor_type == ACTOR_USER
         and viewer.role == ROLE_ADMIN
@@ -505,6 +545,46 @@ def list_items(
             if len(visible) >= limit:
                 break
     return visible
+
+
+#: The actions a person can take from the review page, in display order.
+HUMAN_ACTIONS = (
+    "edit",
+    "submit",
+    "approve",
+    "reject",
+    "request_changes",
+    "deprecate",
+    "promote_scope",
+)
+
+
+def allowed_actions(actor: Actor, item: dict[str, Any]) -> list[str]:
+    """The :data:`HUMAN_ACTIONS` *actor* may take on *item* right now.
+
+    Asks the same two pure questions :func:`transition` asks (permission, then
+    lifecycle), so the page never offers a button the store would refuse. One
+    exception is deliberate: ``approve`` on a personal item in review is
+    offered, because approving it shares it first (the route promotes the
+    scope, then approves).
+    """
+    facts = _facts(item)
+    owners = _certifier_owner_ids(item["database_id"], item["content"])
+    allowed: list[str] = []
+    for action in HUMAN_ACTIONS:
+        if refusal_reason(actor, action, facts, owners) is not None:
+            continue
+        lifecycle = lifecycle_refusal(action, facts)
+        if (
+            lifecycle is not None
+            and action == "approve"
+            and facts.status == "in_review"
+            and facts.scope == "personal"
+        ):
+            lifecycle = None
+        if lifecycle is None:
+            allowed.append(action)
+    return allowed
 
 
 def replay_events(events: list[dict[str, Any]]) -> dict[str, Any] | None:

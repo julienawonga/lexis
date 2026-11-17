@@ -78,6 +78,16 @@ ALLOWED_DETAILS: dict[str, frozenset[str]] = {
     "semantic_domain.generate": frozenset({"database", "domains"}),
     "semantic_domain.rename": frozenset(),
     "semantic_domain.move_terms": frozenset({"terms"}),
+    # Knowledge items: the item id is the target; the content (a definition that
+    # may quote a user's question) is never recorded, only the kind and the
+    # status or scope change.
+    "knowledge.propose": frozenset({"kind", "to_status", "source"}),
+    "knowledge.submit": frozenset({"kind", "from_status", "to_status"}),
+    "knowledge.approve": frozenset({"kind", "from_status", "to_status", "to_scope"}),
+    "knowledge.reject": frozenset({"kind", "from_status", "to_status"}),
+    "knowledge.request_changes": frozenset({"kind", "from_status", "to_status"}),
+    "knowledge.deprecate": frozenset({"kind", "from_status", "to_status"}),
+    "knowledge.promote_scope": frozenset({"kind", "from_scope", "to_scope"}),
 }
 
 

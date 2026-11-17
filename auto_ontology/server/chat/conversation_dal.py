@@ -9,6 +9,7 @@ from __future__ import annotations
 import logging
 import uuid
 from dataclasses import dataclass
+from datetime import datetime
 
 import psycopg
 from psycopg.rows import dict_row
@@ -54,6 +55,9 @@ class PreparedConversation:
     # The clarification this turn answers: the conversation's last message, when
     # that message is a clarification question. ``history`` still ends with it.
     pending_clarification: Clarification | None = None
+    # When that question was asked (the message's ``created_at``), kept so the
+    # answer can be recorded with who said what and when.
+    pending_asked_at: datetime | None = None
 
 
 def _is_context_assistant(row: dict) -> bool:
@@ -143,7 +147,7 @@ def prepare_conversation(
 
             cur.execute(
                 f"""
-                SELECT role, content, sql_code, sql_response
+                SELECT role, content, sql_code, sql_response, created_at
                 FROM {FRONTEND_SCHEMA}.messages
                 WHERE conversation_id = %s
                 ORDER BY created_at ASC, id ASC
@@ -182,7 +186,10 @@ def prepare_conversation(
             )
 
     return PreparedConversation(
-        history=history, analytics_id=analytics_id, pending_clarification=pending
+        history=history,
+        analytics_id=analytics_id,
+        pending_clarification=pending,
+        pending_asked_at=rows[-1]["created_at"] if pending is not None else None,
     )
 
 
