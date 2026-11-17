@@ -91,30 +91,65 @@ owner's go-ahead at the end of each. **Phase 0 is done, phase 1 is in progress.*
   is in `HomeLab/lexis-evals/secrets/internal_api_token.txt`; the owner adds the
   line to `.env`. Until then, pass the token to every call
   (`-H "x-internal-token: ..."`, or `--token` for `dev_tools.evals`).
-- **Phase 2 (engine robustness), first part merged on 2026-11-16** (`main` green
-  at `eef2c54b`): #98 chart from the rows returned; #99 the database shown; #100
-  a chat worker that cannot start fails loudly; #101 row-cut and no-rows notices;
-  #102 error screens and interface states; #103 proxy 502/504, `Retry-After`,
-  safe login redirect; #104 Kumo SQL guard and one ingest per database; #105
-  structured `caveats`. Status per audit finding: the table in
-  [`docs/audit-2026-11-16.md`](./docs/audit-2026-11-16.md).
-  None of it changes what the model sees, so none went through the evaluation
-  gate. The stack runs these images (E35: eight chats, 0 caveats on 8 answers,
-  and a failing worker start answers 503 with its cause). Rollback tags:
-  `auto-ontology:pre-phase2`, `auto-ontology-frontend:pre-phase2`.
-- **Owed after phase 2's first part:** the owner's click-through (sign in, ask a
-  question, look at the database line, the notes and the error screens); a
-  measured false-alarm rate for caveats on answerable questions (8 answers, 0
-  caveats is not a rate); the vote path behind `database` (no database named).
-- **Next: the rest of phase 2 needs the evaluation gate.** E1 (the engine cannot
-  refuse an unanswerable question) first needs a frozen set of unanswerable
-  questions (audit V2) and the conversation-aware protocol in the repository
-  (V1), so phase 3's first two items come before it. E7 (time budgets that add up
-  past the 300 s limit) changes engine behaviour and goes through the gate too.
-  Medium items still open: E8 (empty retrieval answered from the raw schema,
-  Term definitions dropped without a trace, the rewritten question not shown,
-  sampling). Frontend items still open: F6, F8 (list, select, rename), F14,
-  F15 and the browser test.
+- **Session closed by the owner on 2026-11-17 after about seven hours.** Phases
+  0 and 1 are done. Phase 2 and the evaluation work of phase 3 are largely done
+  except the pieces that need a passing gate (below). Phase 4 is partly done.
+  The full account per finding and per roadmap step is the "Closing status"
+  section of [`docs/audit-2026-11-16.md`](./docs/audit-2026-11-16.md).
+- **`main`** is green. Merged on 2026-11-16 and 2026-11-17: #85 to #111, #113,
+  #114, #116, #118, #119 (the audit, the fixes of the first and second parts of
+  phase 2, the conversation protocol and the new frozen sets, read-only on four
+  engines, recorded-model checks, the knowledge-item tables, the audit log, and
+  the review API and page). Anything that changes what the chat model sees is
+  behind a flag and is NOT merged.
+- **Open drafts, flags off, each needing its gate** (criteria written first, in
+  [`docs/preregistered/answerability-gate.md`](./docs/preregistered/answerability-gate.md)):
+  - #112 answerability check: version 1 measured and **rejected** (E36), version 2
+    written, never run. Gate for version 2: amendment 2, on the fresh blind sets
+    of #119 (`unanswerable_rentals.json`, `answerable_heldout.json`).
+  - #115 soft-delete hint: never measured; gate in amendment 1 (rentals is its
+    development set; chinook and pagila are the guard).
+  - #117 applied-knowledge record: never measured; evaluation plan in its body.
+  - #62 semantic contract: parked since 2026-11-15.
+- **What the owner's stack runs.** The backend and ingestion images built from
+  `main` eef2c54b (the same as before the gate experiments) and the frontend image
+  built from that same commit on the evening of 2026-11-16: the stack is **not**
+  on current `main` and lacks #114 to #119. The stack
+  has the internal token set in `.env`, configuration rows `clarification_enabled`
+  and `semantic_compilation_enabled` only (the two experimental rows were removed),
+  the databases of the benchmarks plus `rentals`. Rollback tags:
+  `auto-ontology:pre-answerability` (the running one),
+  `auto-ontology:answerability` (the experimental image, unneeded),
+  `pre-phase2`, `pre-rebuild`, `pre-token`. Dumps in `HomeLab/lexis-backups/`.
+- **Deploying `main` now needs care.** `main` carries two Alembic migrations
+  (`157f86888f41` knowledge tables, `452f4d72c1f5` audit log), additive and
+  reversible, applied by the migrate job at start. An older image then refuses
+  the database (see [backup-restore.md](./docs/backup-restore.md)). Steps: take a
+  dump; tag the running images; build the backend image from a clean worktree of
+  `main`; stop the stack and build the frontend image alone (the VM crashes
+  otherwise); `docker compose up -d --no-build`; check `/api/health`. **Owed after
+  that deploy** (CLAUDE.md asks a live trial for what crosses the worker/server
+  boundary): turn `knowledge_items_enabled` on for one trial, answer a
+  clarification through `python -m dev_tools.evals conversation run`, check that
+  a personal draft appears on the review page and that a
+  `knowledge.*` row appears in the audit log (admins, Settings), then decide
+  whether to leave the flag on.
+- **Owed by the owner:** a click-through of the web app (sign in, a question, the
+  database line, the notes, the error screens, the Learned page once enabled).
+- **Lessons of the session** (also in `docs/experiments.md`): a measurement
+  script that exports the token through nested quotes silently sent an empty
+  token (401, an hour lost): read the log one minute after starting any
+  background measurement; a machine sleep corrupts a run (keep it awake); two
+  arms run one after the other are not paired; `MSYS_NO_PATHCONV=1` breaks
+  `python.exe` path arguments in a script; the owner's remark that benchmark
+  constants must not be tuned on those sets held: every change that touches what
+  the model sees went behind a flag with a gate written before the run.
+- **Outside the repository** (`HomeLab/lexis-evals/p3/`): the baseline and
+  candidate reports of E36 and E37, the three preregistration files with their
+  hashes, the measurement scripts, `gettoken.py`. `lexis-evals/secrets/` holds the
+  token file. Worktrees under `.claude/worktrees/` (about thirty) are left in
+  place: delete them only with the owner's agreement, with the `\\?\` path trick
+  noted below if Windows refuses.
 - **Parked:** PR #62 (semantic contract, draft, branch
   `codex/semantic-contract`: needs a measurement and an `alembic merge`). Branch
   `answerability` is pushed, not merged (E27, E29): it flags unanswerable

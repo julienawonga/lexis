@@ -1045,6 +1045,104 @@ to interpret the entries is repeated.
   without an answer" error. `REAL-E2E` for trial 1 at the API; `REAL-ENGINE` for
   trial 2 (a real subprocess and database, a throwaway backend, no web app).
 
+### E36 - The answerability check, version 1: preregistered gate, REJECTED (2026-11-17)
+
+- **Question.** Can the engine refuse a question the database cannot answer,
+  instead of returning a result for another question (audit E1, E27: 4 of 28
+  runs refused, 21 answered something else)? Draft PR #112 adds a check that
+  lists what the question asks for, asks the model whether each item is in the
+  offered schema, verifies the cited columns in code, and refuses when an item is
+  absent. It is behind the configuration row `answerability_check_enabled`, off
+  by default.
+- **Criteria, written first.** [docs/preregistered/answerability-gate.md](./preregistered/answerability-gate.md)
+  (SHA-256 `2c34828d...`, amendments `b59c3b8c...` and `a35a4dbd...`), written
+  before the candidate ran once: C1 at least 50% refusal on the unanswerable set
+  and +25 points over the baseline; C2 a sign test favouring the candidate; C3 at
+  most one more refusal than the baseline on the 12 answerable controls; C4 no
+  regression on Chinook, Pagila and Rentals and at most 10% of their runs
+  refused; C5 the four Rentals questions that carry a certified definition never
+  refused. Accept only if all hold.
+- **Setup.** Baseline: the image built from `main` b371dc11. Candidate: an image
+  from the branch of #112 (plus the unmerged soft-delete hint of #115, its flag
+  off) with the flag on, 2026-11-17 05:10 to 06:01, the same stack, harness and
+  4 workers. Sets: `unanswerable.json` with its 12 controls (36 + 12
+  questions), `chinook.json`, `pagila.json`, `rentals.json`, 3 repeats. **The two
+  arms were run one after the other, not alternated**, so a drift of the model
+  gateway over the evening is not controlled. A machine sleep had corrupted part
+  of the baseline run (eight runs of 2,848 to 8,324 s); the five questions
+  concerned were run again under one rule and merged (the 13 runs that reached the
+  300 s limit stay `no_answer`, excluded from the scores and counted).
+- **Result.**
+
+| Set | Baseline | Candidate (flag on) | Runs refused or without rows, baseline then candidate |
+|---|---|---|---|
+| Unanswerable, 36 questions (refusal is the pass) | 12 of 91 scored runs (13.2%), 17 `no_answer` | **105 of 105 (100%)**, 3 `no_answer` | marker present on 99 of 105 |
+| Controls (answerable), 12 questions x 3 | 35 of 36 correct | 30 of 36 correct | 0, then **6** |
+| Chinook, 20 x 3 | 98.3% (59 of 60) | **80.0%** (48 of 60) | 5.0%, then **15.0%** |
+| Pagila, 13 x 3 | 97.4% (38 of 39) | **51.3%** (20 of 39) | 0%, then **48.7%** |
+| Rentals, 24 x 3 | 44.4% (32 of 72) | 43.1% (31 of 72) | 0%, then **12.5%** |
+
+  C1 passes (+86.8 points). C2 passes (30 questions only the candidate refused,
+  none the other way, p about 2e-9). **C3 fails** (6 more refusals on the
+  controls, the limit was 1). **C4 fails** on all three sets (15.0%, 48.7%,
+  12.5%, ceiling 10%) and Chinook and Pagila lose whole questions (for example
+  three Pagila revenue questions, 3 of 3 runs refused). C5 passes (the four
+  questions with a certified definition were never refused). **Verdict: REJECT.**
+  Median seconds per unanswerable-question run fell from 85 to 24.
+- **What went wrong, from the backend log.** The check calls a computed measure
+  absent (`missing ['revenue per film']`: a revenue that exists only as payments
+  joined through rental and inventory to films) and calls an item absent when
+  the table holding it was dropped by the relevance filter before the check
+  (`missing ['number of customers in each country']`: the country table was not
+  offered). On genuinely missing things (churn, age, marketing campaign) it was
+  right. Version 1 is therefore a good detector with an unacceptable false-refusal
+  rate on questions that need joins or computation.
+- **After the verdict.** Version 2 (#112, still a draft) adds a second look at
+  the whole catalog before refusing and tells the model that computed measures
+  are not absent. Its gate was written before it ran (amendment 2) and two fresh
+  blind sets exist (`unanswerable_rentals.json`, `answerable_heldout.json`, PR
+  #119), but **version 2 was never run**: the owner closed the session after
+  about seven hours. The flag row was deleted and the previous backend image
+  restored afterwards, so the owner's stack runs the merged code with the check
+  absent.
+- **Limits.** Public or invented databases only, no real company data. One run
+  order (not alternated). Questions and gold written by the same author as the
+  data, no second reviewer (some `undefined-term` refusals are arguable). The
+  unanswerable set and the three answerable sets were seen by version 1, so
+  they are development sets for version 2. Not run: the 180 LiveSQLBench tasks.
+  `REAL-E2E`, manual, reports kept outside the repository.
+
+### E37 - The new frozen sets on a third database: what the engine scores (2026-11-17)
+
+- **Question.** What does the current engine score on an invented database that
+  looks more like a real one (cryptic column names, coded statuses, a junction
+  table, soft-deleted rows, text dates, an irrelevant table) and on the
+  unanswerable questions, before any change?
+- **Setup.** `rentals.json` (24 questions, `rentals.sql` loaded into the stack's
+  PostgreSQL, 76 of 76 ontology rows indexed) and `unanswerable.json`, 3 repeats,
+  engine from `main` b371dc11, the same session as E36. Chinook and Pagila in
+  the same session as a reference.
+- **Result.** Rentals **44.4%** (32 of 72 runs, 13 of 24 questions fail every
+  run; failure reasons: 36 wrong values, 4 wrong row counts). Chinook 98.3%,
+  Pagila 97.4%. Unanswerable questions: refused in 13.2% of scored runs (E27 had
+  14%). **The dominant cause on Rentals is soft-deleted rows**: "how many
+  customers do we have?" generated `SELECT COUNT(cust_id) FROM customer` while 4
+  of 36 customer rows have `deleted_at` filled. Eight or more of the 13 failing
+  questions show the same pattern (customers, business customers, units per
+  category, late returns, completed rentals per branch, top units, and others).
+- **Reading, and a caution on the reference.** Chinook at 98% and Pagila at 97%
+  are ceilings that hide this; the invented database, which no model has seen,
+  exposes it. The gold answers exclude soft-deleted rows, which the case
+  descriptions say but the questions do not: a reader may argue the engine had no
+  way to know that convention. That is the point of the finding: real
+  application databases use soft deletes widely, and a business reader means the
+  active rows. A mechanism was written (draft PR #115: detect a nullable
+  deletion-date column by name convention and tell the model to exclude those
+  rows by default), with a preregistered gate (amendment 1), **never measured**.
+  Rentals is the motivating set for that change, so it is a development set for it.
+- **Limits.** One database written by the engine's authors, one session, and the
+  first measurement of this set, so no variance estimate. `REAL-E2E`, manual.
+
 ### Built but never run
 
 PR #44 (`bench split/run/score`) is tested with synthetic cases and fakes only;
@@ -1139,7 +1237,7 @@ Engineering findings without a score: E02 (empty index), E04 (FK extraction), E0
 E10 (connection exhaustion), E11 (host crash), E12 (429 storm), E17 (startup
 re-ingestion), E18 (trace), E19 (flaky test), E21 (Terms API), E23 (domain grouping, not scored),
 E24 (semantic contract review; the measurement was stopped twice and has no result),
-E25 (domain map review), E26 (value-anchor repair, not merged), E27 (unanswerable questions: baseline), E28 (certified metric, change not merged), E29 (rule on the SQL, exploration), E30 (value matching, live check), E31 (clarification choice and its database), E32 (internal API token, live), E33 (eight chats at once, live), E34 (install from scratch, images rebuilt), E35 (rebuilt from `main`, eight chats, a worker that cannot start).
+E25 (domain map review), E26 (value-anchor repair, not merged), E27 (unanswerable questions: baseline), E28 (certified metric, change not merged), E29 (rule on the SQL, exploration), E30 (value matching, live check), E31 (clarification choice and its database), E32 (internal API token, live), E33 (eight chats at once, live), E34 (install from scratch, images rebuilt), E35 (rebuilt from `main`, eight chats, a worker that cannot start), E36 (answerability check version 1, rejected), E37 (frozen sets on a third database).
 
 ## 5. What is NOT yet measured
 
