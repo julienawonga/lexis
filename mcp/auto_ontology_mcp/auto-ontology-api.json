@@ -5737,6 +5737,883 @@
         "x-auto-ontology-proxied": false
       }
     },
+    "/api/knowledge-items": {
+      "get": {
+        "description": "Reading and proposing need the same permission as using the chat. What a person\nmay approve, reject or edit is decided by the backend (the knowledge DAL's rules),\nnot here: the web app only forwards the signed-in user's id.\nknowledgeApi.list",
+        "operationId": "get_api_knowledge_items",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Status"
+            }
+          },
+          {
+            "in": "query",
+            "name": "kind",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Kind"
+            }
+          },
+          {
+            "description": "Database name or id.",
+            "in": "query",
+            "name": "database",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Database name or id.",
+              "title": "Database"
+            }
+          },
+          {
+            "description": "Only items you own.",
+            "in": "query",
+            "name": "mine",
+            "required": false,
+            "schema": {
+              "default": false,
+              "description": "Only items you own.",
+              "title": "Mine",
+              "type": "boolean"
+            }
+          },
+          {
+            "description": "Only items you may approve right now.",
+            "in": "query",
+            "name": "reviewable",
+            "required": false,
+            "schema": {
+              "default": false,
+              "description": "Only items you may approve right now.",
+              "title": "Reviewable",
+              "type": "boolean"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "description": "`next_cursor` of the page before.",
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "`next_cursor` of the page before.",
+              "title": "Cursor"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/KnowledgeItemListResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "description": "No authenticated caller could be resolved"
+          },
+          "403": {
+            "description": "The caller lacks the required permission"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Reading and proposing need the same permission as using the chat.",
+        "tags": ["knowledge-items"],
+        "security": [
+          {
+            "ApiToken": []
+          }
+        ],
+        "x-auto-ontology-source": "frontend/app/api/knowledge-items/route.ts",
+        "x-auto-ontology-permissions": {
+          "chat": ["use"]
+        },
+        "x-auto-ontology-proxied": true
+      },
+      "post": {
+        "description": "knowledgeApi.create — a personal draft owned by the caller.",
+        "operationId": "post_api_knowledge_items",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/KnowledgeItemCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/KnowledgeItemResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "description": "No authenticated caller could be resolved"
+          },
+          "403": {
+            "description": "The caller lacks the required permission"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Knowledge Item",
+        "tags": ["knowledge-items"],
+        "security": [
+          {
+            "ApiToken": []
+          }
+        ],
+        "x-auto-ontology-source": "frontend/app/api/knowledge-items/route.ts",
+        "x-auto-ontology-permissions": {
+          "chat": ["use"]
+        },
+        "x-auto-ontology-proxied": true
+      }
+    },
+    "/api/knowledge-items/{item_id}": {
+      "get": {
+        "description": "Reading and proposing need the same permission as using the chat. What a person\nmay approve, reject or edit is decided by the backend (the knowledge DAL's rules),\nnot here: the web app only forwards the signed-in user's id.\nknowledgeApi.get — one item with its history (404 when the caller may not see it).",
+        "operationId": "get_api_knowledge_items_item_id_",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "item_id",
+            "required": true,
+            "schema": {
+              "minLength": 1,
+              "title": "Item Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/KnowledgeItemResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "description": "No authenticated caller could be resolved"
+          },
+          "403": {
+            "description": "The caller lacks the required permission"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Reading and proposing need the same permission as using the chat.",
+        "tags": ["knowledge-items"],
+        "security": [
+          {
+            "ApiToken": []
+          }
+        ],
+        "x-auto-ontology-source": "frontend/app/api/knowledge-items/[item_id]/route.ts",
+        "x-auto-ontology-permissions": {
+          "chat": ["use"]
+        },
+        "x-auto-ontology-proxied": true
+      },
+      "patch": {
+        "description": "knowledgeApi.edit — owner only, draft only, with the optimistic-lock token.",
+        "operationId": "patch_api_knowledge_items_item_id_",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "item_id",
+            "required": true,
+            "schema": {
+              "minLength": 1,
+              "title": "Item Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/KnowledgeItemEdit"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/KnowledgeItemResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "description": "No authenticated caller could be resolved"
+          },
+          "403": {
+            "description": "The caller lacks the required permission"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Edit Knowledge Item",
+        "tags": ["knowledge-items"],
+        "security": [
+          {
+            "ApiToken": []
+          }
+        ],
+        "x-auto-ontology-source": "frontend/app/api/knowledge-items/[item_id]/route.ts",
+        "x-auto-ontology-permissions": {
+          "chat": ["use"]
+        },
+        "x-auto-ontology-proxied": true
+      }
+    },
+    "/api/knowledge-items/{item_id}/approve": {
+      "post": {
+        "description": "Reading and proposing need the same permission as using the chat. What a person\nmay approve, reject or edit is decided by the backend (the knowledge DAL's rules),\nnot here: the web app only forwards the signed-in user's id.\nknowledgeApi.approve",
+        "operationId": "post_api_knowledge_items_item_id_approve",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "item_id",
+            "required": true,
+            "schema": {
+              "minLength": 1,
+              "title": "Item Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/KnowledgeTransitionBody"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Body"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/KnowledgeItemResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "description": "No authenticated caller could be resolved"
+          },
+          "403": {
+            "description": "The caller lacks the required permission"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Reading and proposing need the same permission as using the chat.",
+        "tags": ["knowledge-items"],
+        "security": [
+          {
+            "ApiToken": []
+          }
+        ],
+        "x-auto-ontology-source": "frontend/app/api/knowledge-items/[item_id]/approve/route.ts",
+        "x-auto-ontology-permissions": {
+          "chat": ["use"]
+        },
+        "x-auto-ontology-proxied": true
+      }
+    },
+    "/api/knowledge-items/{item_id}/deprecate": {
+      "post": {
+        "description": "Reading and proposing need the same permission as using the chat. What a person\nmay approve, reject or edit is decided by the backend (the knowledge DAL's rules),\nnot here: the web app only forwards the signed-in user's id.\nNo client call yet: the review page withdraws (own items) and approves.",
+        "operationId": "post_api_knowledge_items_item_id_deprecate",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "item_id",
+            "required": true,
+            "schema": {
+              "minLength": 1,
+              "title": "Item Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/KnowledgeTransitionBody"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Body"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/KnowledgeItemResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "description": "No authenticated caller could be resolved"
+          },
+          "403": {
+            "description": "The caller lacks the required permission"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Reading and proposing need the same permission as using the chat.",
+        "tags": ["knowledge-items"],
+        "security": [
+          {
+            "ApiToken": []
+          }
+        ],
+        "x-auto-ontology-source": "frontend/app/api/knowledge-items/[item_id]/deprecate/route.ts",
+        "x-auto-ontology-permissions": {
+          "chat": ["use"]
+        },
+        "x-auto-ontology-proxied": true
+      }
+    },
+    "/api/knowledge-items/{item_id}/promote-scope": {
+      "post": {
+        "description": "Reading and proposing need the same permission as using the chat. What a person\nmay approve, reject or edit is decided by the backend (the knowledge DAL's rules),\nnot here: the web app only forwards the signed-in user's id.\nNo client call yet: approving a personal item in review shares it first.",
+        "operationId": "post_api_knowledge_items_item_id_promote_scope",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "item_id",
+            "required": true,
+            "schema": {
+              "minLength": 1,
+              "title": "Item Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/KnowledgeTransitionBody"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Body"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/KnowledgeItemResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "description": "No authenticated caller could be resolved"
+          },
+          "403": {
+            "description": "The caller lacks the required permission"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Reading and proposing need the same permission as using the chat.",
+        "tags": ["knowledge-items"],
+        "security": [
+          {
+            "ApiToken": []
+          }
+        ],
+        "x-auto-ontology-source": "frontend/app/api/knowledge-items/[item_id]/promote-scope/route.ts",
+        "x-auto-ontology-permissions": {
+          "chat": ["use"]
+        },
+        "x-auto-ontology-proxied": true
+      }
+    },
+    "/api/knowledge-items/{item_id}/reject": {
+      "post": {
+        "description": "Reading and proposing need the same permission as using the chat. What a person\nmay approve, reject or edit is decided by the backend (the knowledge DAL's rules),\nnot here: the web app only forwards the signed-in user's id.\nknowledgeApi.reject",
+        "operationId": "post_api_knowledge_items_item_id_reject",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "item_id",
+            "required": true,
+            "schema": {
+              "minLength": 1,
+              "title": "Item Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/KnowledgeTransitionBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/KnowledgeItemResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "description": "No authenticated caller could be resolved"
+          },
+          "403": {
+            "description": "The caller lacks the required permission"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Reading and proposing need the same permission as using the chat.",
+        "tags": ["knowledge-items"],
+        "security": [
+          {
+            "ApiToken": []
+          }
+        ],
+        "x-auto-ontology-source": "frontend/app/api/knowledge-items/[item_id]/reject/route.ts",
+        "x-auto-ontology-permissions": {
+          "chat": ["use"]
+        },
+        "x-auto-ontology-proxied": true
+      }
+    },
+    "/api/knowledge-items/{item_id}/request-changes": {
+      "post": {
+        "description": "Reading and proposing need the same permission as using the chat. What a person\nmay approve, reject or edit is decided by the backend (the knowledge DAL's rules),\nnot here: the web app only forwards the signed-in user's id.\nknowledgeApi.requestChanges",
+        "operationId": "post_api_knowledge_items_item_id_request_changes",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "item_id",
+            "required": true,
+            "schema": {
+              "minLength": 1,
+              "title": "Item Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/KnowledgeTransitionBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/KnowledgeItemResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "description": "No authenticated caller could be resolved"
+          },
+          "403": {
+            "description": "The caller lacks the required permission"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Reading and proposing need the same permission as using the chat.",
+        "tags": ["knowledge-items"],
+        "security": [
+          {
+            "ApiToken": []
+          }
+        ],
+        "x-auto-ontology-source": "frontend/app/api/knowledge-items/[item_id]/request-changes/route.ts",
+        "x-auto-ontology-permissions": {
+          "chat": ["use"]
+        },
+        "x-auto-ontology-proxied": true
+      }
+    },
+    "/api/knowledge-items/{item_id}/submit": {
+      "post": {
+        "description": "Reading and proposing need the same permission as using the chat. What a person\nmay approve, reject or edit is decided by the backend (the knowledge DAL's rules),\nnot here: the web app only forwards the signed-in user's id.\nknowledgeApi.submit",
+        "operationId": "post_api_knowledge_items_item_id_submit",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "item_id",
+            "required": true,
+            "schema": {
+              "minLength": 1,
+              "title": "Item Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/KnowledgeTransitionBody"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Body"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/KnowledgeItemResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "description": "No authenticated caller could be resolved"
+          },
+          "403": {
+            "description": "The caller lacks the required permission"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Reading and proposing need the same permission as using the chat.",
+        "tags": ["knowledge-items"],
+        "security": [
+          {
+            "ApiToken": []
+          }
+        ],
+        "x-auto-ontology-source": "frontend/app/api/knowledge-items/[item_id]/submit/route.ts",
+        "x-auto-ontology-permissions": {
+          "chat": ["use"]
+        },
+        "x-auto-ontology-proxied": true
+      }
+    },
+    "/api/knowledge-items/{item_id}/withdraw": {
+      "post": {
+        "description": "Reading and proposing need the same permission as using the chat. What a person\nmay approve, reject or edit is decided by the backend (the knowledge DAL's rules),\nnot here: the web app only forwards the signed-in user's id.\nknowledgeApi.withdraw",
+        "operationId": "post_api_knowledge_items_item_id_withdraw",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "item_id",
+            "required": true,
+            "schema": {
+              "minLength": 1,
+              "title": "Item Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/KnowledgeTransitionBody"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Body"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/KnowledgeItemResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "description": "No authenticated caller could be resolved"
+          },
+          "403": {
+            "description": "The caller lacks the required permission"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Reading and proposing need the same permission as using the chat.",
+        "tags": ["knowledge-items"],
+        "security": [
+          {
+            "ApiToken": []
+          }
+        ],
+        "x-auto-ontology-source": "frontend/app/api/knowledge-items/[item_id]/withdraw/route.ts",
+        "x-auto-ontology-permissions": {
+          "chat": ["use"]
+        },
+        "x-auto-ontology-proxied": true
+      }
+    },
+    "/api/knowledge-items/status": {
+      "get": {
+        "description": "knowledgeApi.status — whether the feature is on. Never 404s, so the nav can hide the page.",
+        "operationId": "get_api_knowledge_items_status",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/KnowledgeStatus"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "description": "No authenticated caller could be resolved"
+          },
+          "403": {
+            "description": "The caller lacks the required permission"
+          }
+        },
+        "summary": "knowledgeApi.status — whether the feature is on.",
+        "tags": ["knowledge-items"],
+        "security": [
+          {
+            "ApiToken": []
+          }
+        ],
+        "x-auto-ontology-source": "frontend/app/api/knowledge-items/status/route.ts",
+        "x-auto-ontology-permissions": {
+          "chat": ["use"]
+        },
+        "x-auto-ontology-proxied": true
+      }
+    },
     "/api/model/export": {
       "post": {
         "description": "modelInterchangeApi.exportModel — download the catalog + semantic layer as a\nYAML file. Admin-only: it can include every connection's schema.",
@@ -11821,6 +12698,328 @@
         },
         "required": ["id"],
         "title": "IdRef",
+        "type": "object"
+      },
+      "KnowledgeEventOut": {
+        "properties": {
+          "action": {
+            "title": "Action",
+            "type": "string"
+          },
+          "actor_email": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Actor Email"
+          },
+          "actor_id": {
+            "title": "Actor Id",
+            "type": "string"
+          },
+          "actor_type": {
+            "title": "Actor Type",
+            "type": "string"
+          },
+          "at": {
+            "format": "date-time",
+            "title": "At",
+            "type": "string"
+          },
+          "comment": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Comment"
+          },
+          "from_scope": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "From Scope"
+          },
+          "from_status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "From Status"
+          },
+          "to_scope": {
+            "title": "To Scope",
+            "type": "string"
+          },
+          "to_status": {
+            "title": "To Status",
+            "type": "string"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "at",
+          "action",
+          "actor_type",
+          "actor_id",
+          "from_status",
+          "to_status",
+          "from_scope",
+          "to_scope",
+          "version",
+          "comment"
+        ],
+        "title": "KnowledgeEventOut",
+        "type": "object"
+      },
+      "KnowledgeItemCreate": {
+        "properties": {
+          "content": {
+            "additionalProperties": true,
+            "title": "Content",
+            "type": "object"
+          },
+          "database": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Catalog database name or id; omit for a glossary.",
+            "title": "Database"
+          },
+          "kind": {
+            "enum": ["term", "synonym"],
+            "title": "Kind",
+            "type": "string"
+          }
+        },
+        "required": ["kind", "content"],
+        "title": "KnowledgeItemCreate",
+        "type": "object"
+      },
+      "KnowledgeItemEdit": {
+        "properties": {
+          "content": {
+            "additionalProperties": true,
+            "title": "Content",
+            "type": "object"
+          },
+          "expected_version": {
+            "description": "`current_version` you loaded.",
+            "minimum": 1,
+            "title": "Expected Version",
+            "type": "integer"
+          }
+        },
+        "required": ["content", "expected_version"],
+        "title": "KnowledgeItemEdit",
+        "type": "object"
+      },
+      "KnowledgeItemListResponse": {
+        "properties": {
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/KnowledgeItemOut"
+            },
+            "title": "Data",
+            "type": "array"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          }
+        },
+        "required": ["data"],
+        "title": "KnowledgeItemListResponse",
+        "type": "object"
+      },
+      "KnowledgeItemOut": {
+        "properties": {
+          "allowed_actions": {
+            "description": "What the caller may do with this item right now.",
+            "items": {
+              "type": "string"
+            },
+            "title": "Allowed Actions",
+            "type": "array"
+          },
+          "content": {
+            "additionalProperties": true,
+            "title": "Content",
+            "type": "object"
+          },
+          "created": {
+            "format": "date-time",
+            "title": "Created",
+            "type": "string"
+          },
+          "created_by": {
+            "title": "Created By",
+            "type": "string"
+          },
+          "current_version": {
+            "description": "Send it back as `expected_version`: the optimistic lock.",
+            "title": "Current Version",
+            "type": "integer"
+          },
+          "database_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Database Id"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          },
+          "modified": {
+            "format": "date-time",
+            "title": "Modified",
+            "type": "string"
+          },
+          "owner_email": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Owner Email"
+          },
+          "owner_id": {
+            "title": "Owner Id",
+            "type": "string"
+          },
+          "provenance": {
+            "additionalProperties": true,
+            "title": "Provenance",
+            "type": "object"
+          },
+          "scope": {
+            "title": "Scope",
+            "type": "string"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "status",
+          "scope",
+          "owner_id",
+          "database_id",
+          "content",
+          "provenance",
+          "current_version",
+          "created_by",
+          "created",
+          "modified",
+          "allowed_actions"
+        ],
+        "title": "KnowledgeItemOut",
+        "type": "object"
+      },
+      "KnowledgeItemResponse": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/KnowledgeItemOut"
+          },
+          "events": {
+            "items": {
+              "$ref": "#/components/schemas/KnowledgeEventOut"
+            },
+            "title": "Events",
+            "type": "array"
+          }
+        },
+        "required": ["data", "events"],
+        "title": "KnowledgeItemResponse",
+        "type": "object"
+      },
+      "KnowledgeStatus": {
+        "properties": {
+          "enabled": {
+            "title": "Enabled",
+            "type": "boolean"
+          }
+        },
+        "required": ["enabled"],
+        "title": "KnowledgeStatus",
+        "type": "object"
+      },
+      "KnowledgeTransitionBody": {
+        "properties": {
+          "comment": {
+            "anyOf": [
+              {
+                "maxLength": 2000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Comment"
+          },
+          "expected_version": {
+            "anyOf": [
+              {
+                "minimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "`current_version` you loaded.",
+            "title": "Expected Version"
+          }
+        },
+        "title": "KnowledgeTransitionBody",
         "type": "object"
       },
       "ListResponse_DatabaseSummary_": {

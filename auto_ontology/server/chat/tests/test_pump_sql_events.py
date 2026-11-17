@@ -35,7 +35,9 @@ def persisted_fixture(monkeypatch: pytest.MonkeyPatch) -> list[dict[str, Any]]:
     return calls
 
 
-def _run_pump(events: list[dict[str, Any]]) -> router._Slot:
+def _run_pump(
+    events: list[dict[str, Any]], learned_term: dict[str, str] | None = None
+) -> router._Slot:
     """Drain ``events`` through ``_pump`` and return the slot it filled."""
 
     class _FakeWorker:
@@ -53,6 +55,7 @@ def _run_pump(events: list[dict[str, Any]]) -> router._Slot:
         cancelled=threading.Event(),
         released=threading.Event(),
     )
+    slot.learned_term = learned_term
     router._pump(slot)
     return slot
 
@@ -136,3 +139,29 @@ def test_no_sql_event_leaves_the_turn_unchanged(
     _run_pump([{"type": "error", "message": "boom"}])
 
     assert persisted[0]["sql_code"] is None
+
+
+def test_a_learned_term_rides_on_the_live_answer_only(
+    persisted: list[dict[str, Any]],
+) -> None:
+    """The line "Saved as your draft definition" is live-only, like caveats."""
+
+    slot = _run_pump(
+        [{"type": "result", "answer": {"response": "42", "sql_code": "SELECT 42"}}],
+        learned_term={"id": "k-1", "name": "VIP"},
+    )
+
+    result = next(e for e in slot.buffer if e["type"] == "result")
+    assert result["answer"]["learned_term"] == {"id": "k-1", "name": "VIP"}
+    assert result["answer"]["response"] == "42"
+    # Not stored with the conversation.
+    assert "learned_term" not in persisted[0]
+
+
+def test_no_learned_term_leaves_the_answer_untouched(
+    persisted: list[dict[str, Any]],
+) -> None:
+    slot = _run_pump([{"type": "result", "answer": {"response": "42"}}])
+
+    result = next(e for e in slot.buffer if e["type"] == "result")
+    assert "learned_term" not in result["answer"]

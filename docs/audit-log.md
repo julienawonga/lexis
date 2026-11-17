@@ -27,6 +27,7 @@ One event per successful action. The action is a short dotted verb.
 | `sql_attribute.create`, `sql_attribute.update`, `sql_attribute.delete` | A SQL attribute changes |
 | `custom_analysis.create`, `custom_analysis.update`, `custom_analysis.delete` | A custom analysis changes |
 | `semantic_domain.generate`, `semantic_domain.rename`, `semantic_domain.move_terms` | Business domains change |
+| `knowledge.propose`, `knowledge.submit`, `knowledge.approve`, `knowledge.reject`, `knowledge.request_changes`, `knowledge.deprecate`, `knowledge.promote_scope` | A learned definition is created, submitted, decided on, withdrawn or shared. Only the item id, its kind and the status or scope change are kept, never the definition or a comment |
 
 Each event carries:
 

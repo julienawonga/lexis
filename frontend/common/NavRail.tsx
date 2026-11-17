@@ -7,6 +7,8 @@
 import { useEffect, useState, useSyncExternalStore } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { useQuery } from '@tanstack/react-query';
+import { knowledgeApi } from '@/api/knowledge';
 import { Icon, IconName } from '@/common/icons';
 import { GlobalSearchModal } from '@/common/GlobalSearch';
 import { UserMenu } from '@/common/UserMenu';
@@ -17,12 +19,20 @@ type NavItem = {
 	href: string;
 	label: string;
 	adminOnly?: boolean;
+	/** Shown only when learned knowledge items are switched on (asked of the server). */
+	requiresKnowledge?: boolean;
 };
 
 const navItems: NavItem[] = [
 	{ icon: IconName.ChatBubble, href: '/chat', label: 'Chat' },
 	{ icon: IconName.Discovery, href: '/discovery', label: 'Discovery' },
 	{ icon: IconName.Terms, href: '/terms', label: 'Terms' },
+	{
+		icon: IconName.Certification,
+		href: '/knowledge',
+		label: 'Learned',
+		requiresKnowledge: true,
+	},
 	{ icon: IconName.ChartBar, href: '/analysis', label: 'Analysis' },
 	{ icon: IconName.Exploration, href: '/exploration', label: 'Exploration' },
 	{ icon: IconName.Database, href: '/data', label: 'Data' },
@@ -56,7 +66,20 @@ export const NavRail = ({ isAdmin = false, version }: { isAdmin?: boolean; versi
 		readShortcutLabelOnServer,
 	);
 	const [searchOpen, setSearchOpen] = useState(false);
-	const visibleItems = navItems.filter((item) => !item.adminOnly || isAdmin);
+	// Hidden until the server says the feature is on, and while it cannot say.
+	const knowledge = useQuery({
+		queryKey: ['knowledge-status'],
+		staleTime: 5 * 60 * 1000,
+		queryFn: async () => {
+			const res = await knowledgeApi.status();
+			if (res.error) throw new Error(res.message ?? 'Could not check this feature');
+			return res.enabled;
+		},
+	});
+	const knowledgeEnabled = knowledge.data === true;
+	const visibleItems = navItems.filter(
+		(item) => (!item.adminOnly || isAdmin) && (!item.requiresKnowledge || knowledgeEnabled),
+	);
 
 	// Ctrl+K / Cmd+K opens search from anywhere in the app.
 	useEffect(() => {

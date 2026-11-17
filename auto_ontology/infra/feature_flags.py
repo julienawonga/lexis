@@ -48,8 +48,10 @@ CLARIFICATION_ENABLED_KEY = "clarification_enabled"
 SQL_ATTRIBUTE_SUGGESTION_ENABLED_KEY = "sql_attribute_suggestion_enabled"
 
 # Master switch for learned knowledge items (design `docs/design/self-improving-ontology.md`).
-# Opt-in and read per request: no route, capture or retrieval reads it yet, so
-# today it changes nothing. It exists so that the later slices ship behind it.
+# Opt-in and read per request. Off, every `/api/knowledge-items` route answers 404,
+# a clarification answer is not saved as a draft, and the web app hides the page.
+# Retrieval of drafts at answer time is not built, so this never changes what the
+# model sees.
 KNOWLEDGE_ITEMS_ENABLED_KEY = "knowledge_items_enabled"
 
 # Lets an admin see other people's PERSONAL drafts (decision 3 of design section

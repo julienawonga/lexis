@@ -10,6 +10,7 @@ import { conversationsApi, toConversation } from '@/api/conversations';
 import { GENERIC_ANSWER_ERROR, buildSqlAnswerMessage, isResultMessage } from '@/lib/answerMessages';
 import { clarificationRefusalMessage, toClarificationPart } from '@/lib/clarification';
 import { busyMessage } from '@/lib/upstream';
+import type { LearnedTerm } from '@/types/knowledge';
 import type {
 	ChartsEvent,
 	ChatMessage,
@@ -129,6 +130,7 @@ export const useChat = () => {
 				knowledgeTrace?: KnowledgeTraceEntry[];
 				caveats?: AnswerCaveat[];
 				database?: string;
+				learnedTerm?: LearnedTerm;
 				steps?: GraphStep[];
 			},
 		) => {
@@ -142,6 +144,7 @@ export const useChat = () => {
 				knowledgeTrace: extras?.knowledgeTrace,
 				caveats: extras?.caveats,
 				database: extras?.database,
+				learnedTerm: extras?.learnedTerm,
 				steps: extras?.steps,
 				timestamp: Date.now(),
 			};
@@ -163,6 +166,7 @@ export const useChat = () => {
 					knowledgeTrace: msg.knowledgeTrace,
 					caveats: msg.caveats,
 					database: msg.database,
+					learnedTerm: msg.learnedTerm,
 					steps: stepsRef.current,
 				});
 		},

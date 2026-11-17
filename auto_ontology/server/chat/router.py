@@ -132,6 +132,7 @@ from auto_ontology.server.chat.conversation_dal import (
     prepare_conversation,
 )
 from auto_ontology.server.chat.settings_dal import is_visualization_enabled
+from auto_ontology.server.knowledge.capture import capture_clarification_answer
 from auto_ontology.server.chat.worker import PrewarmedWorker, get_pool
 from auto_ontology.server.identity import resolve_internal_user
 from auto_ontology.utils.llm_invoke import get_llm_client, get_non_reasoning_llm_client
@@ -297,6 +298,11 @@ class _Slot:
     # never got a query past validation has no ``sql`` event and so persists
     # none. See ``_pump``.
     last_sql: str | None = None
+    # The draft definition learned from a clarification answer in this turn
+    # (``{"id", "name"}``), set by a background thread and attached to the
+    # live answer by ``_pump`` when it is there by then. Never stored with the
+    # conversation: the review page is the durable place for it.
+    learned_term: dict[str, str] | None = None
     # --- supervision (see ``_supervise_step``) ---
     # When the run started, for the CHAT_MAX_RUN_S limit.
     started: float = field(default_factory=time.monotonic)
@@ -547,6 +553,18 @@ def _build_charts_event(slot: _Slot, answer: dict[str, Any]) -> dict[str, Any] |
     return {"type": "charts", "content": content, "sql_response": sql_response}
 
 
+def _capture_learned_term(slot: _Slot, capture: dict[str, Any]) -> None:
+    """Save the answer as a personal draft and remember it for the live answer.
+
+    Best-effort by construction: ``capture_clarification_answer`` never raises,
+    and this swallows anything else, because nothing here may touch the turn.
+    """
+    try:
+        slot.learned_term = capture_clarification_answer(**capture)
+    except Exception:  # noqa: BLE001 - the draft must never hurt the chat turn
+        logger.exception("Learned-term capture failed")
+
+
 def _pump(slot: _Slot) -> None:
     """Drain ``slot.worker``'s event queue into ``slot.buffer``.
 
@@ -654,6 +672,14 @@ def _pump(slot: _Slot) -> None:
                 # Streamed straight through for the live view; remembered so
                 # the failure paths above have something to persist.
                 slot.last_sql = str(event.get("sql") or "") or None
+            if event.get("type") == "result" and slot.learned_term is not None:
+                event = {
+                    **event,
+                    "answer": {
+                        **(event.get("answer") or {}),
+                        "learned_term": slot.learned_term,
+                    },
+                }
             persist_event(event, option_databases)
             with slot.buffer_lock:
                 slot.buffer.append(event)
@@ -909,6 +935,7 @@ async def chat_completions(
         agent_question = request.question
         agent_evidence = request.evidence
         detect_clarification = False
+        capture: dict[str, Any] | None = None
         if request.conversation_id is not None and user_id is not None:
             try:
                 prepared = await asyncio.to_thread(
@@ -956,6 +983,19 @@ async def chat_completions(
                 # stops before that turn, exactly as it did when the question was
                 # first asked, and it is never asked a second time.
                 answer = answer_text(pending, request.clarification, request.question)
+                capture = {
+                    "user_id": user_id,
+                    "conversation_id": request.conversation_id,
+                    "clarification_id": pending.clarification_id,
+                    "term": pending.term,
+                    "definition": answer,
+                    "option_id": (
+                        request.clarification.option_id
+                        if request.clarification is not None
+                        else None
+                    ),
+                    "asked_at": prepared.pending_asked_at,
+                }
                 agent_question = pending.original_question or request.question
                 agent_evidence = "\n".join(
                     part
@@ -1006,6 +1046,13 @@ async def chat_completions(
             evidence=agent_evidence,
             detect_clarification=detect_clarification,
         )
+        if capture is not None:
+            # After the turn is accepted, and off the request path: the draft
+            # is a by-product, so it can neither fail nor delay the answer.
+            capture["database"] = target_db
+            threading.Thread(
+                target=_capture_learned_term, args=(slot, capture), daemon=True
+            ).start()
         threading.Thread(target=_pump, args=(slot,), daemon=True).start()
     except BaseException:  # noqa: BLE001 — re-raised below; the slot must not leak
         # Any failure between acquiring the worker and handing the slot to

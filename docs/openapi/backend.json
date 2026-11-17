@@ -2886,6 +2886,344 @@
         "title": "IdRef",
         "type": "object"
       },
+      "KnowledgeEventOut": {
+        "properties": {
+          "action": {
+            "title": "Action",
+            "type": "string"
+          },
+          "actor_email": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Actor Email"
+          },
+          "actor_id": {
+            "title": "Actor Id",
+            "type": "string"
+          },
+          "actor_type": {
+            "title": "Actor Type",
+            "type": "string"
+          },
+          "at": {
+            "format": "date-time",
+            "title": "At",
+            "type": "string"
+          },
+          "comment": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Comment"
+          },
+          "from_scope": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "From Scope"
+          },
+          "from_status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "From Status"
+          },
+          "to_scope": {
+            "title": "To Scope",
+            "type": "string"
+          },
+          "to_status": {
+            "title": "To Status",
+            "type": "string"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "at",
+          "action",
+          "actor_type",
+          "actor_id",
+          "from_status",
+          "to_status",
+          "from_scope",
+          "to_scope",
+          "version",
+          "comment"
+        ],
+        "title": "KnowledgeEventOut",
+        "type": "object"
+      },
+      "KnowledgeItemCreate": {
+        "properties": {
+          "content": {
+            "additionalProperties": true,
+            "title": "Content",
+            "type": "object"
+          },
+          "database": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Catalog database name or id; omit for a glossary.",
+            "title": "Database"
+          },
+          "kind": {
+            "enum": [
+              "term",
+              "synonym"
+            ],
+            "title": "Kind",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "content"
+        ],
+        "title": "KnowledgeItemCreate",
+        "type": "object"
+      },
+      "KnowledgeItemEdit": {
+        "properties": {
+          "content": {
+            "additionalProperties": true,
+            "title": "Content",
+            "type": "object"
+          },
+          "expected_version": {
+            "description": "`current_version` you loaded.",
+            "minimum": 1.0,
+            "title": "Expected Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "content",
+          "expected_version"
+        ],
+        "title": "KnowledgeItemEdit",
+        "type": "object"
+      },
+      "KnowledgeItemListResponse": {
+        "properties": {
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/KnowledgeItemOut"
+            },
+            "title": "Data",
+            "type": "array"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "title": "KnowledgeItemListResponse",
+        "type": "object"
+      },
+      "KnowledgeItemOut": {
+        "properties": {
+          "allowed_actions": {
+            "description": "What the caller may do with this item right now.",
+            "items": {
+              "type": "string"
+            },
+            "title": "Allowed Actions",
+            "type": "array"
+          },
+          "content": {
+            "additionalProperties": true,
+            "title": "Content",
+            "type": "object"
+          },
+          "created": {
+            "format": "date-time",
+            "title": "Created",
+            "type": "string"
+          },
+          "created_by": {
+            "title": "Created By",
+            "type": "string"
+          },
+          "current_version": {
+            "description": "Send it back as `expected_version`: the optimistic lock.",
+            "title": "Current Version",
+            "type": "integer"
+          },
+          "database_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Database Id"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          },
+          "modified": {
+            "format": "date-time",
+            "title": "Modified",
+            "type": "string"
+          },
+          "owner_email": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Owner Email"
+          },
+          "owner_id": {
+            "title": "Owner Id",
+            "type": "string"
+          },
+          "provenance": {
+            "additionalProperties": true,
+            "title": "Provenance",
+            "type": "object"
+          },
+          "scope": {
+            "title": "Scope",
+            "type": "string"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "status",
+          "scope",
+          "owner_id",
+          "database_id",
+          "content",
+          "provenance",
+          "current_version",
+          "created_by",
+          "created",
+          "modified",
+          "allowed_actions"
+        ],
+        "title": "KnowledgeItemOut",
+        "type": "object"
+      },
+      "KnowledgeItemResponse": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/KnowledgeItemOut"
+          },
+          "events": {
+            "items": {
+              "$ref": "#/components/schemas/KnowledgeEventOut"
+            },
+            "title": "Events",
+            "type": "array"
+          }
+        },
+        "required": [
+          "data",
+          "events"
+        ],
+        "title": "KnowledgeItemResponse",
+        "type": "object"
+      },
+      "KnowledgeStatus": {
+        "properties": {
+          "enabled": {
+            "title": "Enabled",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "enabled"
+        ],
+        "title": "KnowledgeStatus",
+        "type": "object"
+      },
+      "KnowledgeTransitionBody": {
+        "properties": {
+          "comment": {
+            "anyOf": [
+              {
+                "maxLength": 2000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Comment"
+          },
+          "expected_version": {
+            "anyOf": [
+              {
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "`current_version` you loaded.",
+            "title": "Expected Version"
+          }
+        },
+        "title": "KnowledgeTransitionBody",
+        "type": "object"
+      },
       "ListResponse_DatabaseSummary_": {
         "additionalProperties": true,
         "properties": {
@@ -9173,6 +9511,715 @@
         "summary": "Update Group",
         "tags": [
           "users"
+        ]
+      }
+    },
+    "/api/knowledge-items": {
+      "get": {
+        "description": "List the knowledge items the caller may see, newest first.\n\nThe caller's own personal items and shared items. Another person's personal\ndraft never appears, administrators included, unless the audit setting is\non; a reviewer also sees a personal item once its owner submitted it.\nKeyset pagination: pass `next_cursor` back as `cursor`.",
+        "operationId": "list_knowledge_items_api_knowledge_items_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Status"
+            }
+          },
+          {
+            "in": "query",
+            "name": "kind",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Kind"
+            }
+          },
+          {
+            "description": "Database name or id.",
+            "in": "query",
+            "name": "database",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Database name or id.",
+              "title": "Database"
+            }
+          },
+          {
+            "description": "Only items you own.",
+            "in": "query",
+            "name": "mine",
+            "required": false,
+            "schema": {
+              "default": false,
+              "description": "Only items you own.",
+              "title": "Mine",
+              "type": "boolean"
+            }
+          },
+          {
+            "description": "Only items you may approve right now.",
+            "in": "query",
+            "name": "reviewable",
+            "required": false,
+            "schema": {
+              "default": false,
+              "description": "Only items you may approve right now.",
+              "title": "Reviewable",
+              "type": "boolean"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "description": "`next_cursor` of the page before.",
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "`next_cursor` of the page before.",
+              "title": "Cursor"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/KnowledgeItemListResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Knowledge Items",
+        "tags": [
+          "knowledge-items"
+        ]
+      },
+      "post": {
+        "description": "Create a personal draft (`term` or `synonym`) owned by the caller.",
+        "operationId": "create_knowledge_item_api_knowledge_items_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/KnowledgeItemCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/KnowledgeItemResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Knowledge Item",
+        "tags": [
+          "knowledge-items"
+        ]
+      }
+    },
+    "/api/knowledge-items/status": {
+      "get": {
+        "description": "Whether knowledge items are switched on. Never 404s: the page asks this.",
+        "operationId": "knowledge_status_api_knowledge_items_status_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/KnowledgeStatus"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Knowledge Status",
+        "tags": [
+          "knowledge-items"
+        ]
+      }
+    },
+    "/api/knowledge-items/{item_id}": {
+      "get": {
+        "description": "One knowledge item with its event history (404 if the caller may not see it).",
+        "operationId": "get_knowledge_item_api_knowledge_items__item_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "item_id",
+            "required": true,
+            "schema": {
+              "minLength": 1,
+              "title": "Item Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/KnowledgeItemResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Knowledge Item",
+        "tags": [
+          "knowledge-items"
+        ]
+      },
+      "patch": {
+        "description": "Edit a draft's content. Owner only, draft only, and never over a newer edit.\n\nSend the `current_version` you loaded as `expected_version`; if the item\nchanged meanwhile the answer is 409 and nothing is written. The database an\nitem is about cannot change.",
+        "operationId": "edit_knowledge_item_api_knowledge_items__item_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "item_id",
+            "required": true,
+            "schema": {
+              "minLength": 1,
+              "title": "Item Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/KnowledgeItemEdit"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/KnowledgeItemResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Edit Knowledge Item",
+        "tags": [
+          "knowledge-items"
+        ]
+      }
+    },
+    "/api/knowledge-items/{item_id}/approve": {
+      "post": {
+        "description": "Certify an item in review, for everyone.\n\nNeeds the right to certify (an administrator, or the owner of the database\nor Term it is about) and nobody certifies what they proposed. A personal\nitem is shared first, as one explicit step recorded in its history, then\ncertified; if the caller may not approve, nothing changes.",
+        "operationId": "approve_knowledge_item_api_knowledge_items__item_id__approve_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "item_id",
+            "required": true,
+            "schema": {
+              "minLength": 1,
+              "title": "Item Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/KnowledgeTransitionBody"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Body"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/KnowledgeItemResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Approve Knowledge Item",
+        "tags": [
+          "knowledge-items"
+        ]
+      }
+    },
+    "/api/knowledge-items/{item_id}/deprecate": {
+      "post": {
+        "description": "Retire an item. Someone who may certify, or the owner of a personal item.",
+        "operationId": "deprecate_knowledge_item_api_knowledge_items__item_id__deprecate_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "item_id",
+            "required": true,
+            "schema": {
+              "minLength": 1,
+              "title": "Item Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/KnowledgeTransitionBody"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Body"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/KnowledgeItemResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Deprecate Knowledge Item",
+        "tags": [
+          "knowledge-items"
+        ]
+      }
+    },
+    "/api/knowledge-items/{item_id}/promote-scope": {
+      "post": {
+        "description": "Make a personal item in review visible to everyone, without approving it.\n\nOnly someone who may certify it can; approving does this for you.",
+        "operationId": "promote_knowledge_item_scope_api_knowledge_items__item_id__promote_scope_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "item_id",
+            "required": true,
+            "schema": {
+              "minLength": 1,
+              "title": "Item Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/KnowledgeTransitionBody"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Body"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/KnowledgeItemResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Promote Knowledge Item Scope",
+        "tags": [
+          "knowledge-items"
+        ]
+      }
+    },
+    "/api/knowledge-items/{item_id}/reject": {
+      "post": {
+        "description": "Reject an item in review. A comment saying why is required.",
+        "operationId": "reject_knowledge_item_api_knowledge_items__item_id__reject_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "item_id",
+            "required": true,
+            "schema": {
+              "minLength": 1,
+              "title": "Item Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/KnowledgeTransitionBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/KnowledgeItemResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Reject Knowledge Item",
+        "tags": [
+          "knowledge-items"
+        ]
+      }
+    },
+    "/api/knowledge-items/{item_id}/request-changes": {
+      "post": {
+        "description": "Send an item in review back to its owner as a draft. A comment is required.",
+        "operationId": "request_changes_knowledge_item_api_knowledge_items__item_id__request_changes_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "item_id",
+            "required": true,
+            "schema": {
+              "minLength": 1,
+              "title": "Item Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/KnowledgeTransitionBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/KnowledgeItemResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Request Changes Knowledge Item",
+        "tags": [
+          "knowledge-items"
+        ]
+      }
+    },
+    "/api/knowledge-items/{item_id}/submit": {
+      "post": {
+        "description": "Send a draft for review. Owner (or someone who may certify) only.",
+        "operationId": "submit_knowledge_item_api_knowledge_items__item_id__submit_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "item_id",
+            "required": true,
+            "schema": {
+              "minLength": 1,
+              "title": "Item Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/KnowledgeTransitionBody"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Body"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/KnowledgeItemResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Submit Knowledge Item",
+        "tags": [
+          "knowledge-items"
+        ]
+      }
+    },
+    "/api/knowledge-items/{item_id}/withdraw": {
+      "post": {
+        "description": "Withdraw your own personal item (a draft or one in review).\n\nThe same lifecycle step as `deprecate`, recorded as such, but only for the\nperson it belongs to.",
+        "operationId": "withdraw_knowledge_item_api_knowledge_items__item_id__withdraw_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "item_id",
+            "required": true,
+            "schema": {
+              "minLength": 1,
+              "title": "Item Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/KnowledgeTransitionBody"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Body"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/KnowledgeItemResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Withdraw Knowledge Item",
+        "tags": [
+          "knowledge-items"
         ]
       }
     },
