@@ -1,0 +1,1263 @@
+{
+  "dataset": "heldout",
+  "description": "36 answerable questions, 12 on each of Chinook, Pagila and Rentals, written as a business user would ask them, to serve as a held-out set for the second version of the answerability check. Two shapes are the risk: `computed` (6 per database) is a measure that must be built through joins and aggregation rather than read from one column (revenue per group, an average per group, a ratio of two counts, a share, a running total); `far-table` (4 per database) needs a table reached through two to three joins (a count or list grouped by something that lives that far away); `plain` (2 per database) are controls. Written blind: without reading the check, its code, reports or logs, and before any engine run. The data and the answers were written by the same author and have not been reviewed by anyone else. The Rentals questions were chosen so that the gold answer does not change when soft-deleted rows are removed (checked on a copy with them deleted), so these cases do not mix in the effect of soft-delete handling. Gold SQL is the source of truth; `expected` rows are a snapshot of it, taken from the SQLite builds of chinook.sql and rentals.sql and from PostgreSQL for pagila.sql: python -m dev_tools.evals snapshot --cases dev_tools/evals/cases/answerable_heldout.json --dsn chinook=sqlite:///chinook.sqlite --dsn rentals=sqlite:///rentals.sqlite --dsn pagila=postgresql://.../pagila. Each case's `database` names the catalog database to ask. Ids are heldout.<database>.<name>.",
+  "frozen_at": "2026-11-17",
+  "frozen_sha256": "304084b1dabab7467677c9f5e15786d284b79fbeaa20827db9151317eeb6801c",
+  "cases": [
+    {
+      "id": "heldout.chinook.revenue_per_genre",
+      "question": "How much revenue has each music genre brought in?",
+      "description": "Revenue is built from invoice lines (unit price times quantity), grouped by the genre of the track sold. Tracks without a genre drop out.",
+      "tags": [
+        "computed"
+      ],
+      "database": "chinook",
+      "gold": [
+        {
+          "label": "primary",
+          "sql": "SELECT g.Name, SUM(il.UnitPrice * il.Quantity) FROM InvoiceLine il JOIN Track t ON t.TrackId = il.TrackId JOIN Genre g ON g.GenreId = t.GenreId GROUP BY g.GenreId, g.Name",
+          "expected": [
+            [
+              "Rock",
+              826.65
+            ],
+            [
+              "Jazz",
+              79.2
+            ],
+            [
+              "Metal",
+              261.36
+            ],
+            [
+              "Alternative & Punk",
+              241.56
+            ],
+            [
+              "Rock And Roll",
+              5.9399999999999995
+            ],
+            [
+              "Blues",
+              60.39
+            ],
+            [
+              "Latin",
+              382.14
+            ],
+            [
+              "Reggae",
+              29.7
+            ],
+            [
+              "Pop",
+              27.72
+            ],
+            [
+              "Soundtrack",
+              19.8
+            ],
+            [
+              "Bossa Nova",
+              14.85
+            ],
+            [
+              "Easy Listening",
+              9.9
+            ],
+            [
+              "Heavy Metal",
+              11.879999999999999
+            ],
+            [
+              "R&B/Soul",
+              40.589999999999996
+            ],
+            [
+              "Electronica/Dance",
+              11.879999999999999
+            ],
+            [
+              "World",
+              12.87
+            ],
+            [
+              "Hip Hop/Rap",
+              16.83
+            ],
+            [
+              "Science Fiction",
+              11.94
+            ],
+            [
+              "TV Shows",
+              93.53
+            ],
+            [
+              "Sci Fi & Fantasy",
+              39.8
+            ],
+            [
+              "Drama",
+              57.71
+            ],
+            [
+              "Comedy",
+              17.91
+            ],
+            [
+              "Alternative",
+              13.86
+            ],
+            [
+              "Classical",
+              40.589999999999996
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "id": "heldout.chinook.avg_tracks_per_album",
+      "question": "On average, how many tracks does an album have?",
+      "description": "Ratio of two counts: tracks over albums, either only albums that have tracks or all albums.",
+      "tags": [
+        "computed"
+      ],
+      "database": "chinook",
+      "gold": [
+        {
+          "label": "albums_with_tracks",
+          "sql": "SELECT 1.0 * COUNT(*) / COUNT(DISTINCT AlbumId) FROM Track WHERE AlbumId IS NOT NULL",
+          "expected": [
+            [
+              10.095100864553315
+            ]
+          ]
+        },
+        {
+          "label": "all_albums",
+          "sql": "SELECT 1.0 * (SELECT COUNT(*) FROM Track WHERE AlbumId IS NOT NULL) / (SELECT COUNT(*) FROM Album)",
+          "expected": [
+            [
+              10.095100864553315
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "id": "heldout.chinook.share_tracks_sold",
+      "question": "What percentage of the tracks in our catalogue has been bought at least once?",
+      "description": "Ratio of two counts: distinct tracks on at least one invoice line over all tracks, as a percentage.",
+      "tags": [
+        "computed"
+      ],
+      "database": "chinook",
+      "gold": [
+        {
+          "label": "primary",
+          "sql": "SELECT 100.0 * (SELECT COUNT(DISTINCT TrackId) FROM InvoiceLine) / (SELECT COUNT(*) FROM Track)",
+          "expected": [
+            [
+              56.63716814159292
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "id": "heldout.chinook.cumulative_sales_by_year",
+      "question": "Show our sales for each year together with the running total up to that year.",
+      "description": "One row per year: the year, its sales and the cumulative sales through that year.",
+      "tags": [
+        "computed"
+      ],
+      "database": "chinook",
+      "ordered": true,
+      "gold": [
+        {
+          "label": "primary",
+          "sql": "SELECT strftime('%Y', InvoiceDate) AS yr, SUM(Total) AS sales, SUM(SUM(Total)) OVER (ORDER BY strftime('%Y', InvoiceDate)) AS running FROM Invoice GROUP BY yr ORDER BY yr",
+          "expected": [
+            [
+              "2021",
+              449.46,
+              449.46
+            ],
+            [
+              "2022",
+              481.45,
+              930.91
+            ],
+            [
+              "2023",
+              469.58,
+              1400.49
+            ],
+            [
+              "2024",
+              477.53,
+              1878.02
+            ],
+            [
+              "2025",
+              450.58,
+              2328.6
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "id": "heldout.chinook.usa_revenue_share",
+      "question": "What share of our total sales comes from the USA?",
+      "description": "As a percentage of total invoiced. The country is either the invoice's billing country or the customer's country.",
+      "tags": [
+        "computed"
+      ],
+      "database": "chinook",
+      "gold": [
+        {
+          "label": "billing_country",
+          "sql": "SELECT 100.0 * SUM(CASE WHEN BillingCountry = 'USA' THEN Total ELSE 0 END) / SUM(Total) FROM Invoice",
+          "expected": [
+            [
+              22.46242377394142
+            ]
+          ]
+        },
+        {
+          "label": "customer_country",
+          "sql": "SELECT 100.0 * SUM(CASE WHEN c.Country = 'USA' THEN i.Total ELSE 0 END) / SUM(i.Total) FROM Invoice i JOIN Customer c ON c.CustomerId = i.CustomerId",
+          "expected": [
+            [
+              22.46242377394142
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "id": "heldout.chinook.avg_minutes_per_media_type",
+      "question": "What is the average length, in minutes, of the tracks of each media type?",
+      "description": "Track length is stored in milliseconds.",
+      "tags": [
+        "computed"
+      ],
+      "database": "chinook",
+      "gold": [
+        {
+          "label": "primary",
+          "sql": "SELECT m.Name, AVG(t.Milliseconds) / 60000.0 FROM Track t JOIN MediaType m ON m.MediaTypeId = t.MediaTypeId GROUP BY m.MediaTypeId, m.Name",
+          "expected": [
+            [
+              "MPEG audio file",
+              4.426238145462536
+            ],
+            [
+              "Protected AAC audio file",
+              4.695397890295359
+            ],
+            [
+              "Protected MPEG-4 video file",
+              39.049007087227416
+            ],
+            [
+              "Purchased AAC audio file",
+              4.348245238095238
+            ],
+            [
+              "AAC audio file",
+              4.608448484848485
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "id": "heldout.chinook.top5_artists_track_count",
+      "question": "Which 5 artists have the most tracks in the catalogue, and how many?",
+      "description": "Tracks reach the artist through the album.",
+      "tags": [
+        "far-table"
+      ],
+      "database": "chinook",
+      "ordered": true,
+      "gold": [
+        {
+          "label": "primary",
+          "sql": "SELECT ar.Name, COUNT(*) FROM Track t JOIN Album al ON al.AlbumId = t.AlbumId JOIN Artist ar ON ar.ArtistId = al.ArtistId GROUP BY ar.ArtistId, ar.Name ORDER BY COUNT(*) DESC LIMIT 5",
+          "expected": [
+            [
+              "Iron Maiden",
+              213
+            ],
+            [
+              "U2",
+              135
+            ],
+            [
+              "Led Zeppelin",
+              114
+            ],
+            [
+              "Metallica",
+              112
+            ],
+            [
+              "Deep Purple",
+              92
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "id": "heldout.chinook.artists_in_playlist",
+      "question": "How many different artists have tracks in the playlist called 'Grunge'?",
+      "description": "Playlist to playlist track to track to album to artist.",
+      "tags": [
+        "far-table"
+      ],
+      "database": "chinook",
+      "gold": [
+        {
+          "label": "primary",
+          "sql": "SELECT COUNT(DISTINCT ar.ArtistId) FROM Playlist p JOIN PlaylistTrack pt ON pt.PlaylistId = p.PlaylistId JOIN Track t ON t.TrackId = pt.TrackId JOIN Album al ON al.AlbumId = t.AlbumId JOIN Artist ar ON ar.ArtistId = al.ArtistId WHERE p.Name = 'Grunge'",
+          "expected": [
+            [
+              6
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "id": "heldout.chinook.genres_bought_in_brazil",
+      "question": "Which music genres have customers in Brazil bought?",
+      "description": "A list of genre names. Brazil is the customer's country or the invoice's billing country.",
+      "tags": [
+        "far-table"
+      ],
+      "database": "chinook",
+      "gold": [
+        {
+          "label": "customer_country",
+          "sql": "SELECT DISTINCT g.Name FROM Customer c JOIN Invoice i ON i.CustomerId = c.CustomerId JOIN InvoiceLine il ON il.InvoiceId = i.InvoiceId JOIN Track t ON t.TrackId = il.TrackId JOIN Genre g ON g.GenreId = t.GenreId WHERE c.Country = 'Brazil'",
+          "expected": [
+            [
+              "Latin"
+            ],
+            [
+              "Rock"
+            ],
+            [
+              "Metal"
+            ],
+            [
+              "Reggae"
+            ],
+            [
+              "Hip Hop/Rap"
+            ],
+            [
+              "Alternative & Punk"
+            ],
+            [
+              "Blues"
+            ],
+            [
+              "Sci Fi & Fantasy"
+            ],
+            [
+              "World"
+            ],
+            [
+              "R&B/Soul"
+            ],
+            [
+              "Classical"
+            ],
+            [
+              "Pop"
+            ],
+            [
+              "Soundtrack"
+            ]
+          ]
+        },
+        {
+          "label": "billing_country",
+          "sql": "SELECT DISTINCT g.Name FROM Invoice i JOIN InvoiceLine il ON il.InvoiceId = i.InvoiceId JOIN Track t ON t.TrackId = il.TrackId JOIN Genre g ON g.GenreId = t.GenreId WHERE i.BillingCountry = 'Brazil'",
+          "expected": [
+            [
+              "Latin"
+            ],
+            [
+              "Rock"
+            ],
+            [
+              "Metal"
+            ],
+            [
+              "Reggae"
+            ],
+            [
+              "Hip Hop/Rap"
+            ],
+            [
+              "Alternative & Punk"
+            ],
+            [
+              "Blues"
+            ],
+            [
+              "Sci Fi & Fantasy"
+            ],
+            [
+              "World"
+            ],
+            [
+              "R&B/Soul"
+            ],
+            [
+              "Classical"
+            ],
+            [
+              "Pop"
+            ],
+            [
+              "Soundtrack"
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "id": "heldout.chinook.invoices_per_support_rep",
+      "question": "For each support representative, how many invoices were issued to the customers they look after?",
+      "description": "The representative's name may be one column or two; only representatives with customers who have invoices appear.",
+      "tags": [
+        "far-table"
+      ],
+      "database": "chinook",
+      "gold": [
+        {
+          "label": "primary",
+          "sql": "SELECT e.FirstName, e.LastName, COUNT(*) FROM Employee e JOIN Customer c ON c.SupportRepId = e.EmployeeId JOIN Invoice i ON i.CustomerId = c.CustomerId GROUP BY e.EmployeeId, e.FirstName, e.LastName",
+          "expected": [
+            [
+              "Jane",
+              "Peacock",
+              146
+            ],
+            [
+              "Margaret",
+              "Park",
+              140
+            ],
+            [
+              "Steve",
+              "Johnson",
+              126
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "id": "heldout.chinook.album_count",
+      "question": "How many albums are there in the catalogue?",
+      "description": "",
+      "tags": [
+        "plain"
+      ],
+      "database": "chinook",
+      "gold": [
+        {
+          "label": "primary",
+          "sql": "SELECT COUNT(*) FROM Album",
+          "expected": [
+            [
+              347
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "id": "heldout.chinook.customer_countries",
+      "question": "In how many different countries do our customers live?",
+      "description": "",
+      "tags": [
+        "plain"
+      ],
+      "database": "chinook",
+      "gold": [
+        {
+          "label": "primary",
+          "sql": "SELECT COUNT(DISTINCT Country) FROM Customer",
+          "expected": [
+            [
+              24
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "id": "heldout.pagila.monthly_revenue_running",
+      "question": "What was our revenue in each month, and the running total so far?",
+      "description": "One row per month with payments: the month, its revenue and the cumulative revenue through that month.",
+      "tags": [
+        "computed"
+      ],
+      "database": "pagila",
+      "ordered": true,
+      "gold": [
+        {
+          "label": "primary",
+          "sql": "SELECT month, revenue, SUM(revenue) OVER (ORDER BY month) AS running FROM (SELECT date_trunc('month', payment_date)::date AS month, SUM(amount) AS revenue FROM payment GROUP BY 1) m ORDER BY month",
+          "expected": [
+            [
+              "2022-01-01",
+              117.67,
+              117.67
+            ],
+            [
+              "2022-02-01",
+              378.12,
+              495.79
+            ],
+            [
+              "2022-03-01",
+              447.97,
+              943.76
+            ],
+            [
+              "2022-04-01",
+              451.98,
+              1395.74
+            ],
+            [
+              "2022-05-01",
+              417.96,
+              1813.7
+            ],
+            [
+              "2022-06-01",
+              390.09,
+              2203.79
+            ],
+            [
+              "2022-07-01",
+              298.22,
+              2502.01
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "id": "heldout.pagila.revenue_by_rating",
+      "question": "How much revenue did each film rating (G, PG, PG-13, R, NC-17) bring in?",
+      "description": "Revenue is the payments, reached through rental, inventory and film.",
+      "tags": [
+        "computed"
+      ],
+      "database": "pagila",
+      "gold": [
+        {
+          "label": "primary",
+          "sql": "SELECT f.rating, SUM(p.amount) FROM payment p JOIN rental r ON r.rental_id = p.rental_id JOIN inventory i ON i.inventory_id = r.inventory_id JOIN film f ON f.film_id = i.film_id GROUP BY f.rating",
+          "expected": [
+            [
+              "PG",
+              387.0
+            ],
+            [
+              "R",
+              485.78
+            ],
+            [
+              "G",
+              484.91
+            ],
+            [
+              "PG-13",
+              601.53
+            ],
+            [
+              "NC-17",
+              542.79
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "id": "heldout.pagila.avg_rentals_per_customer",
+      "question": "On average, how many rentals has each customer made?",
+      "description": "Ratio of two counts. Either over all customers or over the customers who rented at least once.",
+      "tags": [
+        "computed"
+      ],
+      "database": "pagila",
+      "gold": [
+        {
+          "label": "all_customers",
+          "sql": "SELECT (SELECT COUNT(*) FROM rental)::numeric / (SELECT COUNT(*) FROM customer)",
+          "expected": [
+            [
+              1.0
+            ]
+          ]
+        },
+        {
+          "label": "renting_customers",
+          "sql": "SELECT (SELECT COUNT(*) FROM rental)::numeric / (SELECT COUNT(DISTINCT customer_id) FROM rental)",
+          "expected": [
+            [
+              1.568062827225131
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "id": "heldout.pagila.late_return_share",
+      "question": "What percentage of rentals were kept longer than the rental duration allowed for the film?",
+      "description": "Kept longer than rental_duration days between the rental and the return, over rentals that were returned.",
+      "tags": [
+        "computed"
+      ],
+      "database": "pagila",
+      "gold": [
+        {
+          "label": "primary",
+          "sql": "SELECT 100.0 * SUM(CASE WHEN r.return_date - r.rental_date > f.rental_duration * INTERVAL '1 day' THEN 1 ELSE 0 END) / COUNT(*) FROM rental r JOIN inventory i ON i.inventory_id = r.inventory_id JOIN film f ON f.film_id = i.film_id WHERE r.return_date IS NOT NULL",
+          "expected": [
+            [
+              50.250417362270454
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "id": "heldout.pagila.pg_revenue_share",
+      "question": "What share of our revenue comes from PG-rated films?",
+      "description": "Percentage of the payments whose rented film is rated PG.",
+      "tags": [
+        "computed"
+      ],
+      "database": "pagila",
+      "gold": [
+        {
+          "label": "primary",
+          "sql": "SELECT 100.0 * SUM(CASE WHEN f.rating = 'PG' THEN p.amount ELSE 0 END) / SUM(p.amount) FROM payment p JOIN rental r ON r.rental_id = p.rental_id JOIN inventory i ON i.inventory_id = r.inventory_id JOIN film f ON f.film_id = i.film_id",
+          "expected": [
+            [
+              15.467564078480901
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "id": "heldout.pagila.avg_spend_per_customer_by_store",
+      "question": "What is the average amount a customer has spent, for each store?",
+      "description": "Total paid by the customers registered at each store divided by the number of those customers who paid.",
+      "tags": [
+        "computed"
+      ],
+      "database": "pagila",
+      "gold": [
+        {
+          "label": "primary",
+          "sql": "SELECT c.store_id, SUM(p.amount) / COUNT(DISTINCT c.customer_id) FROM customer c JOIN payment p ON p.customer_id = c.customer_id GROUP BY c.store_id",
+          "expected": [
+            [
+              1,
+              6.884858490566038
+            ],
+            [
+              2,
+              6.131882352941177
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "id": "heldout.pagila.customers_per_canadian_city",
+      "question": "How many customers do we have in each city of Canada?",
+      "description": "Customer to address to city to country.",
+      "tags": [
+        "far-table"
+      ],
+      "database": "pagila",
+      "gold": [
+        {
+          "label": "primary",
+          "sql": "SELECT ci.city, COUNT(*) FROM customer cu JOIN address a ON a.address_id = cu.address_id JOIN city ci ON ci.city_id = a.city_id JOIN country co ON co.country_id = ci.country_id WHERE co.country = 'Canada' GROUP BY ci.city_id, ci.city",
+          "expected": [
+            [
+              "Gatineau",
+              1
+            ],
+            [
+              "Halifax",
+              1
+            ],
+            [
+              "Oshawa",
+              1
+            ],
+            [
+              "Richmond Hill",
+              1
+            ],
+            [
+              "Vancouver",
+              1
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "id": "heldout.pagila.horror_actors",
+      "question": "How many different actors have appeared in Horror films?",
+      "description": "Actor to film to category.",
+      "tags": [
+        "far-table"
+      ],
+      "database": "pagila",
+      "gold": [
+        {
+          "label": "primary",
+          "sql": "SELECT COUNT(DISTINCT fa.actor_id) FROM film_actor fa JOIN film_category fc ON fc.film_id = fa.film_id JOIN category c ON c.category_id = fc.category_id WHERE c.name = 'Horror'",
+          "expected": [
+            [
+              156
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "id": "heldout.pagila.top2_countries_rentals",
+      "question": "Which 2 countries have made the most rentals, and how many?",
+      "description": "Rentals are attributed to the country of the customer who made them.",
+      "tags": [
+        "far-table"
+      ],
+      "database": "pagila",
+      "ordered": true,
+      "gold": [
+        {
+          "label": "primary",
+          "sql": "SELECT co.country, COUNT(*) FROM rental r JOIN customer cu ON cu.customer_id = r.customer_id JOIN address a ON a.address_id = cu.address_id JOIN city ci ON ci.city_id = a.city_id JOIN country co ON co.country_id = ci.country_id GROUP BY co.country_id, co.country ORDER BY COUNT(*) DESC LIMIT 2",
+          "expected": [
+            [
+              "China",
+              56
+            ],
+            [
+              "India",
+              53
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "id": "heldout.pagila.scifi_copies_per_store",
+      "question": "How many copies of Sci-Fi films does each store have in stock?",
+      "description": "Copies are the inventory rows.",
+      "tags": [
+        "far-table"
+      ],
+      "database": "pagila",
+      "gold": [
+        {
+          "label": "primary",
+          "sql": "SELECT i.store_id, COUNT(*) FROM inventory i JOIN film_category fc ON fc.film_id = i.film_id JOIN category c ON c.category_id = fc.category_id WHERE c.name = 'Sci-Fi' GROUP BY i.store_id",
+          "expected": [
+            [
+              1,
+              149
+            ],
+            [
+              2,
+              163
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "id": "heldout.pagila.pg13_films",
+      "question": "How many films are rated PG-13?",
+      "description": "",
+      "tags": [
+        "plain"
+      ],
+      "database": "pagila",
+      "gold": [
+        {
+          "label": "primary",
+          "sql": "SELECT COUNT(*) FROM film WHERE rating = 'PG-13'",
+          "expected": [
+            [
+              223
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "id": "heldout.pagila.avg_replacement_cost",
+      "question": "What is the average replacement cost of a film?",
+      "description": "",
+      "tags": [
+        "plain"
+      ],
+      "database": "pagila",
+      "gold": [
+        {
+          "label": "primary",
+          "sql": "SELECT AVG(replacement_cost) FROM film",
+          "expected": [
+            [
+              19.984
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "id": "heldout.rentals.monthly_invoiced_running",
+      "question": "For each month of 2024, how much did we invoice before tax, and what is the running total over the year?",
+      "description": "One row per month that has invoices: the month, the invoice subtotals (before tax) and the cumulative subtotal through that month.",
+      "tags": [
+        "computed"
+      ],
+      "database": "rentals",
+      "ordered": true,
+      "gold": [
+        {
+          "label": "primary",
+          "sql": "SELECT substr(inv_dt, 1, 7) AS m, SUM(inv_sub) AS invoiced, SUM(SUM(inv_sub)) OVER (ORDER BY substr(inv_dt, 1, 7)) AS running FROM invoice WHERE inv_dt >= '2024-01-01' AND inv_dt <= '2024-12-31' GROUP BY m ORDER BY m",
+          "expected": [
+            [
+              "2024-01",
+              3799,
+              3799
+            ],
+            [
+              "2024-02",
+              2518,
+              6317
+            ],
+            [
+              "2024-03",
+              5286,
+              11603
+            ],
+            [
+              "2024-04",
+              7756,
+              19359
+            ],
+            [
+              "2024-05",
+              4882,
+              24241
+            ],
+            [
+              "2024-06",
+              2259,
+              26500
+            ],
+            [
+              "2024-07",
+              8636,
+              35136
+            ],
+            [
+              "2024-08",
+              5313,
+              40449
+            ],
+            [
+              "2024-09",
+              7512,
+              47961
+            ],
+            [
+              "2024-10",
+              7466,
+              55427
+            ],
+            [
+              "2024-11",
+              3047,
+              58474
+            ],
+            [
+              "2024-12",
+              7379,
+              65853
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "id": "heldout.rentals.tax_rate_overall",
+      "question": "Overall, what percentage of what we invoice is tax?",
+      "description": "Tax over the pre-tax subtotal, or tax over the invoice total including tax.",
+      "tags": [
+        "computed"
+      ],
+      "database": "rentals",
+      "gold": [
+        {
+          "label": "on_subtotal",
+          "sql": "SELECT 100.0 * SUM(inv_tax) / SUM(inv_sub) FROM invoice",
+          "expected": [
+            [
+              10.000000000000002
+            ]
+          ]
+        },
+        {
+          "label": "on_total",
+          "sql": "SELECT 100.0 * SUM(inv_tax) / SUM(inv_ttl) FROM invoice",
+          "expected": [
+            [
+              9.090909090909092
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "id": "heldout.rentals.heavy_line_share",
+      "question": "What percentage of the equipment lines on our rentals are for heavy equipment?",
+      "description": "A line is one row of rental_item; heavy equipment is a category flagged heavy.",
+      "tags": [
+        "computed"
+      ],
+      "database": "rentals",
+      "gold": [
+        {
+          "label": "primary",
+          "sql": "SELECT 100.0 * SUM(CASE WHEN ec.heavy_flg = 1 THEN 1 ELSE 0 END) / COUNT(*) FROM rental_item ri JOIN equip_unit eu ON eu.unit_id = ri.unit_id JOIN equip_category ec ON ec.cat_id = eu.cat_id",
+          "expected": [
+            [
+              39.682539682539684
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "id": "heldout.rentals.avg_job_cost_per_category",
+      "question": "What is the average maintenance cost of a job for each equipment category?",
+      "description": "Jobs with no recorded cost are not counted in the average.",
+      "tags": [
+        "computed"
+      ],
+      "database": "rentals",
+      "gold": [
+        {
+          "label": "primary",
+          "sql": "SELECT ec.cat_nm, AVG(mj.cost) FROM maint_job mj JOIN equip_unit eu ON eu.unit_id = mj.unit_id JOIN equip_category ec ON ec.cat_id = eu.cat_id GROUP BY ec.cat_id, ec.cat_nm",
+          "expected": [
+            [
+              "Excavators",
+              225.4
+            ],
+            [
+              "Scaffolding",
+              277.07142857142856
+            ],
+            [
+              "Generators",
+              332.7142857142857
+            ],
+            [
+              "Pressure Washers",
+              221.92857142857142
+            ],
+            [
+              "Aerial Lifts",
+              289.3333333333333
+            ],
+            [
+              "Concrete Mixers",
+              308.5
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "id": "heldout.rentals.avg_items_per_rental",
+      "question": "On average, how many pieces of equipment are on a rental?",
+      "description": "Lines on rentals that have at least one line, divided by the number of those rentals.",
+      "tags": [
+        "computed"
+      ],
+      "database": "rentals",
+      "gold": [
+        {
+          "label": "primary",
+          "sql": "SELECT 1.0 * COUNT(*) / COUNT(DISTINCT rental_id) FROM rental_item",
+          "expected": [
+            [
+              1.4
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "id": "heldout.rentals.avg_invoice_per_branch",
+      "question": "What is the average invoice total for each branch?",
+      "description": "An invoice belongs to the branch of its rental.",
+      "tags": [
+        "computed"
+      ],
+      "database": "rentals",
+      "gold": [
+        {
+          "label": "primary",
+          "sql": "SELECT b.br_name, AVG(i.inv_ttl) FROM invoice i JOIN rental r ON r.rental_id = i.rental_id JOIN branch b ON b.branch_id = r.branch_id GROUP BY b.branch_id, b.br_name",
+          "expected": [
+            [
+              "Northgate Depot",
+              1340.8214285714287
+            ],
+            [
+              "Harbour Yard",
+              1490.0285714285715
+            ],
+            [
+              "Millbrook Site",
+              1277.0214285714285
+            ],
+            [
+              "Eastcliff Hub",
+              1742.18
+            ],
+            [
+              "Southvale Depot",
+              1299.4142857142856
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "id": "heldout.rentals.jobs_per_equipment_branch",
+      "question": "How many maintenance jobs have been done on the equipment based at each branch?",
+      "description": "The branch is the one where the piece of equipment is based.",
+      "tags": [
+        "far-table"
+      ],
+      "database": "rentals",
+      "gold": [
+        {
+          "label": "primary",
+          "sql": "SELECT b.br_name, COUNT(*) FROM maint_job mj JOIN equip_unit eu ON eu.unit_id = mj.unit_id JOIN branch b ON b.branch_id = eu.branch_id GROUP BY b.branch_id, b.br_name",
+          "expected": [
+            [
+              "Northgate Depot",
+              9
+            ],
+            [
+              "Harbour Yard",
+              9
+            ],
+            [
+              "Millbrook Site",
+              9
+            ],
+            [
+              "Eastcliff Hub",
+              7
+            ],
+            [
+              "Southvale Depot",
+              6
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "id": "heldout.rentals.lines_per_category",
+      "question": "How many equipment lines have been rented in each equipment category?",
+      "description": "A line is one row of rental_item.",
+      "tags": [
+        "far-table"
+      ],
+      "database": "rentals",
+      "gold": [
+        {
+          "label": "primary",
+          "sql": "SELECT ec.cat_nm, COUNT(*) FROM rental_item ri JOIN equip_unit eu ON eu.unit_id = ri.unit_id JOIN equip_category ec ON ec.cat_id = eu.cat_id GROUP BY ec.cat_id, ec.cat_nm",
+          "expected": [
+            [
+              "Excavators",
+              28
+            ],
+            [
+              "Scaffolding",
+              17
+            ],
+            [
+              "Generators",
+              22
+            ],
+            [
+              "Pressure Washers",
+              20
+            ],
+            [
+              "Aerial Lifts",
+              22
+            ],
+            [
+              "Concrete Mixers",
+              17
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "id": "heldout.rentals.invoices_per_branch",
+      "question": "How many invoices have been issued for the rentals handled by each branch?",
+      "description": "An invoice belongs to the branch of its rental.",
+      "tags": [
+        "far-table"
+      ],
+      "database": "rentals",
+      "gold": [
+        {
+          "label": "primary",
+          "sql": "SELECT b.br_name, COUNT(*) FROM invoice i JOIN rental r ON r.rental_id = i.rental_id JOIN branch b ON b.branch_id = r.branch_id GROUP BY b.branch_id, b.br_name",
+          "expected": [
+            [
+              "Northgate Depot",
+              14
+            ],
+            [
+              "Harbour Yard",
+              14
+            ],
+            [
+              "Millbrook Site",
+              14
+            ],
+            [
+              "Eastcliff Hub",
+              15
+            ],
+            [
+              "Southvale Depot",
+              14
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "id": "heldout.rentals.jobs_per_category",
+      "question": "How many maintenance jobs has each equipment category needed?",
+      "description": "A job concerns a piece of equipment, which belongs to a category.",
+      "tags": [
+        "far-table"
+      ],
+      "database": "rentals",
+      "gold": [
+        {
+          "label": "primary",
+          "sql": "SELECT ec.cat_nm, COUNT(*) FROM maint_job mj JOIN equip_unit eu ON eu.unit_id = mj.unit_id JOIN equip_category ec ON ec.cat_id = eu.cat_id GROUP BY ec.cat_id, ec.cat_nm",
+          "expected": [
+            [
+              "Excavators",
+              6
+            ],
+            [
+              "Scaffolding",
+              8
+            ],
+            [
+              "Generators",
+              8
+            ],
+            [
+              "Pressure Washers",
+              7
+            ],
+            [
+              "Aerial Lifts",
+              6
+            ],
+            [
+              "Concrete Mixers",
+              5
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "id": "heldout.rentals.heavy_categories",
+      "question": "How many of our equipment categories are heavy?",
+      "description": "",
+      "tags": [
+        "plain"
+      ],
+      "database": "rentals",
+      "gold": [
+        {
+          "label": "primary",
+          "sql": "SELECT COUNT(*) FROM equip_category WHERE heavy_flg = 1",
+          "expected": [
+            [
+              2
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "id": "heldout.rentals.invoices_2025",
+      "question": "How many invoices did we issue in 2025?",
+      "description": "",
+      "tags": [
+        "plain"
+      ],
+      "database": "rentals",
+      "gold": [
+        {
+          "label": "primary",
+          "sql": "SELECT COUNT(*) FROM invoice WHERE inv_dt >= '2025-01-01' AND inv_dt <= '2025-12-31'",
+          "expected": [
+            [
+              19
+            ]
+          ]
+        }
+      ]
+    }
+  ]
+}

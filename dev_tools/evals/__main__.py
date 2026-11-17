@@ -67,6 +67,7 @@ from dev_tools.evals.cases import (
     control_files,
     load_controls,
     load_many,
+    parse_dsn_args,
     snapshot_file,
 )
 from dev_tools.evals.lsb import (
@@ -171,9 +172,16 @@ def _preflight_all(
 
 
 def _cmd_snapshot(args: argparse.Namespace) -> int:
-    dsn = args.dsn or os.environ.get("EVAL_SOURCE_DSN")
-    if not dsn:
+    values = args.dsn or (
+        [os.environ["EVAL_SOURCE_DSN"]] if os.environ.get("EVAL_SOURCE_DSN") else []
+    )
+    if not values:
         print("error: pass --dsn or set EVAL_SOURCE_DSN", file=sys.stderr)
+        return 2
+    try:
+        dsn = parse_dsn_args(values)
+    except ValueError as exc:
+        print(f"error: {exc}", file=sys.stderr)
         return 2
     drifted = snapshot_file(Path(args.cases), dsn, check=args.check)
     if args.check:
@@ -686,7 +694,10 @@ def build_parser() -> argparse.ArgumentParser:
     )
     snap.add_argument("--cases", default=str(DEFAULT_CASES))
     snap.add_argument(
-        "--dsn", help="Postgres DSN or sqlite:///path (or EVAL_SOURCE_DSN)"
+        "--dsn",
+        action="append",
+        help="Postgres DSN or sqlite:///path (or EVAL_SOURCE_DSN); repeat as "
+        "name=dsn for a file that mixes databases",
     )
     snap.add_argument(
         "--check", action="store_true", help="verify only; exit 1 if stale"
