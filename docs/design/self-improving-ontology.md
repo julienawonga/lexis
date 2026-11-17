@@ -668,6 +668,26 @@ within-Lexis comparison, not a leaderboard claim.
 
 ## 9. Phased delivery plan
 
+**Status (2026-11-17), what P0 has built so far.** Built: the tables `knowledge_item`
+(the projection) and `knowledge_event` (append-only, one row per transition) with their
+Alembic revision; the transition function in `auto_ontology/dal/knowledge.py` (lifecycle of
+3.2, permissions of 7.2 and 10.3, event and projection written in one transaction under a
+row lock, idempotent on retry, by `request_id` or by state); draft creation; the scope
+filter with the `knowledge_admin_audit_enabled` setting; replay and rebuild of the
+projection from the events, with a test that replay equals the stored row after a seeded
+random run; the permissions as pure functions with an exhaustive table test
+(`dal/knowledge_rules.py`); and the `knowledge_items_enabled` flag (no reader yet). Tested
+against real PostgreSQL. Not built: any route or UI, capture from clarification answers,
+retrieval of drafts at answer time, the semantic index labels for drafts, materialisation
+into `term` and `sql_attribute` on certify (`target_table` and `target_id` stay null), the
+tables `knowledge_item_version`, `knowledge_evidence`, `knowledge_use`, `episode`,
+`term_label`, `answer_provenance` and `verified_query`, the legacy-certification backfill,
+the store-level guard that makes `knowledge_event` append-only, the evaluation work
+(golden slices, stream mode, the KB-as-Terms experiment) and the read-only "knowledge used"
+panel. Evidence lives on the events (`provenance.evidence`, required when a draft is
+created) instead of in its own table, and an event carries the full content snapshot, so
+the version table is not needed yet.
+
 Each phase is independently shippable behind a setting and has a measured acceptance
 criterion. Effort is the author's estimate for one engineer who knows the repo [I]; read
 it as order of magnitude.
