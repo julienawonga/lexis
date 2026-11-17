@@ -238,7 +238,6 @@ The [published documentation](https://julienawonga.github.io/lexis/); preview it
 | Backup, restore and rollback | [docs/backup-restore.md](./docs/backup-restore.md) |
 | Kubernetes with Helm | [DEPLOYMENT.md](./DEPLOYMENT.md) |
 | REST API (OpenAPI) | [docs/openapi/auto-ontology-api.json](./docs/openapi/auto-ontology-api.json) |
-| What this fork changed | [FORK.md](./FORK.md) |
 
 ## 📄 License and credits
 

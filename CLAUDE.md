@@ -7,7 +7,6 @@ SPDX-License-Identifier: Apache-2.0
 # Lexis
 
 Full-stack repo: Next.js frontend (`frontend/`) and FastAPI backend (`auto_ontology/`).
-Taking over? Read [`HANDOFF.md`](./HANDOFF.md) first: current state, how to run and deploy on the owner's machine.
 This file is for maintainers. Agent skills for users and partners start at [`AGENTS.md`](./AGENTS.md); frontend rules are in [`frontend/CLAUDE.md`](./frontend/CLAUDE.md).
 
 ## Run (from the repo root)
@@ -24,6 +23,19 @@ This file is for maintainers. Agent skills for users and partners start at [`AGE
 - **Lint and format**: `uv run ruff check auto_ontology/` and `uv run ruff format auto_ontology/` before committing.
 - **Dependencies**: `uv add`, never pip, never by hand in `pyproject.toml`.
 - **API**: all routes under `/api/`; type hints on every signature; `@app.exception_handler` functions are plain `def`.
+
+## Working with the owner
+
+- The owner reads French: answer in simple, short French, with a table when comparing; code, commits and docs stay in English.
+- Say what was verified and what was not; never claim more than the evidence. Merge only with the owner's explicit OK, and ask before anything destructive (an Alembic downgrade, a database restore, deleting unmerged work). Never print `.env`.
+- Announce the cost (time, model calls) of any measurement over about 15 minutes, and what it will teach. Use `git add <paths>`, never `git add -A`, and work in worktrees (`git worktree add .claude/worktrees/<name> -b <name> origin/main`), not by switching the main tree's branch.
+
+## The owner's machine (Windows, Docker Desktop)
+
+- **Deploying** applies Alembic migrations at start, after which an older image refuses the database ([`docs/backup-restore.md`](./docs/backup-restore.md)): dump first, tag the running images, build the backend from a clean worktree, and build the frontend image **with the stack stopped** (the 7 GB Docker VM crashes otherwise).
+- **Generated artefacts** (Alembic migrations, DAL snapshots, the public OpenAPI spec) are produced on Linux in Docker against a throwaway pgvector container, never the owner's `postgres` one. Before pushing, `git ls-files --eol` must show no `i/crlf`.
+- **Measurements**: at most 8 concurrent chats (4 workers), the machine kept awake (a sleep corrupts a run), and read the log one minute after starting a background run. Never put `export MSYS_NO_PATHCONV=1` in a script that gives paths to `python.exe`.
+- Remove a `node_modules` junction with a non-recursive delete, never `rm -rf`; a worktree Windows refuses to delete needs a literal `\?\` path in PowerShell, then `git worktree prune`.
 
 ## Git
 
