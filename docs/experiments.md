@@ -1054,7 +1054,7 @@ to interpret the entries is repeated.
   offered schema, verifies the cited columns in code, and refuses when an item is
   absent. It is behind the configuration row `answerability_check_enabled`, off
   by default.
-- **Criteria, written first.** [docs/preregistered/answerability-gate.md](./preregistered/answerability-gate.md)
+- **Criteria, written first.** The preregistration files, kept outside the repository (`HomeLab/lexis-evals/archive/`)
   (SHA-256 `2c34828d...`, amendments `b59c3b8c...` and `a35a4dbd...`), written
   before the candidate ran once: C1 at least 50% refusal on the unanswerable set
   and +25 points over the baseline; C2 a sign test favouring the candidate; C3 at
