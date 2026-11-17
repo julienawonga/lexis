@@ -1,0 +1,598 @@
+{
+ "databases": {
+  "pagila": {
+   "primary_keys": {
+    "analytics.category_rollup": [
+     "category_rollup_id"
+    ],
+    "analytics.film_performance": [
+     "film_performance_id"
+    ],
+    "public.actor": [
+     "actor_id"
+    ],
+    "public.address": [
+     "address_id"
+    ],
+    "public.category": [
+     "category_id"
+    ],
+    "public.city": [
+     "city_id"
+    ],
+    "public.country": [
+     "country_id"
+    ],
+    "public.customer": [
+     "customer_id"
+    ],
+    "public.film": [
+     "film_id"
+    ],
+    "public.film_actor": [
+     "actor_id",
+     "film_id"
+    ],
+    "public.film_category": [
+     "film_id",
+     "category_id"
+    ],
+    "public.inventory": [
+     "inventory_id"
+    ],
+    "public.language": [
+     "language_id"
+    ],
+    "public.payment": [
+     "payment_date",
+     "payment_id"
+    ],
+    "public.rental": [
+     "rental_id"
+    ],
+    "public.staff": [
+     "staff_id"
+    ],
+    "public.store": [
+     "store_id"
+    ]
+   },
+   "foreign_keys": [
+    [
+     "analytics",
+     "category_rollup",
+     "category_id",
+     "public",
+     "category",
+     "category_id"
+    ],
+    [
+     "analytics",
+     "category_rollup",
+     "parent_rollup_id",
+     "analytics",
+     "category_rollup",
+     "category_rollup_id"
+    ],
+    [
+     "analytics",
+     "film_performance",
+     "film_id",
+     "public",
+     "film",
+     "film_id"
+    ],
+    [
+     "public",
+     "address",
+     "city_id",
+     "public",
+     "city",
+     "city_id"
+    ],
+    [
+     "public",
+     "city",
+     "country_id",
+     "public",
+     "country",
+     "country_id"
+    ],
+    [
+     "public",
+     "customer",
+     "address_id",
+     "public",
+     "address",
+     "address_id"
+    ],
+    [
+     "public",
+     "customer",
+     "store_id",
+     "public",
+     "store",
+     "store_id"
+    ],
+    [
+     "public",
+     "film",
+     "language_id",
+     "public",
+     "language",
+     "language_id"
+    ],
+    [
+     "public",
+     "film",
+     "original_language_id",
+     "public",
+     "language",
+     "language_id"
+    ],
+    [
+     "public",
+     "film_actor",
+     "actor_id",
+     "public",
+     "actor",
+     "actor_id"
+    ],
+    [
+     "public",
+     "film_actor",
+     "film_id",
+     "public",
+     "film",
+     "film_id"
+    ],
+    [
+     "public",
+     "film_category",
+     "category_id",
+     "public",
+     "category",
+     "category_id"
+    ],
+    [
+     "public",
+     "film_category",
+     "film_id",
+     "public",
+     "film",
+     "film_id"
+    ],
+    [
+     "public",
+     "inventory",
+     "film_id",
+     "public",
+     "film",
+     "film_id"
+    ],
+    [
+     "public",
+     "inventory",
+     "store_id",
+     "public",
+     "store",
+     "store_id"
+    ],
+    [
+     "public",
+     "payment",
+     "customer_id",
+     "public",
+     "customer",
+     "customer_id"
+    ],
+    [
+     "public",
+     "payment",
+     "rental_id",
+     "public",
+     "rental",
+     "rental_id"
+    ],
+    [
+     "public",
+     "payment",
+     "staff_id",
+     "public",
+     "staff",
+     "staff_id"
+    ],
+    [
+     "public",
+     "rental",
+     "customer_id",
+     "public",
+     "customer",
+     "customer_id"
+    ],
+    [
+     "public",
+     "rental",
+     "inventory_id",
+     "public",
+     "inventory",
+     "inventory_id"
+    ],
+    [
+     "public",
+     "rental",
+     "staff_id",
+     "public",
+     "staff",
+     "staff_id"
+    ],
+    [
+     "public",
+     "staff",
+     "address_id",
+     "public",
+     "address",
+     "address_id"
+    ],
+    [
+     "public",
+     "staff",
+     "store_id",
+     "public",
+     "store",
+     "store_id"
+    ],
+    [
+     "public",
+     "store",
+     "address_id",
+     "public",
+     "address",
+     "address_id"
+    ]
+   ],
+   "undeclared_relations": {
+    "expected_to_infer": [],
+    "must_not_infer": [],
+    "notes": [
+     "Every relation between the public tables is declared. The partitioned table payment declares its keys on its partitions, not on the parent, and the partition payment_p2022_07 declares no foreign key at all: the three foreign keys of payment are read from payment_p2022_01..06 and reported for the root. Detection that only looked at one partition would miss them."
+    ]
+   }
+  },
+  "chinook": {
+   "primary_keys": {
+    "main.Album": [
+     "AlbumId"
+    ],
+    "main.Artist": [
+     "ArtistId"
+    ],
+    "main.Customer": [
+     "CustomerId"
+    ],
+    "main.Employee": [
+     "EmployeeId"
+    ],
+    "main.Genre": [
+     "GenreId"
+    ],
+    "main.Invoice": [
+     "InvoiceId"
+    ],
+    "main.InvoiceLine": [
+     "InvoiceLineId"
+    ],
+    "main.MediaType": [
+     "MediaTypeId"
+    ],
+    "main.Playlist": [
+     "PlaylistId"
+    ],
+    "main.PlaylistTrack": [
+     "PlaylistId",
+     "TrackId"
+    ],
+    "main.Track": [
+     "TrackId"
+    ]
+   },
+   "foreign_keys": [
+    [
+     "main",
+     "Album",
+     "ArtistId",
+     "main",
+     "Artist",
+     "ArtistId"
+    ],
+    [
+     "main",
+     "Customer",
+     "SupportRepId",
+     "main",
+     "Employee",
+     "EmployeeId"
+    ],
+    [
+     "main",
+     "Employee",
+     "ReportsTo",
+     "main",
+     "Employee",
+     "EmployeeId"
+    ],
+    [
+     "main",
+     "Invoice",
+     "CustomerId",
+     "main",
+     "Customer",
+     "CustomerId"
+    ],
+    [
+     "main",
+     "InvoiceLine",
+     "InvoiceId",
+     "main",
+     "Invoice",
+     "InvoiceId"
+    ],
+    [
+     "main",
+     "InvoiceLine",
+     "TrackId",
+     "main",
+     "Track",
+     "TrackId"
+    ],
+    [
+     "main",
+     "PlaylistTrack",
+     "PlaylistId",
+     "main",
+     "Playlist",
+     "PlaylistId"
+    ],
+    [
+     "main",
+     "PlaylistTrack",
+     "TrackId",
+     "main",
+     "Track",
+     "TrackId"
+    ],
+    [
+     "main",
+     "Track",
+     "AlbumId",
+     "main",
+     "Album",
+     "AlbumId"
+    ],
+    [
+     "main",
+     "Track",
+     "GenreId",
+     "main",
+     "Genre",
+     "GenreId"
+    ],
+    [
+     "main",
+     "Track",
+     "MediaTypeId",
+     "main",
+     "MediaType",
+     "MediaTypeId"
+    ]
+   ],
+   "undeclared_relations": {
+    "expected_to_infer": [],
+    "must_not_infer": [],
+    "notes": [
+     "Chinook declares all its relations. Columns that agree on values without a constraint (Invoice.BillingCountry and Customer.Country) are not keys and must not become foreign keys."
+    ]
+   }
+  },
+  "rentals": {
+   "primary_keys": {
+    "main.branch": [
+     "branch_id"
+    ],
+    "main.customer": [
+     "cust_id"
+    ],
+    "main.equip_category": [
+     "cat_id"
+    ],
+    "main.equip_unit": [
+     "unit_id"
+    ],
+    "main.invoice": [
+     "inv_id"
+    ],
+    "main.legacy_export_log": [
+     "log_id"
+    ],
+    "main.maint_job": [
+     "job_id"
+    ],
+    "main.payment": [
+     "pay_id"
+    ],
+    "main.rental": [
+     "rental_id"
+    ],
+    "main.rental_item": [
+     "rental_id",
+     "unit_id"
+    ],
+    "main.rental_status": [
+     "stat_cd"
+    ],
+    "main.staff": [
+     "staff_id"
+    ]
+   },
+   "foreign_keys": [
+    [
+     "main",
+     "customer",
+     "home_branch_id",
+     "main",
+     "branch",
+     "branch_id"
+    ],
+    [
+     "main",
+     "equip_unit",
+     "branch_id",
+     "main",
+     "branch",
+     "branch_id"
+    ],
+    [
+     "main",
+     "equip_unit",
+     "cat_id",
+     "main",
+     "equip_category",
+     "cat_id"
+    ],
+    [
+     "main",
+     "invoice",
+     "cust_id",
+     "main",
+     "customer",
+     "cust_id"
+    ],
+    [
+     "main",
+     "invoice",
+     "rental_id",
+     "main",
+     "rental",
+     "rental_id"
+    ],
+    [
+     "main",
+     "maint_job",
+     "tech_id",
+     "main",
+     "staff",
+     "staff_id"
+    ],
+    [
+     "main",
+     "maint_job",
+     "unit_id",
+     "main",
+     "equip_unit",
+     "unit_id"
+    ],
+    [
+     "main",
+     "payment",
+     "inv_id",
+     "main",
+     "invoice",
+     "inv_id"
+    ],
+    [
+     "main",
+     "rental",
+     "branch_id",
+     "main",
+     "branch",
+     "branch_id"
+    ],
+    [
+     "main",
+     "rental",
+     "cust_id",
+     "main",
+     "customer",
+     "cust_id"
+    ],
+    [
+     "main",
+     "rental",
+     "staff_id",
+     "main",
+     "staff",
+     "staff_id"
+    ],
+    [
+     "main",
+     "rental",
+     "stat_cd",
+     "main",
+     "rental_status",
+     "stat_cd"
+    ],
+    [
+     "main",
+     "rental_item",
+     "rental_id",
+     "main",
+     "rental",
+     "rental_id"
+    ],
+    [
+     "main",
+     "rental_item",
+     "unit_id",
+     "main",
+     "equip_unit",
+     "unit_id"
+    ],
+    [
+     "main",
+     "staff",
+     "branch_id",
+     "main",
+     "branch",
+     "branch_id"
+    ],
+    [
+     "main",
+     "staff",
+     "mgr_id",
+     "main",
+     "staff",
+     "staff_id"
+    ]
+   ],
+   "undeclared_relations": {
+    "expected_to_infer": [],
+    "must_not_infer": [
+     {
+      "column": "invoice.pay_stat",
+      "not": "rental_status.stat_cd",
+      "why": "a coded status with no lookup table: its codes (P, O, V) are not the lookup's (A, C, X), only the name looks alike"
+     },
+     {
+      "column": "payment.method_cd",
+      "not": "rental_status.stat_cd",
+      "why": "codes BT, CH, CC and no lookup table"
+     },
+     {
+      "column": "staff.role_cd",
+      "not": "rental_status.stat_cd",
+      "why": "codes MGR, CTR, TCH, DRV and no lookup table"
+     },
+     {
+      "column": "legacy_export_log.*",
+      "not": "any table",
+      "why": "the deliberately unrelated table has no relation to infer"
+     }
+    ],
+    "notes": [
+     "All 16 relations of rentals are declared, so there is no undeclared relation the inference is expected to find: the fixture's traps are the look-alike coded columns above, which an inference must leave alone. Check the codes before changing this list: `SELECT DISTINCT pay_stat FROM invoice`."
+    ]
+   }
+  }
+ },
+ "_about": "Keys DECLARED as constraints in the fixture SQL (primary_keys, foreign_keys), parsed by dev_tools/fixtures/declared_keys.py and checked against both the SQL and what the connectors detect. undeclared_relations is documentation only and is not tested: it says what the semantic foreign-key inference should and should not conclude where no constraint exists. Regenerate the first two sections with `python -m dev_tools.fixtures.declared_keys --write`."
+}
