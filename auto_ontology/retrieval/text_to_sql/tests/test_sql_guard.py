@@ -127,3 +127,43 @@ def test_refusal_message_tells_the_model_what_is_allowed() -> None:
 def test_a_dialect_specific_select_is_judged_in_that_dialect() -> None:
     assert_read_only("SELECT TOP 5 * FROM t", "tsql")
     assert_read_only("SELECT `a` FROM `t` LIMIT 5", "mysql")
+
+
+@pytest.mark.parametrize(
+    ("dialect", "sql"),
+    [
+        ("spark", "SELECT reflect('java.lang.System', 'currentTimeMillis')"),
+        ("spark", "SELECT java_method('java.lang.System', 'currentTimeMillis')"),
+        ("databricks", "SELECT REFLECT('a', 'b')"),
+        ("databricks", "SELECT try_reflect('a', 'b')"),
+        ("snowflake", "SELECT SYSTEM$ABORT_SESSION(1)"),
+        ("snowflake", "SELECT system$cancel_all_queries(1)"),
+        ("snowflake", "SELECT SYSTEM$CANCEL_QUERY('x')"),
+    ],
+)
+def test_engine_functions_that_act_outside_the_data_are_refused(
+    dialect: str, sql: str
+) -> None:
+    with pytest.raises(UnsafeSqlError, match="not allowed"):
+        assert_read_only(sql, dialect)
+
+
+@pytest.mark.parametrize(
+    ("dialect", "sql"),
+    [
+        ("snowflake", "COPY INTO @stage FROM (SELECT 1)"),
+        ("snowflake", "PUT file:///tmp/x @stage"),
+        ("snowflake", "GET @stage file:///tmp/x"),
+        ("databricks", "COPY INTO t FROM 's3://bucket/x'"),
+        ("databricks", "INSERT OVERWRITE DIRECTORY '/tmp/x' SELECT 1"),
+        ("spark", "INSERT OVERWRITE LOCAL DIRECTORY '/tmp/x' SELECT 1"),
+        ("spark", "INSERT OVERWRITE DIRECTORY '/tmp/x' USING parquet SELECT 1"),
+        ("postgres", "COPY (SELECT 1) TO '/tmp/x.csv' WITH (header='true')"),
+        ("postgres", "DUMP TABLE t TO '/tmp/x'"),
+        ("postgres", "KILL QUERY '123'"),
+    ],
+)
+def test_engine_specific_export_statements_are_refused(dialect: str, sql: str) -> None:
+    """Pins the engine forms the root-node check already refuses."""
+    with pytest.raises(UnsafeSqlError):
+        assert_read_only(sql, dialect)

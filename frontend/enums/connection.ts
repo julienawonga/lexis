@@ -38,6 +38,7 @@ export type ConnectionFieldKey =
 	| 'password'
 	| 'private_key'
 	| 'private_key_passphrase'
+	| 'agent_role'
 	| 'database'
 	| 'protocol'
 	| 'ssa_url'
@@ -156,6 +157,13 @@ export const CONNECTION_FIELDS: Record<ConnectionType, ConnectionField[]> = {
 			secret: true,
 			optional: true,
 			hint: 'Only needed if the private key above is encrypted.',
+		},
+		{
+			key: 'agent_role',
+			label: 'Agent Role',
+			placeholder: 'LEXIS_READER',
+			optional: true,
+			hint: 'A role granted SELECT only. Chat queries run under it, so Snowflake itself refuses a write. Without it, only Lexis’s own SQL check stands in the way, because Snowflake has no read-only session mode.',
 		},
 		{ key: 'database', label: 'Database', placeholder: 'MY_DATABASE' },
 	],

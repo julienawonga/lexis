@@ -40,7 +40,11 @@ from urllib.parse import parse_qs, unquote, urlparse
 import heavydb
 import pandas as pd
 from heavydb.common.ttypes import TDatumType
-from auto_ontology.connectors.base import SQLDatabase, StatementTimeout
+from auto_ontology.connectors.base import (
+    SQLDatabase,
+    StatementTimeout,
+    warn_guard_only_once,
+)
 
 if TYPE_CHECKING:
     from heavydb.connection import Connection
@@ -239,6 +243,12 @@ class HeavyDBDatabase(SQLDatabase):
     def __init__(self, connection_string: str) -> None:
         self._connect_kwargs = _parse_connection_string(connection_string)
         self._database_name: str = self._connect_kwargs["dbname"]
+        warn_guard_only_once(
+            "HeavyDB",
+            self._database_name,
+            "HeavyDB has no per-session read-only mode (only the server-wide "
+            "'read-only' flag). Connect as a user granted SELECT only.",
+        )
         # HeavyDB is flat-namespaced; strip schema/catalog qualifiers the
         # text-to-SQL agent emits (``public.`` and ``<database_name>.``).
         self._schema_qualifier_re = _build_schema_qualifier_re(self._database_name)

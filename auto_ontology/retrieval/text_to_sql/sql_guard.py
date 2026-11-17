@@ -78,6 +78,16 @@ _FORBIDDEN_FUNCTIONS = frozenset(
         "lo_export",
         "dblink",
         "dblink_exec",
+        # Spark SQL (Databricks, Kyuubi): call an arbitrary JVM static method,
+        # which no read-only setting would stop either.
+        "reflect",
+        "try_reflect",
+        "java_method",
+        # Snowflake: end other queries or sessions from inside a SELECT.
+        "system$abort_session",
+        "system$abort_transaction",
+        "system$cancel_query",
+        "system$cancel_all_queries",
     }
 )
 
