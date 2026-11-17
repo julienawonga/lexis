@@ -187,3 +187,17 @@ jobs:
               | grep '^SKIPPED' || true
             exit 1
           fi
+
+      # The recorded-model regression check (docs/recorded-evaluation.md): the
+      # frozen questions go through the real pipeline with the model replayed
+      # from cassettes under dev_tools/cassettes/<set>/. A no-op until a set is
+      # committed. After the suite, because it re-ingests the fixture database
+      # into this Postgres and the suite's golden tests must not see that. No
+      # model and no secret: replay never touches the network.
+      - name: Replay recorded-model cases (no-op until cassettes exist)
+        run: |
+          if ls dev_tools/cassettes/*/manifest.json >/dev/null 2>&1; then
+            LEXIS_REPLAY_PIPELINE=1 uv run --no-sync pytest dev_tools/cassettes -q
+          else
+            echo "No cassette set committed under dev_tools/cassettes/ yet; nothing to replay."
+          fi
