@@ -18,7 +18,11 @@ from databricks import sql
 from databricks.sql.client import Connection
 from databricks.sql.exc import Error
 from auto_ontology.catalog.constants import TableTypes
-from auto_ontology.connectors.base import SQLDatabase, StatementTimeout
+from auto_ontology.connectors.base import (
+    SQLDatabase,
+    StatementTimeout,
+    warn_guard_only_once,
+)
 
 from auto_ontology.connectors.db_errors import is_session_lost
 
@@ -175,6 +179,12 @@ class DatabricksDatabase(SQLDatabase):
             self._database_name,
             self._auth_mode,
         ) = _parse_connection_string(connection_string)
+        warn_guard_only_once(
+            "Databricks",
+            self._database_name,
+            "Databricks SQL has no read-only session mode. Connect with a token "
+            "of a principal granted only USE CATALOG, USE SCHEMA and SELECT.",
+        )
         self._schema_filter: set[str] | None = (
             {schema.casefold() for schema in schemas if schema.strip()}
             if schemas

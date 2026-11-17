@@ -198,3 +198,141 @@ def test_columns_spell_out_the_scale_of_a_number(monkeypatch: MonkeyPatch) -> No
     assert (
         "'NUMBER(' || NUMERIC_PRECISION || ',' || NUMERIC_SCALE || ')'" in captured_sql
     )
+
+
+class _Cursor:
+    def __init__(self, log: list[str]) -> None:
+        self._log = log
+        self.description = None
+
+    def __enter__(self) -> "_Cursor":
+        return self
+
+    def __exit__(self, *_exc: object) -> None:
+        return None
+
+    def execute(self, sql: str, parameters: object = None) -> None:
+        self._log.append(sql)
+
+
+class _Connection:
+    def __init__(self, log: list[str]) -> None:
+        self._log = log
+
+    def __enter__(self) -> "_Connection":
+        return self
+
+    def __exit__(self, *_exc: object) -> None:
+        return None
+
+    def cursor(self) -> _Cursor:
+        return _Cursor(self._log)
+
+
+def _fake_connect(monkeypatch: MonkeyPatch) -> tuple[list[dict], list[str]]:
+    import snowflake.connector
+
+    logins: list[dict] = []
+    statements: list[str] = []
+
+    def connect(**kwargs: object) -> _Connection:
+        logins.append(dict(kwargs))
+        return _Connection(statements)
+
+    monkeypatch.setattr(snowflake.connector, "connect", connect)
+    return logins, statements
+
+
+def test_read_only_flag_is_off_without_an_agent_role() -> None:
+    database = SnowflakeDatabase(_connection_string())
+
+    assert database.supports_read_only_execution is False
+
+
+def test_read_only_flag_is_on_with_an_agent_role() -> None:
+    database = SnowflakeDatabase(_connection_string("agent_role=LEXIS_READER"))
+
+    assert database.supports_read_only_execution is True
+
+
+def test_agent_statement_logs_in_under_the_agent_role(
+    monkeypatch: MonkeyPatch,
+) -> None:
+    logins, statements = _fake_connect(monkeypatch)
+    database = SnowflakeDatabase(
+        _connection_string("agent_role=LEXIS_READER&role=INGEST_ROLE")
+    )
+
+    database.execute("SELECT 1", read_only=True)
+
+    assert logins[0]["role"] == "LEXIS_READER"
+    assert statements[0] == "USE SECONDARY ROLES NONE"
+    assert statements[-1] == "SELECT 1"
+
+
+def test_plain_statement_keeps_the_connection_role(monkeypatch: MonkeyPatch) -> None:
+    logins, statements = _fake_connect(monkeypatch)
+    database = SnowflakeDatabase(
+        _connection_string("agent_role=LEXIS_READER&role=INGEST_ROLE")
+    )
+
+    database.execute("SELECT 1")
+
+    assert logins[0]["role"] == "INGEST_ROLE"
+    assert "USE SECONDARY ROLES NONE" not in statements
+
+
+def test_read_only_without_agent_role_changes_nothing(
+    monkeypatch: MonkeyPatch,
+) -> None:
+    logins, statements = _fake_connect(monkeypatch)
+    database = SnowflakeDatabase(_connection_string())
+
+    database.execute("SELECT 1", read_only=True)
+
+    assert "role" not in logins[0]
+    assert "USE SECONDARY ROLES NONE" not in statements
+
+
+@pytest.mark.parametrize(
+    "bad",
+    ['X"; DROP ROLE r; --', "has space", "1LEADING", 'a"b', "a;b", "r%0Ab"],
+)
+def test_agent_role_must_be_a_plain_identifier(bad: str) -> None:
+    from urllib.parse import quote
+
+    with pytest.raises(ValueError, match="agent_role"):
+        SnowflakeDatabase(_connection_string(f"agent_role={quote(bad, safe='')}"))
+
+
+def test_no_agent_role_logs_a_warning_once(caplog: pytest.LogCaptureFixture) -> None:
+    from auto_ontology.connectors import base
+
+    base._GUARD_ONLY_WARNED.clear()
+    with caplog.at_level("WARNING"):
+        SnowflakeDatabase(_connection_string())
+        SnowflakeDatabase(_connection_string())
+
+    messages = [r.getMessage() for r in caplog.records if "NOT run" in r.getMessage()]
+    assert len(messages) == 1
+    assert "agent_role" in messages[0]
+
+
+def test_agent_role_is_built_from_the_structured_connection() -> None:
+    from auto_ontology.connectors.connection_string_factory import (
+        build_connection_string,
+    )
+
+    url = build_connection_string(
+        {
+            "type": "snowflake",
+            "account": "acct",
+            "warehouse": "wh",
+            "user": "u",
+            "password": "p",
+            "database": "db",
+            "agent_role": "LEXIS_READER",
+        }
+    )
+
+    assert SnowflakeDatabase(url).supports_read_only_execution is True

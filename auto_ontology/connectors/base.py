@@ -33,6 +33,7 @@ Example
 
 from __future__ import annotations
 
+import logging
 import time
 from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING, Optional
@@ -49,6 +50,32 @@ if TYPE_CHECKING:  # pragma: no cover - typing only
 # the engine has a lower limit of its own (a warehouse- or account-level
 # statement timeout). Generous, because connect time is inside the measurement.
 _OWN_CAP_FRACTION = 0.9
+
+logger = logging.getLogger(__name__)
+
+
+_GUARD_ONLY_WARNED: set[tuple[str, str]] = set()
+
+
+def warn_guard_only_once(engine: str, database: str, advice: str) -> None:
+    """Log, once per engine and database, that agent SQL is checked at parse time only.
+
+    For engines whose database cannot be told to refuse a write for one
+    statement: an operator reading the log must see that the parse-time guard is
+    the only layer between the model's SQL and the account's own privileges.
+    """
+    key = (engine, database)
+    if key in _GUARD_ONLY_WARNED:
+        return
+    _GUARD_ONLY_WARNED.add(key)
+    logger.warning(
+        "%s database %r: agent SQL is NOT run in a database-enforced read-only "
+        "mode, only the parse-time guard stands between a statement and the "
+        "account's privileges. %s",
+        engine,
+        database,
+        advice,
+    )
 
 
 class StatementTimeout(TimeoutError):
@@ -130,8 +157,10 @@ class SQLDatabase(ABC):
     #: :mod:`auto_ontology.retrieval.text_to_sql.sql_guard`. A connector that
     #: does not set this is called without it and relies on the guard (and on
     #: the grants of its database user) alone. Set it only where the engine
-    #: enforces it: Snowflake, Databricks, Kyuubi and HeavyDB have no
-    #: per-statement read-only mode this could switch on, so they do not.
+    #: enforces it. Databricks, Kyuubi and HeavyDB have no per-statement
+    #: read-only mode this could switch on, so they do not. Snowflake has none
+    #: either; it reports ``True`` only when an ``agent_role`` is configured, so
+    #: the statements run under a role the operator granted no write privilege.
     supports_read_only_execution: bool = False
 
     #: ``True`` when ``execute`` accepts ``max_rows=N`` and then stops reading

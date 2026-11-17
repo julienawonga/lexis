@@ -43,7 +43,8 @@ enforced by the database, so a write is refused even if it got past the parser.
 | DuckDB | `BEGIN TRANSACTION READ ONLY` on a private cursor |
 | ClickHouse | `readonly=1` on that request |
 | Trino | `START TRANSACTION READ ONLY` per statement, rolled back afterwards |
-| Snowflake, Databricks, Kyuubi, HeavyDB | none: they rely on the first protection |
+| Snowflake | none in the engine; privileges only. With the optional `agent_role` set, agent statements run under that role (see below) |
+| Databricks, Kyuubi, HeavyDB | none: they rely on the first protection and on the account's grants |
 
 Notes:
 
@@ -61,6 +62,31 @@ Notes:
   `memory` catalog. A statement that is refused aborts its transaction, so
   each statement gets its own. `SET SESSION` is not blocked by it (the first
   protection refuses it).
+
+### Engines with no read-only mode
+
+Snowflake, Databricks, Kyuubi and HeavyDB have no session, transaction or
+statement setting that makes the database refuse a write. This was checked in
+each vendor's documentation on 2026-11-17; nothing was run against any engine.
+
+| Engine | What the documentation offers | What Lexis does | What the operator must do |
+|---|---|---|---|
+| Snowflake | Privileges of a role. [`USE ROLE`](https://docs.snowflake.com/en/sql-reference/sql/use-role) sets the primary role for a session; no read-only session mode is documented. ("Restricted Session Scope" appears only in limited-access agent documentation and is not used.) | Optional `agent_role` (an unquoted identifier, validated, never put in SQL text): the per-statement connection logs in with `role=<agent_role>` and runs `USE SECONDARY ROLES NONE` first. `supports_read_only_execution` is true only when it is set. Without it, a WARNING is logged once per database. | Create a role granted `USAGE` on the warehouse and database and `SELECT` only, grant it to the connection user, and set `agent_role`. |
+| Databricks | [Unity Catalog privileges](https://docs.databricks.com/aws/en/data-governance/unity-catalog/access-control/privileges-reference): reading needs `SELECT` plus `USE CATALOG` and `USE SCHEMA`; `MODIFY` allows writes. No read-only session mode is documented. | Nothing to switch on. WARNING logged once per catalog. | Connect with a token of a principal that holds `SELECT` and the two `USE` privileges only. |
+| Kyuubi (Spark) | [Kyuubi AuthZ plugin](https://kyuubi.readthedocs.io/en/master/security/authorization/spark/overview.html) (Ranger) for access policies, and `kyuubi.session.conf.restrict.list` to stop users changing settings. No read-only session mode is documented. | Nothing to switch on. WARNING logged once per catalog. | Connect as a user whose authorization policy grants no write. |
+| HeavyDB | A server-wide `read-only` flag ([config reference](https://docs.nvidia.com/heavyai/installation-and-configuration/config-parameters/configuration-parameters-for-heavydb), "Enable read-only mode. Prevents changes to the dataset."), set at server start, not per session. Per-user privileges. | Nothing to switch on. WARNING logged once per database. | Connect as a user granted `SELECT` only, or run the server read-only if nothing else needs to write. |
+
+Verification: for Snowflake, CI uses a fake driver and checks the arguments of
+the login and the statements issued, not that Snowflake refuses a write or that
+the role really lacks write grants. For the other three there is nothing
+database-side to test. In all four cases the first protection, the parse-time
+guard, is the only layer Lexis itself provides unless the account is
+least-privilege. The guard also refuses the Spark functions `reflect`,
+`try_reflect` and `java_method` and the Snowflake `SYSTEM$` functions that abort
+sessions or queries. Not covered: SELECTs that read files or stages directly
+(Snowflake `SELECT ... FROM @stage`, Spark `csv.`/path``, Databricks
+`read_files(...)`). They write nothing, so a read-only mode would not stop them
+either; the account's grants decide what they can reach.
 
 ## 3. Results are capped
 

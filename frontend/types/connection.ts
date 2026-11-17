@@ -58,6 +58,8 @@ export type SnowflakeConnectionParams = {
 	private_key?: string;
 	/** Only required when `private_key` is encrypted. */
 	private_key_passphrase?: string;
+	/** Optional SELECT-only role that chat queries run under. */
+	agent_role?: string;
 	database: string;
 	/** Optional ingestion allowlist: only these schemas are ingested. Empty/absent = all. */
 	schemas?: string[];

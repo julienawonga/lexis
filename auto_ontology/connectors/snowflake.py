@@ -9,6 +9,7 @@ from __future__ import annotations
 import base64
 import binascii
 import logging
+import re
 import time
 from typing import Any, Optional
 from urllib.parse import parse_qs, unquote, urlparse
@@ -17,13 +18,23 @@ import pandas as pd
 import snowflake.connector
 from cryptography.hazmat.primitives import serialization
 
-from auto_ontology.connectors.base import SQLDatabase, StatementTimeout
+from auto_ontology.connectors.base import (
+    SQLDatabase,
+    StatementTimeout,
+    warn_guard_only_once,
+)
 
 logger = logging.getLogger(__name__)
 
 # 000630: "Statement reached its statement or warehouse timeout ... and was
 # canceled" -- the STATEMENT_TIMEOUT_IN_SECONDS cap firing.
 _STATEMENT_TIMEOUT_ERRNO = 630
+
+
+# An unquoted Snowflake identifier. ``agent_role`` is restricted to this form so
+# it can never carry quotes, spaces or a statement separator; the connector also
+# never interpolates it into SQL (see ``_agent_connect_kwargs``).
+_ROLE_NAME_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_$]{0,254}$")
 
 
 def _quoted_identifier(name: str) -> str:
@@ -165,6 +176,25 @@ def _parse_connection_string(
     return connect_kwargs, warehouse, database
 
 
+def _parse_agent_role(connection_string: str) -> str | None:
+    """Return the optional ``agent_role`` of a Snowflake URL, validated.
+
+    The role agent SQL runs under. It is an unquoted identifier or the
+    connection string is refused, so nothing but a role name can reach the
+    login request.
+    """
+    raw = parse_qs(urlparse(connection_string).query).get("agent_role", [None])[0]
+    if raw is None or not raw.strip():
+        return None
+    role = raw.strip()
+    if not _ROLE_NAME_RE.fullmatch(role):
+        raise ValueError(
+            "Snowflake agent_role must be a plain role name (letters, digits, "
+            "'_' and '$', not starting with a digit)"
+        )
+    return role
+
+
 class SnowflakeDatabase(SQLDatabase):
     """Concrete :class:`SQLDatabase` backed by ``snowflake-connector-python``.
 
@@ -176,6 +206,17 @@ class SnowflakeDatabase(SQLDatabase):
 
     supports_statement_timeout = True
 
+    @property
+    def supports_read_only_execution(self) -> bool:  # type: ignore[override]
+        """Whether agent SQL runs under a dedicated role.
+
+        Snowflake has no read-only session or transaction mode. The only
+        database-side enforcement is the grants of a role, so this is ``True``
+        only when ``agent_role`` is set. Whether that role really lacks write
+        privileges is the operator's responsibility; Lexis cannot check it.
+        """
+        return self._agent_role is not None
+
     def __init__(
         self,
         connection_string: str,
@@ -186,6 +227,14 @@ class SnowflakeDatabase(SQLDatabase):
             self._warehouse,
             self._database_name,
         ) = _parse_connection_string(connection_string)
+        self._agent_role = _parse_agent_role(connection_string)
+        if self._agent_role is None:
+            warn_guard_only_once(
+                "Snowflake",
+                self._database_name,
+                "Snowflake has no read-only session mode. Set agent_role to a "
+                "role granted SELECT only, or connect with a read-only user.",
+            )
         # Optional ingestion allowlist: an explicit structured-connection
         # selection takes precedence; otherwise a URL ``schema=`` parameter
         # scopes env-var connections such as CONNECTION_STRINGS. Without this
@@ -239,13 +288,23 @@ class SnowflakeDatabase(SQLDatabase):
         parameters: Optional[list] = None,
         *,
         timeout_s: float | None = None,
+        read_only: bool = False,
     ) -> pd.DataFrame:
         """Run *sql*; with *timeout_s*, Snowflake cancels it after that long.
 
         The cap is the ``STATEMENT_TIMEOUT_IN_SECONDS`` session parameter on the
         per-call connection, so it never outlives the statement.
+
+        With *read_only* and a configured ``agent_role``, the per-call
+        connection logs in under that role and drops secondary roles, so the
+        statement has only the role's privileges. Without an ``agent_role`` the
+        flag changes nothing: Snowflake offers no other mechanism.
         """
         connect_kwargs = self._connect_kwargs
+        use_agent_role = bool(read_only and self._agent_role)
+        if use_agent_role:
+            # A login parameter, not ``USE ROLE`` text: no SQL is built from it.
+            connect_kwargs = {**connect_kwargs, "role": self._agent_role}
         if timeout_s is not None:
             connect_kwargs = {
                 **connect_kwargs,
@@ -256,7 +315,7 @@ class SnowflakeDatabase(SQLDatabase):
             }
         started = time.monotonic()
         try:
-            return self._execute(connect_kwargs, sql, parameters)
+            return self._execute(connect_kwargs, sql, parameters, use_agent_role)
         except snowflake.connector.errors.Error as exc:
             # 630 also fires for a lower warehouse/account timeout; ``since``
             # tells the two apart by how long the statement actually ran.
@@ -269,9 +328,14 @@ class SnowflakeDatabase(SQLDatabase):
         connect_kwargs: dict[str, Any],
         sql: str,
         parameters: Optional[list],
+        drop_secondary_roles: bool = False,
     ) -> pd.DataFrame:
         with snowflake.connector.connect(**connect_kwargs) as conn:
             with conn.cursor() as cur:
+                if drop_secondary_roles:
+                    # The user's default secondary roles would otherwise add
+                    # their privileges to the agent role's.
+                    cur.execute("USE SECONDARY ROLES NONE")
                 cur.execute(f"USE WAREHOUSE {_quoted_identifier(self._warehouse)}")
                 if parameters:
                     cur.execute(sql, parameters)

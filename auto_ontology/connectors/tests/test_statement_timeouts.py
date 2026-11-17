@@ -69,13 +69,15 @@ def test_every_registered_connector_supports_a_timeout() -> None:
 def test_only_engines_that_can_refuse_a_write_advertise_read_only_execution() -> None:
     """Advertising it without enforcing it would be a false sense of safety.
 
-    Snowflake, Databricks, Kyuubi and HeavyDB have no per-statement read-only
-    mode; they rely on the parse-time guard and their grants.
+    Databricks, Kyuubi and HeavyDB have no per-statement read-only mode; they
+    rely on the parse-time guard and their grants. Snowflake advertises it per
+    instance, only when an ``agent_role`` is configured (a property, so it is
+    left out of this class-level check and tested in ``test_snowflake.py``).
     """
     advertised = {
         cls.__name__
         for cls in CONNECTOR_REGISTRY.values()
-        if getattr(cls, "supports_read_only_execution", False)
+        if getattr(cls, "supports_read_only_execution", False) is True
     }
     assert advertised == {
         "PostgresDatabase",

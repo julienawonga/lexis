@@ -78,6 +78,10 @@ def build_connection_string(connection: Mapping[str, Any]) -> str:
         user = _require(connection, "user")
         database = _require(connection, "database")
         params = f"warehouse={_enc(warehouse)}&database={_enc(database)}"
+        # Optional least-privilege role for agent SQL; the connector validates it.
+        agent_role = str(connection.get("agent_role") or "").strip()
+        if agent_role:
+            params += f"&agent_role={_enc(agent_role)}"
 
         # Snowflake accounts that enforce MFA reject passwords for PERSON users and
         # forbid them on SERVICE users, so a key pair is the only credential an

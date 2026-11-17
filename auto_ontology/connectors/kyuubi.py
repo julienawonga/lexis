@@ -58,7 +58,11 @@ from urllib.parse import parse_qs, unquote, urlparse
 
 import pandas as pd
 from auto_ontology.catalog.extract import IncompleteCatalogExtractionError
-from auto_ontology.connectors.base import SQLDatabase, StatementTimeout
+from auto_ontology.connectors.base import (
+    SQLDatabase,
+    StatementTimeout,
+    warn_guard_only_once,
+)
 
 from auto_ontology.connectors.db_errors import is_session_lost
 
@@ -321,6 +325,12 @@ class KyuubiDatabase(SQLDatabase):
     ) -> None:
         self._settings = _parse_connection_string(connection_string)
         self._catalog = str(self._settings["catalog"])
+        warn_guard_only_once(
+            "Kyuubi",
+            self._catalog,
+            "Neither Kyuubi nor Spark has a read-only session mode. Connect as a "
+            "user whose authorization policy (for example Ranger) grants no write.",
+        )
 
         # Compared case-insensitively: Spark lower-cases unquoted identifiers.
         self._schema_filter: set[str] | None = (
