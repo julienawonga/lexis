@@ -45,6 +45,7 @@ from auto_ontology.server.semantic_compilation.router import (  # noqa: E402
     router as semantic_compilation_router,
 )
 from auto_ontology.server.sql_attributes.router import router as sql_attributes_router  # noqa: E402
+from auto_ontology.server.audit import router as audit_router  # noqa: E402
 from auto_ontology.server.users.router import router as users_router  # noqa: E402
 from auto_ontology.server.zones.router import router as zones_router  # noqa: E402
 from auto_ontology.server.tags.router import router as tags_router  # noqa: E402
@@ -117,6 +118,7 @@ def create_app() -> FastAPI:
         semantic_compilation_router, prefix="/api", tags=["semantic-compilation"]
     )
     app.include_router(zones_router, prefix="/api", tags=["zones"])
+    app.include_router(audit_router, prefix="/api", tags=["audit"])
     app.include_router(users_router, prefix="/api", tags=["users"])
     app.include_router(tags_router, prefix="/api", tags=["tags"])
     app.include_router(rules_router, prefix="/api", tags=["rules"])

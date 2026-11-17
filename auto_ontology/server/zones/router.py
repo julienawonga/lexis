@@ -6,10 +6,13 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter, HTTPException, Query
+from typing import Any
+
+from fastapi import APIRouter, HTTPException, Query, Request
 from pydantic import BaseModel
 
 from auto_ontology.dal import zones as dal
+from auto_ontology.server.audit import audit
 from auto_ontology.server.users import postgres_dal
 from auto_ontology.server.responses import IdResponse, ZoneListResponse, ZoneResponse
 
@@ -63,7 +66,7 @@ def get_zone(
 
 
 @router.post("/zones", status_code=201, response_model=ZoneResponse)
-def create_zone(body: ZoneCreate) -> dict:
+def create_zone(request: Request, body: ZoneCreate) -> dict:
     """Create a zone and attach catalog items.  Requires admin role."""
     _require_admin(body.created_by)
     normalized_name = body.name.strip()
@@ -78,11 +81,19 @@ def create_zone(body: ZoneCreate) -> dict:
         )
     except ValueError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
+    audit(
+        request,
+        "zone.create",
+        target_kind="zone",
+        target_id=row["id"],
+        target_name=row.get("name"),
+        details={"item_count": len(body.items or [])},
+    )
     return {"data": row}
 
 
 @router.patch("/zones/{zone_id}", response_model=ZoneResponse)
-def update_zone(zone_id: str, body: ZoneUpdate) -> dict:
+def update_zone(request: Request, zone_id: str, body: ZoneUpdate) -> dict:
     """Update zone fields and optionally replace catalog data items."""
     field_updates: dict[str, str | None] = {}
     provided_fields = body.model_fields_set
@@ -111,19 +122,32 @@ def update_zone(zone_id: str, body: ZoneUpdate) -> dict:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
     if row is None:
         raise HTTPException(status_code=404, detail=f"Zone {zone_id!r} not found")
+    details: dict[str, Any] = {"fields": sorted(field_updates)}
+    if "items" in provided_fields:
+        details["item_count"] = len(body.items or [])
+    audit(
+        request,
+        "zone.update",
+        target_kind="zone",
+        target_id=zone_id,
+        target_name=row.get("name"),
+        details=details,
+    )
     return {"data": row}
 
 
 @router.delete("/zones/{zone_id}", response_model=IdResponse)
-def delete_zone(zone_id: str) -> dict:
+def delete_zone(request: Request, zone_id: str) -> dict:
     """Delete one zone by id."""
     if not dal.delete_zone(zone_id):
         raise HTTPException(status_code=404, detail=f"Zone {zone_id!r} not found")
+    audit(request, "zone.delete", target_kind="zone", target_id=zone_id)
     return {"data": {"id": zone_id}}
 
 
 @router.patch("/zones/{zone_id}/status", response_model=ZoneResponse)
 def set_zone_status(
+    request: Request,
     zone_id: str,
     body: ZoneStatusUpdate,
     admin_uid: str = Query(..., description="Admin user id performing the request"),
@@ -138,4 +162,12 @@ def set_zone_status(
     row = dal.set_zone_enabled(zone_id, body.enabled)
     if row is None:
         raise HTTPException(status_code=404, detail=f"Zone {zone_id!r} not found")
+    audit(
+        request,
+        "zone.set_status",
+        target_kind="zone",
+        target_id=zone_id,
+        target_name=row.get("name"),
+        details={"enabled": body.enabled},
+    )
     return {"data": row}

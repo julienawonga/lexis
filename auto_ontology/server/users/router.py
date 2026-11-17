@@ -19,6 +19,7 @@ from pydantic import BaseModel
 
 from auto_ontology.dal import groups as dal
 from auto_ontology.dal.schema import GROUP_ROLE_ADMIN, GROUP_ROLE_VIEWER, GroupRole
+from auto_ontology.server.audit import audit
 from auto_ontology.server.identity import resolve_internal_user
 from auto_ontology.server.responses import (
     GroupListResponse,
@@ -235,6 +236,14 @@ def create_group(request: Request, body: GroupCreate) -> dict:
         )
     except (dal.GroupNameTaken, dal.UnknownGroupMembers, ValueError) as exc:
         raise _translate(exc) from exc
+    audit(
+        request,
+        "group.create",
+        target_kind="group",
+        target_id=group["id"],
+        target_name=group["name"],
+        details={"role": group["role"], "member_count": len(group["users"])},
+    )
     return {"data": _present(group)}
 
 
@@ -280,6 +289,17 @@ def update_group(request: Request, group_id: str, body: GroupUpdate) -> dict:
         raise _translate(exc) from exc
     if group is None:
         raise HTTPException(status_code=404, detail=f"Group {group_id!r} not found")
+    audit(
+        request,
+        "group.update",
+        target_kind="group",
+        target_id=group_id,
+        target_name=group["name"],
+        details={
+            "fields": sorted(updates) + (["user_ids"] if user_ids is not None else []),
+            "member_count": len(group["users"]),
+        },
+    )
     return {"data": _present(group)}
 
 
@@ -294,4 +314,5 @@ def delete_group(request: Request, group_id: str) -> dict:
     _require_admin(request)
     if not dal.delete_group(group_id):
         raise HTTPException(status_code=404, detail=f"Group {group_id!r} not found")
+    audit(request, "group.delete", target_kind="group", target_id=group_id)
     return {"data": {"id": group_id}}

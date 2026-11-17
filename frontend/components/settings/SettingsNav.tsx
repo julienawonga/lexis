@@ -31,6 +31,7 @@ const AGENT_SETTINGS_NAV_ITEM: NavItem = {
 	label: 'Agent Settings',
 	href: '/settings/agent-settings',
 };
+const AUDIT_LOG_NAV_ITEM: NavItem = { label: 'Audit Log', href: '/settings/audit-log' };
 const IMPORT_EXPORT_NAV_ITEM: NavItem = {
 	label: 'Import / Export',
 	href: '/settings/import-export',
@@ -71,6 +72,7 @@ export const SettingsNav = ({ connectionsEnvManaged }: SettingsNavProps) => {
 		SSO_NAV_ITEM,
 		SEMANTIC_COMPILATION_NAV_ITEM,
 		AGENT_SETTINGS_NAV_ITEM,
+		AUDIT_LOG_NAV_ITEM,
 		IMPORT_EXPORT_NAV_ITEM,
 	);
 

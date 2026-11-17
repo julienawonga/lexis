@@ -16,7 +16,8 @@ import logging
 from dataclasses import asdict
 from typing import Any
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, Request
+from starlette.concurrency import run_in_threadpool
 
 from auto_ontology.connectors.registry import get_connectors
 from auto_ontology.dal.datasources import fetch_databases
@@ -25,6 +26,7 @@ from auto_ontology.ingestion_service.history import (
     get_last_failure_if_most_recent,
     get_last_successful_run,
 )
+from auto_ontology.server.audit import audit
 from auto_ontology.server.ingestion.proxy import (
     is_semantic_compilation_running,
     trigger_semantic_compile,
@@ -60,18 +62,23 @@ async def trigger() -> dict[str, str]:
 @router.post(
     "/semantic-compilation/reset", status_code=202, response_model=StatusResponse
 )
-async def reset() -> dict[str, str]:
+async def reset(request: Request) -> dict[str, str]:
     """Ask the ingestion service to rebuild every database's semantic layer.
 
     The service deletes the semantic nodes and embeddings and compiles them
     again, so the layer is rebuilt without waiting for the next scheduled run.
     """
     trigger_semantic_reset()
+    # ``audit`` writes to Postgres synchronously: keep it off the event loop.
+    await run_in_threadpool(
+        audit, request, "semantic_compilation.reset", target_kind="semantic_compilation"
+    )
     return {"status": "accepted"}
 
 
 @router.post("/semantic-compilation/reindex", response_model=SemanticReindexResponse)
 def reindex(
+    request: Request,
     database_name: str = Query(
         description="Name of the catalog database whose semantic index to rebuild."
     ),
@@ -107,6 +114,14 @@ def reindex(
             status_code=503, detail="Embedding is not configured (no API key)"
         )
     result = embed_all_semantic_nodes(embedder)
+    audit(
+        request,
+        "semantic_compilation.reindex",
+        target_kind="database",
+        target_id=database_name,
+        target_name=database_name,
+        details={"database": database_name},
+    )
     return {"database_name": database_name, **asdict(result)}
 
 

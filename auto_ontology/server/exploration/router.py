@@ -13,6 +13,7 @@ from fastapi import APIRouter, HTTPException, Path, Query, Request
 from pydantic import BaseModel, Field
 
 from auto_ontology.dal.owners import CATALOG_EDIT
+from auto_ontology.server.audit import audit
 from auto_ontology.server.owners import enforce_permission
 from auto_ontology.server.exploration import service
 from auto_ontology.server.pagination import LIMIT_QUERY, SKIP_QUERY
@@ -71,6 +72,13 @@ def generate_semantic_domains(request: Request, database_id: str = Query(...)) -
         request.headers.get("x-auto-ontology-user-id", "anonymous"),
         len(result["domains"]),
     )
+    audit(
+        request,
+        "semantic_domain.generate",
+        target_kind="database",
+        target_id=database_id,
+        details={"database": database_id, "domains": len(result["domains"])},
+    )
     return {"data": result}
 
 
@@ -96,6 +104,12 @@ def rename_semantic_domain(
         request.headers.get("x-auto-ontology-user-id", "anonymous"),
         body.name.strip(),
     )
+    audit(
+        request,
+        "semantic_domain.rename",
+        target_kind="semantic_domain",
+        target_id=domain_id,
+    )
     return {"data": result}
 
 
@@ -119,6 +133,13 @@ def move_semantic_domain_terms(
         domain_id,
         request.headers.get("x-auto-ontology-user-id", "anonymous"),
         len(body.term_ids),
+    )
+    audit(
+        request,
+        "semantic_domain.move_terms",
+        target_kind="semantic_domain",
+        target_id=domain_id,
+        details={"terms": len(body.term_ids)},
     )
     return {"data": result}
 

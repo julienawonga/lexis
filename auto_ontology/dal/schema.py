@@ -1632,6 +1632,48 @@ join_path_edge = Table(
     Column("dst_id", Text, nullable=False),
 )
 
+# ---------------------------------------------------------------------------
+# AUDIT LOG
+# ---------------------------------------------------------------------------
+
+AUDIT_ACTOR_KINDS = ("user", "api_token", "system")
+
+# One row per administrative or governance action, appended by
+# ``dal/audit.py``. Append-only by convention, like ``knowledge_event``: no
+# function updates or deletes a row, and nothing prunes the table yet.
+#
+# * ``seq`` orders the log and is the pagination cursor (``at`` ties within a
+#   transaction). ``id`` is the stable public identifier.
+# * ``actor_id`` and ``actor_email`` are copied at the time of the action and are
+#   NOT foreign keys: accounts live in a schema Alembic does not manage, and the
+#   trail must outlive the account it names.
+# * ``target_id`` / ``target_name`` likewise name a row that may be deleted
+#   later. The client IP is deliberately not stored.
+# * ``details`` is a small allowlisted object per action (see ``dal/audit.py``).
+#   It never holds a secret or a question's text.
+audit_event = Table(
+    "audit_event",
+    METADATA,
+    Column("seq", BigInteger, Identity(always=True), nullable=False, unique=True),
+    _id(),
+    Column("at", DateTime(timezone=True), nullable=False),
+    Column("actor_id", Text, nullable=True),
+    Column("actor_email", Text, nullable=True),
+    Column("actor_kind", Text, nullable=False),
+    Column("action", Text, nullable=False),
+    Column("target_kind", Text, nullable=True),
+    Column("target_id", Text, nullable=True),
+    Column("target_name", Text, nullable=True),
+    Column("request_id", Text, nullable=True),
+    Column("details", JSONB, nullable=False, server_default=text("'{}'::jsonb")),
+    CheckConstraint(
+        f"actor_kind IN ({_sql_list(AUDIT_ACTOR_KINDS)})", name="actor_kind_value"
+    ),
+)
+Index("ix_audit_event_at", audit_event.c.at)
+Index("ix_audit_event_actor_seq", audit_event.c.actor_id, audit_event.c.seq)
+
+
 __all__ = [
     "METADATA",
     "TRIGRAM_SEARCH_TABLES",
@@ -1647,6 +1689,8 @@ __all__ = [
     "KNOWLEDGE_KINDS",
     "KNOWLEDGE_SCOPES",
     "KNOWLEDGE_STATUSES",
+    "AUDIT_ACTOR_KINDS",
+    "audit_event",
     "knowledge_event",
     "knowledge_item",
     "catalog_column",

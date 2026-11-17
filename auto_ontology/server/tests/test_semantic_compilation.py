@@ -8,11 +8,14 @@ from typing import Any
 
 import pytest
 from fastapi import HTTPException
+from starlette.requests import Request
 
 from auto_ontology.semantic.embed import SemanticIndexRebuild
 from auto_ontology.semantic.index_health import SemanticIndexHealth
 from auto_ontology.semantic.value_index import ValueIndexRebuild
 from auto_ontology.server.semantic_compilation import router
+
+_REQUEST = Request({"type": "http", "headers": []})
 
 
 @pytest.fixture
@@ -29,6 +32,7 @@ def rebuild(monkeypatch: pytest.MonkeyPatch) -> list[tuple[str, bool]]:
 
     monkeypatch.setattr(router, "fetch_databases", lambda: [{"name": "pagila"}])
     monkeypatch.setattr(router, "is_semantic_compilation_running", lambda: False)
+    monkeypatch.setattr(router, "audit", lambda *args, **kwargs: None)
     monkeypatch.setattr(router, "build_semantic_embedder", _build)
     monkeypatch.setattr(
         router,
@@ -41,7 +45,7 @@ def rebuild(monkeypatch: pytest.MonkeyPatch) -> list[tuple[str, bool]]:
 def test_reindex_reports_written_against_expected(
     rebuild: list[tuple[str, bool]],
 ) -> None:
-    assert router.reindex("pagila") == {
+    assert router.reindex(_REQUEST, "pagila") == {
         "database_name": "pagila",
         "expected": 80,
         "written": 78,
@@ -51,7 +55,7 @@ def test_reindex_reports_written_against_expected(
 def test_reindex_never_resets_the_index(rebuild: list[tuple[str, bool]]) -> None:
     """``reset=True`` deletes every row of the database first -- including the
     SqlAttributes and analyses this route does not rebuild."""
-    router.reindex("pagila")
+    router.reindex(_REQUEST, "pagila")
 
     assert rebuild == [("pagila", False)]
 
@@ -60,7 +64,7 @@ def test_reindex_of_an_unknown_database_is_a_404(
     rebuild: list[tuple[str, bool]],
 ) -> None:
     with pytest.raises(HTTPException) as raised:
-        router.reindex("nope")
+        router.reindex(_REQUEST, "nope")
 
     assert raised.value.status_code == 404
     assert rebuild == []
@@ -72,7 +76,7 @@ def test_reindex_is_refused_while_compilation_is_running(
     monkeypatch.setattr(router, "is_semantic_compilation_running", lambda: True)
 
     with pytest.raises(HTTPException) as raised:
-        router.reindex("pagila")
+        router.reindex(_REQUEST, "pagila")
 
     assert raised.value.status_code == 409
     assert rebuild == []
@@ -84,7 +88,7 @@ def test_reindex_without_an_embedding_endpoint_is_a_503(
     monkeypatch.setattr(router, "build_semantic_embedder", lambda _db, *, reset: None)
 
     with pytest.raises(HTTPException) as raised:
-        router.reindex("pagila")
+        router.reindex(_REQUEST, "pagila")
 
     assert raised.value.status_code == 503
 
