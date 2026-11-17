@@ -61,7 +61,6 @@ nav:
       - Safety of agent-issued SQL: query-safety.md
       - Evaluating the text-to-SQL engine: evaluation.md
       - Experiments log: experiments.md
-      - Preregistered gate (answerability check): preregistered/answerability-gate.md
   - API reference: api/
   - Project:
       - Verification status: verification-status.md

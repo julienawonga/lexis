@@ -1,80 +1,33 @@
 <!--
 SPDX-FileCopyrightText: Copyright (c) 2026, NVIDIA CORPORATION & AFFILIATES.
-All rights reserved.
+SPDX-FileCopyrightText: Copyright (c) 2026, Julien Awonga.
 SPDX-License-Identifier: Apache-2.0
 -->
 
-# AGENTS.md — Lexis agent entry point
+# AGENTS.md: Lexis agent entry point
 
-Skills that teach an agent how to **set up** the current Lexis implementation and
-**use** its ontology layer. They live in **`skills/`** (repo root), one directory
-per skill, under the `ontology-*` namespace.
+Skills that teach an agent to **set up** Lexis and **use** its ontology layer, in `skills/` (one directory per skill, `ontology-*`). This file is for developers bringing Lexis up and partners embedding it in an agent harness. Maintainer conventions (build, test, schema, frontend) are in [`CLAUDE.md`](./CLAUDE.md): do not fold them into the skills.
 
-This file is for developers bringing Lexis up and partners embedding it in an
-agent harness. Lexis **maintainers** (build, test, schema, frontend conventions)
-stay on [`CLAUDE.md`](./CLAUDE.md). Do not fold those conventions into these
-skills.
+## Which skill
 
-## Which skill to read
+- [`skills/ontology-setup/`](./skills/ontology-setup/): Helm (the official install), Compose, developer mode, MCP against a running instance, troubleshooting. Start here when Lexis is not up yet.
+- [`skills/ontology-management/`](./skills/ontology-management/): inspect, model, modify and publish glossary terms, SQL attributes, relationships and model YAML. MCP cannot write; this skill covers the approved write paths.
+- [`skills/ontology-query/`](./skills/ontology-query/): call Lexis (MCP first, REST fallback), discover meaning, validate SQL, rows and answers. Start here when Lexis is deployed.
 
-- [`skills/ontology-setup/`](./skills/ontology-setup/) — Helm (the official
-  install), local Compose, developer `--dev` / `--ds`, MCP against an
-  already-running instance, and troubleshooting. Start here when Lexis is not up yet or something failed
-  during bring-up.
-- [`skills/ontology-management/`](./skills/ontology-management/) — inspect, model,
-  **modify**, and safely publish through glossary terms, SQL attributes,
-  semantic relationships, model YAML import/export, and governed result
-  definitions. MCP cannot write; this skill covers the approved write paths.
-- [`skills/ontology-query/`](./skills/ontology-query/) — how an
-  agent calls Lexis (MCP first, REST fallback), discovers meaning through the
-  semantic layer, and validates SQL, rows, and answers. Start here when Lexis is
-  already deployed.
-
-## Workflow ownership and handoffs
-
-| User action | Owning skill |
-| --- | --- |
-| Install, configure, connect, ingest, compile, prove readiness | `ontology-setup` |
-| Inspect meaning and semantic relationships | `ontology-management` |
-| Design concepts, mappings, relationships, measures, units, grain, and policies | `ontology-management` → `references/modeling.md` |
-| Apply, verify, certify honestly, publish, and roll back | `ontology-management` → `references/publication.md` |
-| Ask descriptive or diagnostic questions and validate SQL, rows, and prose | `ontology-query` → `references/query-validation.md` |
-
-The composed lifecycle is install/connect/readiness → inspect/model → staged
-apply/readback → query validation → governed publication → fresh query readback.
-A step that lacks product support must return an explicit gap or receipt rather
-than inventing an operation. Authentication, permissions, provenance, and error
-handling remain shared concerns rather than separate overlapping skills.
+The lifecycle is install and readiness, then inspect and model, then staged apply, query validation, governed publication and a fresh readback. A step the product does not support must return an explicit gap, never an invented operation.
 
 ## Sources of truth (do not duplicate)
 
-Skills encode **workflow, order, and pitfalls**. They must not become a second
-API catalog or a second installer.
+Skills encode workflow, order and pitfalls. They are not a second API catalog or installer.
 
-| Job | Owner | Skills do |
-| --- | --- | --- |
-| Install commands | `DEPLOYMENT.md` (Helm, official), `docker-compose.yml`; `dev_tools/setup_env.sh` for developer workflows | Invoke them; do not write a new installer |
-| Live read tools | `mcp/auto_ontology_mcp/tools.py` (handshake tool list) | Prefer MCP; sequence reads; never copy the tool table |
-| REST shapes and permissions | `docs/openapi/auto-ontology-api.json` | Name the operation and permission; link; do not paste schemas |
+| Job | Owner |
+|---|---|
+| Install | `DEPLOYMENT.md` (Helm), `docker-compose.yml`, `dev_tools/setup_env.sh` |
+| Live read tools | `mcp/auto_ontology_mcp/tools.py` (the handshake list wins over any skill text) |
+| REST shapes and permissions | `docs/openapi/auto-ontology-api.json` |
 
-MCP is read-only by design. Writes go through the Next.js `/api/...` surface.
-The live MCP tool list at handshake is the source of truth if it disagrees
-with anything in a skill.
+MCP is read-only by design; writes go through the web app's `/api/...`.
 
 ## Skill files
 
-Each skill directory holds:
-
-- `SKILL.md` — the skill itself, with its `name:` frontmatter matching the
-  directory name
-- `skill-card.md` — a short description of what the skill does and its limits
-- `evals/evals.json` — prompts and expected behavior used to check the skill
-- `references/` and `assets/` — longer material that `SKILL.md` links to
-- `BENCHMARK.md` — an evaluation report inherited from the upstream project. It
-  is not regenerated here, so treat its numbers as historical.
-
-Change the skill name in all of these together if you ever rename a skill.
-
-Skills must stay free of staging hostnames, cluster names, Vault paths, and
-credentials — they are public even when an Lexis deployment is
-access-restricted.
+Each skill has `SKILL.md` (its `name:` matches the directory), `skill-card.md`, `evals/evals.json`, and `references/` or `assets/`. `BENCHMARK.md` is inherited from the upstream project and not regenerated: treat its numbers as historical. Rename a skill in all of these together. Skills are public: no staging hostnames, cluster names, Vault paths or credentials.
