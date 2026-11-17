@@ -25,6 +25,7 @@ NODE_LABELS: dict[str, str] = {
     "retrieve_candidates": "Retrieving candidates",
     "information_agent": "Answering from metadata",
     "prepare_candidates": "Preparing candidates",
+    "check_answerability": "Checking the data can answer it",
     "refine_evidence": "Refining evidence",
     "precheck_combined": "Checking joins and filter values",
     "construct_sql_from_candidates": "Constructing SQL",

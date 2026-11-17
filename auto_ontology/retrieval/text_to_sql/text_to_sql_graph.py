@@ -16,6 +16,12 @@ from auto_ontology.retrieval.text_to_sql.state import (
 from auto_ontology.retrieval.text_to_sql.agents.candidates_preparation import (
     CandidatePreparationAgent,
 )
+from auto_ontology.infra.feature_flags import is_answerability_check_enabled
+from auto_ontology.retrieval.text_to_sql.agents.answerability_check import (
+    AnswerabilityCheckAgent,
+)
+from auto_ontology.retrieval.text_to_sql.answerability import REFUSE
+from auto_ontology.retrieval.text_to_sql.clarification import USER_DEFINITION_PREFIX
 from auto_ontology.retrieval.text_to_sql.agents.candidates_retrieval import (
     CandidateRetrievalAgent,
 )
@@ -274,6 +280,54 @@ def route_after_candidate_retrieval(state: AgentState) -> str:
     return "prepare_candidates"
 
 
+def _turn_defined_by_user(state: AgentState) -> bool:
+    """Whether this turn answers a clarification the user chose an option for.
+
+    The chat server re-runs the question with the chosen definition as an
+    evidence line (``USER_DEFINITION_PREFIX``). The user has just told the system
+    what the term means, and the run already got past the one question the
+    system chose to ask, so the check does not second-guess it.
+    """
+    return any(
+        line.lstrip().startswith(USER_DEFINITION_PREFIX)
+        for line in (state.get("evidence") or "").splitlines()
+    )
+
+
+def _gate_answerability(route_fn: Callable[[AgentState], str]):
+    """Wrap the router after ``prepare_candidates`` with the answerability gate.
+
+    With the ``answerability_check_enabled`` flag off (the default) this returns
+    exactly what *route_fn* returns, so the graph runs the same nodes with no
+    extra model call. With it on, the question goes through ``check_answerability``
+    first, except:
+
+    * prediction questions, which have no SQL to refuse (the route is kept);
+    * turns that answer a clarification the user chose an option for.
+
+    Information questions never get here (they are answered from metadata
+    before ``prepare_candidates``), so only calculation questions are checked.
+    The flag is read per request, like ``clarification_enabled``.
+    """
+
+    def _route(state: AgentState) -> str:
+        route = route_fn(state)
+        if route == "prediction" or _turn_defined_by_user(state):
+            return route
+        if not is_answerability_check_enabled():
+            return route
+        return "check_answerability"
+
+    return _route
+
+
+def route_after_answerability(state: AgentState) -> str:
+    """End on a refusal; otherwise carry on exactly as without the check."""
+    if state.get("decision") == REFUSE:
+        return "refuse"
+    return route_evidence_refinement(state)
+
+
 def _make_node(name, fn):
     """
     Create a node with logging wrapper.
@@ -352,6 +406,7 @@ def create_graph():
     retrieval_agent = CandidateRetrievalAgent()
     information_agent = InformationAgent()
     candidate_preparation_agent = CandidatePreparationAgent()
+    answerability_check_agent = AnswerabilityCheckAgent()
     evidence_refinement_agent = EvidenceRefinementAgent()
     sql_from_candidates_agent = SQLFromCandidatesAgent()
     sql_reconstruction_agent = SQLReconstructionAgent()
@@ -378,6 +433,9 @@ def create_graph():
     information_node = _make_node("information_agent", agent_wrapper(information_agent))
     prepare_candidates_node = _make_node(
         "prepare_candidates", agent_wrapper(candidate_preparation_agent)
+    )
+    check_answerability_node = _make_node(
+        "check_answerability", agent_wrapper(answerability_check_agent)
     )
     refine_evidence_node = _make_node(
         "refine_evidence", agent_wrapper(evidence_refinement_agent)
@@ -460,6 +518,7 @@ def create_graph():
     graph.add_node("retrieve_candidates", retrieve_candidates_node)
     graph.add_node("information_agent", information_node)
     graph.add_node("prepare_candidates", prepare_candidates_node)
+    graph.add_node("check_answerability", check_answerability_node)
     graph.add_node("refine_evidence", refine_evidence_node)
     graph.add_node("check_value_repair", value_repair_node)
     if combined_precheck_node is not None:
@@ -506,9 +565,10 @@ def create_graph():
 
         graph.add_conditional_edges(
             "prepare_candidates",
-            route_question_type_or_evidence,
+            _gate_answerability(route_question_type_or_evidence),
             {
                 "prediction": "prepare_prediction_graph",
+                "check_answerability": "check_answerability",
                 "refine_evidence": "refine_evidence",
                 "construct_sql_from_candidates": "construct_sql_from_candidates",
             },
@@ -525,12 +585,26 @@ def create_graph():
     else:
         graph.add_conditional_edges(
             "prepare_candidates",
-            route_evidence_refinement,
+            _gate_answerability(route_evidence_refinement),
             {
+                "check_answerability": "check_answerability",
                 "refine_evidence": "refine_evidence",
                 "construct_sql_from_candidates": "construct_sql_from_candidates",
             },
         )
+
+    # The check ends the run on a refusal (no SQL is generated or run) and
+    # otherwise hands over to the same step that would have followed
+    # ``prepare_candidates`` without it.
+    graph.add_conditional_edges(
+        "check_answerability",
+        route_after_answerability,
+        {
+            "refuse": END,
+            "refine_evidence": "refine_evidence",
+            "construct_sql_from_candidates": "construct_sql_from_candidates",
+        },
+    )
 
     graph.add_edge("refine_evidence", "construct_sql_from_candidates")
     graph.add_conditional_edges(
@@ -632,6 +706,7 @@ __all__ = [
     "AgentState",
     "create_graph",
     "get_question_for_processing",
+    "route_after_answerability",
     "route_after_candidate_retrieval",
     "route_sql_execution",
 ]

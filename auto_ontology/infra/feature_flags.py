@@ -39,6 +39,14 @@ PII_DETECTION_ENABLED_KEY = "pii_detection_enabled"
 # there is no settings control yet, so it is switched on by writing the row.
 CLARIFICATION_ENABLED_KEY = "clarification_enabled"
 
+# Lets the text-to-SQL graph check, before any SQL is written, that every thing
+# a question asks for is held by the offered schema or the business definitions,
+# and refuse instead of answering a different question (see
+# ``retrieval/text_to_sql/answerability.py`` and ``docs/answerability.md``).
+# Opt-in and OFF until the owner enables it after the evaluation gate: it adds a
+# model call and changes what the model sees. Switched on by writing the row.
+ANSWERABILITY_CHECK_ENABLED_KEY = "answerability_check_enabled"
+
 # Lets semantic compilation mine past SQL queries (including the chat's own) and
 # write the SqlAttributes an LLM picks from them straight into the shared
 # ontology, with no human review. Opt-in: off by default because those writes
@@ -166,6 +174,16 @@ def is_clarification_enabled() -> bool:
     chat answers exactly as it did before the feature existed.
     """
     return read_configuration_flag(CLARIFICATION_ENABLED_KEY, default=False)
+
+
+def is_answerability_check_enabled() -> bool:
+    """Whether the chat may refuse a question the offered schema cannot answer.
+
+    Opt-in, read per request: a missing row or any DB error means off, in which
+    case the graph is exactly the one that ran before the check existed (no
+    extra model call, no extra node).
+    """
+    return read_configuration_flag(ANSWERABILITY_CHECK_ENABLED_KEY, default=False)
 
 
 def is_sql_attribute_suggestion_enabled() -> bool:

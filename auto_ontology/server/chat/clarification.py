@@ -23,6 +23,7 @@ from uuid import UUID
 from pydantic import BaseModel, model_validator
 
 from auto_ontology.retrieval.text_to_sql.clarification import (
+    USER_DEFINITION_PREFIX,
     Clarification,
     ClarificationOption,
 )
@@ -134,4 +135,4 @@ def definition_evidence(pending: Clarification, answer: str) -> str:
     Evidence is the pipeline's existing channel for facts the user states, so
     the answer reaches retrieval and SQL generation without touching either.
     """
-    return f'The user defined "{pending.term}" as: {answer}'
+    return f'{USER_DEFINITION_PREFIX}{pending.term}" as: {answer}'

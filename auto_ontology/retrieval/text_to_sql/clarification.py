@@ -43,6 +43,11 @@ from auto_ontology.utils.llm_invoke import invoke_with_structured_output
 
 logger = logging.getLogger(__name__)
 
+# Start of the evidence line the server writes for a user's clarification answer.
+# The answerability check reads it to leave that turn alone, so the writer
+# (``server/chat/clarification.definition_evidence``) and the reader share it.
+USER_DEFINITION_PREFIX = 'The user defined "'
+
 MIN_OPTIONS = 2
 MAX_OPTIONS = 4
 MAX_TERM_CHARS = 80
