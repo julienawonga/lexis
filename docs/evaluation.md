@@ -309,6 +309,59 @@ a person, some `undefined-term` questions (a business word with a plausible
 proxy) are arguable by nature, and the `controls` list is not covered by the
 frozen hash (the `cases` are).
 
+### The second-generation answerability sets
+
+A first version of the answerability check ("refuse when something the question
+asks for is absent from the schema") refused every unanswerable question it was
+given, but also refused two kinds of **answerable** question: a measure that has
+to be computed through joins and aggregation instead of read from one column
+(revenue per item built from payment rows), and a table reached through two or
+three joins from the obvious one (a count by country behind customer, address
+and city). The existing sets have been seen by that version, so they cannot judge
+a second one. Two new frozen files do:
+
+- `dev_tools/evals/cases/unanswerable_rentals.json` (dataset
+  `unanswerable_rentals`): 24 refusal cases on Rentals, four per kind
+  (`missing-entity`, `missing-attribute`, `missing-time-or-version`,
+  `undefined-term`, `out-of-scope`, `false-premise`), same format as
+  `unanswerable.json`, five of them in French. Each is tempting: a nearby column
+  (the deposit, the gap between subtotal and total, a current-value column with no
+  history, the legacy log) is there for a careless model to substitute.
+- `dev_tools/evals/cases/answerable_heldout.json` (dataset `heldout`, ids
+  `heldout.<database>.<name>`): 36 answerable cases, 12 on each of Chinook, Pagila
+  and Rentals, tagged `computed` (6 per database: revenue or an average per group,
+  a ratio of two counts, a share, a running total), `far-table` (4: a count or list
+  grouped by something two to three joins away) and `plain` (2 controls). They are
+  the controls for the refusal sets: a refusal here is a false refusal. Where the
+  meaning is ambiguous both answers are accepted (a share over billing country or
+  customer country, an average over all customers or only those who rented).
+
+Both were **written blind**: without reading the check, its code, documentation,
+reports or logs, and before any engine run, so nothing was fitted to the check's
+behaviour. The Rentals cases were also chosen so that the gold answer does not
+change when soft-deleted rows are removed (a test runs every Rentals gold on a
+copy with them deleted and requires the same rows), so a result on these sets does
+not mix in the effect of soft-delete handling.
+
+The expected answers were written by the same author as the data and were **not
+independently reviewed**. Chinook and Rentals expected rows come from the SQLite
+builds, Pagila's from a throwaway PostgreSQL. The file mixes databases, so
+`snapshot` takes one `--dsn` per database:
+
+```bash
+python -m dev_tools.evals snapshot --check --cases dev_tools/evals/cases/answerable_heldout.json   --dsn chinook=sqlite:///chinook.sqlite --dsn rentals=sqlite:///rentals.sqlite   --dsn pagila=postgresql://USER:PASSWORD@HOST:5432/pagila
+```
+
+Neither file has been run through the engine. Run the refusals and the answerable
+cases in one report to get the refusal score and the false-refusal rate together:
+
+```bash
+python -m dev_tools.evals run --cases dev_tools/evals/cases/unanswerable_rentals.json   dev_tools/evals/cases/answerable_heldout.json --label candidate --out candidate.json
+```
+
+Do not edit a case after seeing a result; if one is wrong, say so and score every
+run under the corrected file.
+
 ## Bench
 
 `python -m dev_tools.evals bench` is the one-command workflow that applies the

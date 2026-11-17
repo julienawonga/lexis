@@ -192,19 +192,51 @@ def run_gold(dsn: str, sql: str) -> list[list[Any]]:
             return [[jsonable(v) for v in row] for row in cur.fetchall()]
 
 
-def snapshot_file(path: Path, dsn: str, *, check: bool = False) -> list[str]:
+def parse_dsn_args(values: Sequence[str]) -> str | dict[str, str]:
+    """One DSN, or ``name=dsn`` entries mapping a case's ``database`` to its DSN.
+
+    A file that mixes databases (``answerable_heldout.json``) is snapshotted with
+    ``--dsn chinook=sqlite:///c.sqlite --dsn pagila=postgresql://...``.
+    """
+    mapped: dict[str, str] = {}
+    for value in values:
+        name, sep, rest = value.partition("=")
+        if sep and name.isidentifier() and rest.startswith(("sqlite:", "postgres")):
+            mapped[name] = rest
+    if not mapped:
+        if len(values) != 1:
+            raise ValueError("pass one --dsn, or several as name=dsn")
+        return values[0]
+    if len(mapped) != len(values):
+        raise ValueError("mix of a bare --dsn and name=dsn entries")
+    return mapped
+
+
+def snapshot_file(
+    path: Path, dsn: str | dict[str, str], *, check: bool = False
+) -> list[str]:
     """Fill each gold answer's ``expected`` from the database.
 
-    With ``check`` nothing is written; the returned list names the gold answers
-    whose live result no longer matches the stored snapshot.
+    ``dsn`` is one DSN, or a map from a case's ``database`` to its DSN for a file
+    that mixes databases. With ``check`` nothing is written; the returned list
+    names the gold answers whose live result no longer matches the stored
+    snapshot.
     """
     raw = json.loads(path.read_text(encoding="utf-8"))
     drifted: list[str] = []
     for case in raw["cases"]:
         if case.get("expect", EXPECT_ROWS) == EXPECT_REFUSAL:
             continue  # nothing to snapshot: the database cannot answer it
+        if isinstance(dsn, str):
+            case_dsn = dsn
+        elif case.get("database") in dsn:
+            case_dsn = dsn[case["database"]]
+        else:
+            raise ValueError(
+                f"{case['id']}: no --dsn for database {case.get('database')!r}"
+            )
         for gold in case["gold"]:
-            rows = run_gold(dsn, gold["sql"])
+            rows = run_gold(case_dsn, gold["sql"])
             if check:
                 stored = gold.get("expected")
                 if (

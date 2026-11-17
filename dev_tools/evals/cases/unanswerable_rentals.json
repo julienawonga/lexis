@@ -1,0 +1,234 @@
+{
+  "dataset": "unanswerable_rentals",
+  "description": "Questions the Rentals fixture CANNOT answer (24; four per failure kind), a held-out set for the second version of the answerability check. A run passes when the user is not handed a query result for something else; scoring is in dev_tools/evals/refusal.py and docs/evaluation.md (Unanswerable questions). Written blind: without reading the check, its code, reports or logs, and before any engine run; none repeats a question of unanswerable.json. Each is written to be tempting: a nearby column (a coded status, a soft delete, a deposit, a tax gap, the legacy log) exists that a careless model could substitute. `reason` is for reviewers and is never sent to the engine. The controls for false refusals are in answerable_heldout.json (its `rentals` cases); this file names none.",
+  "frozen_at": "2026-11-17",
+  "frozen_sha256": "b748c59b6b77214f6afad78fa1a4ab22b2f2f7825b296978b5176643f983dca1",
+  "cases": [
+    {
+      "id": "unanswerable_rentals.01_supplier",
+      "question": "Which supplier did we buy each piece of equipment from?",
+      "expect": "refusal",
+      "kind": "missing-entity",
+      "database": "rentals",
+      "tags": [],
+      "reason": "No supplier or vendor exists; equip_unit only has the purchase date, cost and serial number, not who sold it."
+    },
+    {
+      "id": "unanswerable_rentals.02_damage_claims",
+      "question": "How many damage claims did we raise against customer deposits in 2024?",
+      "expect": "refusal",
+      "kind": "missing-entity",
+      "database": "rentals",
+      "tags": [],
+      "reason": "There is no claim or damage record; rental.deposit_amt is only the deposit taken, not a claim against it."
+    },
+    {
+      "id": "unanswerable_rentals.03_chauffeurs_livraisons",
+      "question": "Quels chauffeurs ont effectu\u00e9 le plus de livraisons de mat\u00e9riel chez nos clients ?",
+      "expect": "refusal",
+      "kind": "missing-entity",
+      "database": "rentals",
+      "tags": [
+        "fr"
+      ],
+      "reason": "No delivery entity exists; a staff role code may mark a driver but nothing records a delivery or who made it."
+    },
+    {
+      "id": "unanswerable_rentals.04_quotes",
+      "question": "How many quotes did we send that were never turned into a rental?",
+      "expect": "refusal",
+      "kind": "missing-entity",
+      "database": "rentals",
+      "tags": [],
+      "reason": "No quote table exists; cancelled rentals are rentals that were created, not quotes."
+    },
+    {
+      "id": "unanswerable_rentals.05_customer_phone",
+      "question": "What is the phone number of the contact at Greywater Civil?",
+      "expect": "refusal",
+      "kind": "missing-attribute",
+      "database": "rentals",
+      "tags": [],
+      "reason": "customer has a contact name but no phone or email; the only phone column is on staff, which are our employees."
+    },
+    {
+      "id": "unanswerable_rentals.06_operating_hours",
+      "question": "How many operating hours has each excavator logged?",
+      "expect": "refusal",
+      "kind": "missing-attribute",
+      "database": "rentals",
+      "tags": [],
+      "reason": "No hour meter or usage reading exists; days_billed and downtime_days are billing and maintenance days, not machine hours."
+    },
+    {
+      "id": "unanswerable_rentals.07_manager_salary",
+      "question": "What is the salary of each branch manager?",
+      "expect": "refusal",
+      "kind": "missing-attribute",
+      "database": "rentals",
+      "tags": [],
+      "reason": "staff has no pay information; hired_on and the role code are not a salary."
+    },
+    {
+      "id": "unanswerable_rentals.08_ville_agence",
+      "question": "Dans quelle ville se trouve chacune de nos agences ?",
+      "expect": "refusal",
+      "kind": "missing-attribute",
+      "database": "rentals",
+      "tags": [
+        "fr"
+      ],
+      "reason": "branch has a name, a code and a coarse region (North, Coast...) but no city or address."
+    },
+    {
+      "id": "unanswerable_rentals.09_rate_history",
+      "question": "What was the daily rate of unit 1 before our last price increase?",
+      "expect": "refusal",
+      "kind": "missing-time-or-version",
+      "database": "rentals",
+      "tags": [],
+      "reason": "equip_unit.day_rate holds only the current rate; no price history is kept."
+    },
+    {
+      "id": "unanswerable_rentals.10_credit_limit_history",
+      "question": "Which customers had a higher credit limit last year than they have now?",
+      "expect": "refusal",
+      "kind": "missing-time-or-version",
+      "database": "rentals",
+      "tags": [],
+      "reason": "customer.credit_lmt is a single current value with no history of changes."
+    },
+    {
+      "id": "unanswerable_rentals.11_due_date_extensions",
+      "question": "How many times was each rental's due date extended?",
+      "expect": "refusal",
+      "kind": "missing-time-or-version",
+      "database": "rentals",
+      "tags": [],
+      "reason": "rental.due_dt is the current due date only; the original date and any changes are not stored."
+    },
+    {
+      "id": "unanswerable_rentals.12_previous_home_branch",
+      "question": "Which customers used to belong to a different home branch before moving to their current one?",
+      "expect": "refusal",
+      "kind": "missing-time-or-version",
+      "database": "rentals",
+      "tags": [],
+      "reason": "customer.home_branch_id is overwritten in place; there is no record of a previous branch."
+    },
+    {
+      "id": "unanswerable_rentals.13_vip_accounts",
+      "question": "Which customers are our VIP accounts?",
+      "expect": "refusal",
+      "kind": "undefined-term",
+      "database": "rentals",
+      "tags": [],
+      "reason": "VIP is not defined anywhere; credit_lmt or rental volume could be proxies but would be a guess."
+    },
+    {
+      "id": "unanswerable_rentals.14_underperforming_branches",
+      "question": "Which of our branches are underperforming?",
+      "expect": "refusal",
+      "kind": "undefined-term",
+      "database": "rentals",
+      "tags": [],
+      "reason": "'Underperforming' has no definition or target in the data; revenue or rental counts are only possible stand-ins."
+    },
+    {
+      "id": "unanswerable_rentals.15_clients_a_risque",
+      "question": "Combien de clients sont des clients \u00e0 risque ?",
+      "expect": "refusal",
+      "kind": "undefined-term",
+      "database": "rentals",
+      "tags": [
+        "fr"
+      ],
+      "reason": "No risk flag or rule exists; unpaid invoices or a missing credit limit would be an invented definition."
+    },
+    {
+      "id": "unanswerable_rentals.16_growth_accounts",
+      "question": "Which customer accounts are our best growth opportunities?",
+      "expect": "refusal",
+      "kind": "undefined-term",
+      "database": "rentals",
+      "tags": [],
+      "reason": "'Growth opportunity' is not defined; signup date, credit limit and rentals are possible proxies but nothing says which."
+    },
+    {
+      "id": "unanswerable_rentals.17_competitor_prices",
+      "question": "What do our competitors charge per day for a 5-tonne excavator?",
+      "expect": "refusal",
+      "kind": "out-of-scope",
+      "database": "rentals",
+      "tags": [],
+      "reason": "Competitor prices are not in the database; only our own day_rate is."
+    },
+    {
+      "id": "unanswerable_rentals.18_permis_nacelle",
+      "question": "Avons-nous l\u00e9galement le droit de louer une nacelle \u00e9l\u00e9vatrice \u00e0 un particulier sans permis ?",
+      "expect": "refusal",
+      "kind": "out-of-scope",
+      "database": "rentals",
+      "tags": [
+        "fr"
+      ],
+      "reason": "A legal question, not answerable from data; the heavy_flg column only flags categories."
+    },
+    {
+      "id": "unanswerable_rentals.19_reminder_email",
+      "question": "Write a polite reminder email to Blackmoor Quarry Ltd about their unpaid invoice.",
+      "expect": "refusal",
+      "kind": "out-of-scope",
+      "database": "rentals",
+      "tags": [],
+      "reason": "A writing task, not a data question; the invoice and customer rows exist but no query produces an email."
+    },
+    {
+      "id": "unanswerable_rentals.20_best_brand",
+      "question": "Which excavator brand is the most reliable on the market?",
+      "expect": "refusal",
+      "kind": "out-of-scope",
+      "database": "rentals",
+      "tags": [],
+      "reason": "An opinion about the market; our maintenance jobs cover only our own units and carry no brand column."
+    },
+    {
+      "id": "unanswerable_rentals.21_discounts",
+      "question": "What is the total of the discounts we granted on rentals in 2024?",
+      "expect": "refusal",
+      "kind": "false-premise",
+      "database": "rentals",
+      "tags": [],
+      "reason": "No discount is stored; the gap between inv_sub and inv_ttl is tax, not a discount."
+    },
+    {
+      "id": "unanswerable_rentals.22_late_fee_column",
+      "question": "Using the late_fee column of the invoice table, how much did we charge in late fees?",
+      "expect": "refusal",
+      "kind": "false-premise",
+      "database": "rentals",
+      "tags": [],
+      "reason": "invoice has no late_fee column; there is no late fee anywhere, only due and return dates on rental."
+    },
+    {
+      "id": "unanswerable_rentals.23_taux_tva_client",
+      "question": "Quel est le taux de TVA enregistr\u00e9 sur la fiche de chaque client ?",
+      "expect": "refusal",
+      "kind": "false-premise",
+      "database": "rentals",
+      "tags": [
+        "fr"
+      ],
+      "reason": "customer has a tax number but no tax rate; the tax of each invoice is an amount, not a rate on the customer."
+    },
+    {
+      "id": "unanswerable_rentals.24_rental_fee_column",
+      "question": "What is the total of the rental_fee column in the rental table?",
+      "expect": "refusal",
+      "kind": "false-premise",
+      "database": "rentals",
+      "tags": [],
+      "reason": "rental has no rental_fee column; amounts are on rental_item (line_amt) and invoice."
+    }
+  ]
+}
