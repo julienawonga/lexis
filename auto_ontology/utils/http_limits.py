@@ -356,4 +356,8 @@ def shared_http_client() -> GatewayClient:
                 ),
                 follow_redirects=True,
             )
+            # No-op unless LLM_CASSETTE_MODE is set (see utils/cassette.py).
+            from auto_ontology.utils.cassette import install_from_env
+
+            install_from_env(_client)
         return _client
