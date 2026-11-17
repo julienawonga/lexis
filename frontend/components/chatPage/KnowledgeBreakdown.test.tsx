@@ -122,4 +122,62 @@ describe('KnowledgeBreakdown', () => {
 		expect(html).toContain('col_a');
 		expect(html).toContain('col_b');
 	});
+
+	it('shows the model account beside the SQL match, and says when they disagree', () => {
+		const base = { database: null, certified: null, reason: '', matched: [] };
+		const entries: KnowledgeTraceEntry[] = [
+			{
+				...base,
+				kind: 'term',
+				id: '1',
+				name: 'AgreeTerm',
+				used: true,
+				found_in_sql: true,
+				declared: true,
+			},
+			{
+				...base,
+				kind: 'term',
+				id: '2',
+				name: 'ClaimedTerm',
+				used: false,
+				found_in_sql: false,
+				declared: true,
+			},
+			{
+				...base,
+				kind: 'term',
+				id: '3',
+				name: 'SilentTerm',
+				used: true,
+				found_in_sql: true,
+				declared: false,
+			},
+		];
+
+		const html = renderToStaticMarkup(<KnowledgeBreakdown entries={entries} />);
+		expect(html).toContain('Applied (the model said so)');
+		expect(html).toContain('The two marks disagree (2)');
+		expect(html).toContain('The model said it applied this but nothing in the SQL matches');
+		expect(html).toContain('Found in the SQL but not declared');
+		expect(html).toContain('not a proof');
+	});
+
+	it('shows no disagreement section for answers without the model account', () => {
+		const entries: KnowledgeTraceEntry[] = [
+			{
+				kind: 'term',
+				id: '1',
+				name: 'Plain',
+				database: null,
+				certified: null,
+				reason: '',
+				used: true,
+				matched: [],
+			},
+		];
+		const html = renderToStaticMarkup(<KnowledgeBreakdown entries={entries} />);
+		expect(html).not.toContain('disagree');
+		expect(html).not.toContain('the model said so');
+	});
 });

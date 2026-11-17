@@ -136,3 +136,29 @@ def test_no_sql_event_leaves_the_turn_unchanged(
     _run_pump([{"type": "error", "message": "boom"}])
 
     assert persisted[0]["sql_code"] is None
+
+
+def test_knowledge_trace_signals_reach_the_client(
+    persisted: list[dict[str, Any]],
+) -> None:
+    """The worker's answer dict is forwarded with both trace signals intact.
+
+    The turn is persisted without the trace, so only the client buffer is checked.
+    """
+
+    entry = {
+        "kind": "term",
+        "id": "t1",
+        "name": "Net Revenue",
+        "used": True,
+        "matched": ["refund"],
+        "found_in_sql": True,
+        "declared": False,
+        "tag": "T1",
+    }
+    answer = {"response": "1", "sql_code": "SELECT 1", "knowledge_trace": [entry]}
+
+    slot = _run_pump([{"type": "result", "answer": answer}])
+
+    (result,) = [e for e in slot.buffer if e.get("type") == "result"]
+    assert result["answer"]["knowledge_trace"] == [entry]

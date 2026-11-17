@@ -60,7 +60,15 @@ from auto_ontology.retrieval.text_to_sql.prompts import (
     format_sql_examples_section,
     format_value_anchors_section,
 )
-from auto_ontology.retrieval.text_to_sql.models import SQLGenerationModel
+from auto_ontology.retrieval.text_to_sql.models import (
+    SQLGenerationModel,
+    SQLGenerationWithAppliedModel,
+)
+from auto_ontology.retrieval.text_to_sql.knowledge_tags import (
+    declared_record,
+    render_tag_section,
+)
+from auto_ontology.infra.feature_flags import is_knowledge_applied_record_enabled
 
 logger = logging.getLogger(__name__)
 
@@ -338,6 +346,8 @@ class SQLFromCandidatesAgent(BaseAgent):
             language_note = language_instruction(path_state)
             if language_note:
                 messages.append(SystemMessage(content=language_note))
+            if applied_tags_section:
+                messages.append(SystemMessage(content=applied_tags_section))
             messages.append(HumanMessage(content=user_prompt))
 
             # Add calendar time window reminder if needed
@@ -357,7 +367,11 @@ class SQLFromCandidatesAgent(BaseAgent):
         # Use SQLGenerationModel for new flow (without formatting)
         # Keep old models for feedback scenarios
 
-        schema = SQLGenerationModel
+        # Opt-in, read per request: with the flag off the prompt and the schema
+        # are exactly what they were before the feature existed.
+        record_applied = is_knowledge_applied_record_enabled()
+        applied_tags_section = render_tag_section(path_state) if record_applied else ""
+        schema = SQLGenerationWithAppliedModel if record_applied else SQLGenerationModel
 
         def run_with_context() -> tuple:
             """Invoke LLM with messages, optionally including file snippets and extracted data."""
@@ -409,6 +423,18 @@ class SQLFromCandidatesAgent(BaseAgent):
         has_sql = bool(response.sql_code and response.sql_code.strip())
         has_response = bool(response.response and response.response.strip())
 
+        declared_update: dict = {}
+        if record_applied and applied_tags_section:
+            declared = declared_record(
+                getattr(response, "applied_knowledge", None), path_state
+            )
+            declared_update = {"knowledge_declared": declared}
+            self.logger.info(
+                "Knowledge declared applied: %s (dropped %d unknown tag(s))",
+                declared["tags"],
+                declared["dropped"],
+            )
+
         if has_sql:
             custom_analyses_used = []
             if (
@@ -438,6 +464,7 @@ class SQLFromCandidatesAgent(BaseAgent):
                     "sql_generation_result": response,  # Keep as object (Pydantic model)
                     "relevant_tables": relevant_tables if has_sql else [],
                     "custom_analyses_used": custom_analyses_used,
+                    **declared_update,
                 },
                 "decision": "constructable",
             }
@@ -458,6 +485,7 @@ class SQLFromCandidatesAgent(BaseAgent):
                     "sql_generation_result": response,
                     "relevant_tables": relevant_tables if has_sql else [],
                     "custom_analyses_used": custom_analyses_used,
+                    **declared_update,
                 },
                 "decision": "constructable",
             }

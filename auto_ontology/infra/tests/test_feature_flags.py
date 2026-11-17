@@ -19,6 +19,7 @@ from auto_ontology.infra.feature_flags import (
     is_clarification_enabled,
     is_distinct_value_probing_enabled,
     is_knowledge_admin_audit_enabled,
+    is_knowledge_applied_record_enabled,
     is_knowledge_items_enabled,
     is_pii_detection_enabled,
     read_configuration_flag,
@@ -275,3 +276,13 @@ def test_knowledge_flags_default_to_off_and_read_their_own_row(
         assert is_knowledge_admin_audit_enabled() is True
     with _patched(monkeypatch, ("junk",)):
         assert is_knowledge_admin_audit_enabled() is False
+
+
+def test_knowledge_applied_record_defaults_to_off(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    with _patched(monkeypatch, None) as cursor:
+        assert is_knowledge_applied_record_enabled() is False
+    assert cursor.executed[0][1] == ("knowledge_applied_record_enabled",)
+    with _patched(monkeypatch, ("true",)):
+        assert is_knowledge_applied_record_enabled() is True

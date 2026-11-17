@@ -6,6 +6,7 @@
 import { useMemo } from 'react';
 import type { KnowledgeTraceEntry } from '@/types/chat';
 import { Icon, IconName } from '@/common/icons';
+import { declaredLabel, disagreementText, foundLabel } from '@/lib/knowledgeSignals';
 
 type KnowledgeBreakdownProps = {
 	entries?: KnowledgeTraceEntry[];
@@ -19,20 +20,28 @@ const kindLabels: Record<KnowledgeTraceEntry['kind'], string> = {
 };
 
 export const KnowledgeBreakdown = ({ entries }: KnowledgeBreakdownProps) => {
-	const { usedEntries, otherEntries, undecidedCount, notUsedCount } = useMemo(() => {
-		if (!entries || entries.length === 0) {
-			return { usedEntries: [], otherEntries: [], undecidedCount: 0, notUsedCount: 0 };
-		}
-		const used = entries.filter((e) => e.used === true);
-		const undecided = entries.filter((e) => e.used === null);
-		const notUsed = entries.filter((e) => e.used === false);
-		return {
-			usedEntries: used,
-			otherEntries: [...undecided, ...notUsed],
-			undecidedCount: undecided.length,
-			notUsedCount: notUsed.length,
-		};
-	}, [entries]);
+	const { usedEntries, otherEntries, undecidedCount, notUsedCount, disagreements } =
+		useMemo(() => {
+			if (!entries || entries.length === 0) {
+				return {
+					usedEntries: [],
+					otherEntries: [],
+					undecidedCount: 0,
+					notUsedCount: 0,
+					disagreements: [],
+				};
+			}
+			const used = entries.filter((e) => e.used === true);
+			const undecided = entries.filter((e) => e.used === null);
+			const notUsed = entries.filter((e) => e.used === false);
+			return {
+				usedEntries: used,
+				otherEntries: [...undecided, ...notUsed],
+				undecidedCount: undecided.length,
+				notUsedCount: notUsed.length,
+				disagreements: entries.filter((e) => disagreementText(e) !== null),
+			};
+		}, [entries]);
 
 	if (!entries || entries.length === 0) {
 		return null;
@@ -66,7 +75,12 @@ export const KnowledgeBreakdown = ({ entries }: KnowledgeBreakdownProps) => {
 									</span>
 								</div>
 								<div className="flex items-center gap-1.5 text-[11px] text-secondary dark:text-zinc-400">
-									<span>found in SQL</span>
+									{declaredLabel(entry) && (
+										<span className="rounded bg-black/5 px-1 py-0.5 dark:bg-white/10">
+											{declaredLabel(entry)}
+										</span>
+									)}
+									<span title={foundLabel(entry) ?? undefined}>found in SQL</span>
 									{entry.matched && entry.matched.length > 0 && (
 										<div className="flex flex-wrap gap-1">
 											{entry.matched.map((m, idx) => (
@@ -116,8 +130,29 @@ export const KnowledgeBreakdown = ({ entries }: KnowledgeBreakdownProps) => {
 				</div>
 			)}
 
+			{disagreements.length > 0 && (
+				<div className="flex flex-col gap-1 rounded-xl border border-amber-500/30 bg-amber-500/5 p-2.5">
+					<div className="text-[11px] font-medium text-secondary dark:text-zinc-400">
+						The two marks disagree ({disagreements.length})
+					</div>
+					{disagreements.map((entry) => (
+						<div
+							key={`${entry.kind}:${entry.id}:disagree`}
+							className="text-[11px] text-secondary dark:text-zinc-400"
+						>
+							<span className="font-semibold text-heading dark:text-zinc-100">
+								{entry.name}
+							</span>
+							: {disagreementText(entry)}
+						</div>
+					))}
+				</div>
+			)}
+
 			<p className="text-[11px] italic text-secondary/80 dark:text-zinc-500">
-				&apos;Used&apos; is a text heuristic on the final SQL, not a proof.
+				&apos;Used&apos; and &apos;found in the SQL&apos; are a text match on the final SQL,
+				not a proof. &apos;Applied&apos; is the model&apos;s own account, not a proof
+				either.
 			</p>
 		</div>
 	);

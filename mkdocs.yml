@@ -56,6 +56,7 @@ nav:
       - "Exploration map: business domains": exploration-map.md
       - Lexis MCP server: mcp.md
       - Matching question wording to stored values: value-linking.md
+      - "What each answer used: two marks": knowledge-trace.md
   - Engine & safety:
       - Safety of agent-issued SQL: query-safety.md
       - Evaluating the text-to-SQL engine: evaluation.md

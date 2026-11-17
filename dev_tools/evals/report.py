@@ -117,6 +117,28 @@ class Report:
         return cls.from_json(json.loads(path.read_text(encoding="utf-8")))
 
 
+def knowledge_agreement(report: Report) -> dict[str, int]:
+    """How the trace's two signals relate over a report, as counts (information only).
+
+    ``declared`` is the model's own account of what it applied and
+    ``found_in_sql`` the text match on the final SQL. Entries without both
+    (an older report, the flag off, or an undecided match) are counted as
+    ``undecided``. No threshold belongs on this number.
+    """
+    counts = {"agree": 0, "declared_only": 0, "found_only": 0, "undecided": 0}
+    for case in report.cases.values():
+        for run in case.runs:
+            for entry in run.knowledge_trace or []:
+                declared, found = entry.get("declared"), entry.get("found_in_sql")
+                if declared is None or found is None:
+                    counts["undecided"] += 1
+                elif declared == found:
+                    counts["agree"] += 1
+                else:
+                    counts["declared_only" if declared else "found_only"] += 1
+    return counts
+
+
 def merge_reports(label: str, reports: list[Report]) -> Report:
     """Combine partial reports; a case present in a later report replaces earlier ones.
 

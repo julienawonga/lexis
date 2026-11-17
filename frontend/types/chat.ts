@@ -11,6 +11,12 @@ export type KnowledgeTraceEntry = {
 	reason: string;
 	used: boolean | null;
 	matched: string[];
+	/** The text match on the final SQL (same value as `used`). Absent on older answers. */
+	found_in_sql?: boolean | null;
+	/** The model's own account of applying it; null when it gave none. Not proof. */
+	declared?: boolean | null;
+	/** The short tag the model saw for this item, when recording was on. */
+	tag?: string | null;
 };
 
 /** A structured mark the engine puts on an answer when a check did not fully hold. */

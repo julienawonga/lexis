@@ -140,6 +140,12 @@ absent.
 `matched` lists what was found. The backend logs one line per answer
 (`Knowledge trace: offered N, used M, ...`).
 
+Each entry also carries `found_in_sql` (the same value as `used`), `declared`
+(`true`, `false`, or `null`) and `tag`. `declared` is the model's own account of
+which offered items it applied, recorded only when the
+`knowledge_applied_record_enabled` setting is on; it is not proof. See
+[What each answer used: two marks](knowledge-trace.md).
+
 ## Clarification questions
 
 "How many VIP customers do we have?" has no answer until "VIP" is defined. A

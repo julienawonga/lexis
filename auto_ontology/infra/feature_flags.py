@@ -57,6 +57,10 @@ KNOWLEDGE_ITEMS_ENABLED_KEY = "knowledge_items_enabled"
 # draft is visible to its owner only, admins included.
 KNOWLEDGE_ADMIN_AUDIT_ENABLED_KEY = "knowledge_admin_audit_enabled"
 
+# Whether SQL generation is shown tags for the knowledge it was offered and asks
+# the model which it applied (the trace's `declared` signal). Opt-in.
+KNOWLEDGE_APPLIED_RECORD_ENABLED_KEY = "knowledge_applied_record_enabled"
+
 # Written by the SQL Query Timeout field on Settings > Agent Settings: how long
 # a statement the text-to-SQL agent issues may run before it is cancelled. An
 # instance without the frontend never writes the row and gets the default.
@@ -187,6 +191,15 @@ def is_knowledge_admin_audit_enabled() -> bool:
     error means a personal draft stays private to its owner.
     """
     return read_configuration_flag(KNOWLEDGE_ADMIN_AUDIT_ENABLED_KEY, default=False)
+
+
+def is_knowledge_applied_record_enabled() -> bool:
+    """Whether generation tags offered knowledge and records what the model applied.
+
+    Opt-in, read per request: a missing row or any DB error means off, so the
+    prompt and the output schema stay exactly as before.
+    """
+    return read_configuration_flag(KNOWLEDGE_APPLIED_RECORD_ENABLED_KEY, default=False)
 
 
 def read_configuration_int(

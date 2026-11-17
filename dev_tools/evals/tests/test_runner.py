@@ -10,7 +10,7 @@ import httpx
 import pytest
 
 from dev_tools.evals.cases import Case, GoldAnswer
-from dev_tools.evals.report import CaseResult, Report, Run
+from dev_tools.evals.report import CaseResult, Report, Run, knowledge_agreement
 from dev_tools.evals.runner import (
     Answer,
     answer_from_events,
@@ -440,3 +440,47 @@ def test_answer_records_the_question_language_and_the_score_keeps_it() -> None:
 def test_old_backend_without_language_fields_gives_none() -> None:
     answer = answer_from_events([{"type": "result", "answer": {"sql_code": "s"}}])
     assert answer.question_language is None and answer.question_translated is None
+
+
+def test_trace_with_both_signals_round_trips_and_old_traces_load() -> None:
+    new = {
+        "kind": "term",
+        "id": "t1",
+        "used": True,
+        "found_in_sql": True,
+        "declared": True,
+        "matched": ["x"],
+    }
+    old = {"kind": "term", "id": "t2", "used": True, "matched": ["y"]}
+    case = Case(id="c", question="q", gold=(GoldAnswer("g", "select 1", [[1]]),))
+    answer = Answer(sql="select 1", rows=[[1]], knowledge_trace=[new, old])
+    report = Report(meta={}, cases={"c": CaseResult("q", [score(case, answer)])})
+    restored = Report.from_json(report.to_json())
+    assert restored.cases["c"].runs[0].knowledge_trace == [new, old]
+    # The old entry has neither key: it is undecided, never a disagreement.
+    assert knowledge_agreement(restored) == {
+        "agree": 1,
+        "declared_only": 0,
+        "found_only": 0,
+        "undecided": 1,
+    }
+
+
+def test_knowledge_agreement_counts_each_disagreement() -> None:
+    def entry(declared: bool | None, found: bool | None) -> dict:
+        return {"declared": declared, "found_in_sql": found}
+
+    trace = [
+        entry(True, False),
+        entry(False, True),
+        entry(False, False),
+        entry(True, None),
+    ]
+    run = Run(passed=True, reason="ok", knowledge_trace=trace)
+    report = Report(meta={}, cases={"c": CaseResult("q", [run])})
+    assert knowledge_agreement(report) == {
+        "agree": 1,
+        "declared_only": 1,
+        "found_only": 1,
+        "undecided": 1,
+    }

@@ -268,3 +268,19 @@ class SQLGenerationModel(StrictModel):
                 "sql_code must be the full executable statement; response must be a real explanation."
             )
         return v
+
+
+class SQLGenerationWithAppliedModel(SQLGenerationModel):
+    """``SQLGenerationModel`` plus the tags of the knowledge the model applied.
+
+    A separate class, used only when ``knowledge_applied_record_enabled`` is on,
+    so the schema sent to the model is unchanged when the flag is off.
+    """
+
+    applied_knowledge: list[str] = Field(
+        default_factory=list,
+        description=(
+            "Tags (like T1, A2) of the offered knowledge items whose definition, "
+            "expression or column you actually applied in sql_code; [] if none."
+        ),
+    )

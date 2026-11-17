@@ -8,7 +8,15 @@ Every answer carries ``knowledge_trace``, a list of entries::
     {"kind": "term" | "sql_attribute" | "column_attribute" | "custom_analysis",
      "id": ..., "name": ..., "database": ..., "certified": True | False | None,
      "reason": "why it was offered", "used": True | False | None,
-     "matched": ["identifiers/literals of the entry found in the SQL"]}
+     "matched": ["identifiers/literals of the entry found in the SQL"],
+     "found_in_sql": same value as "used",
+     "declared": True | False | None, "tag": "T1" | None}
+
+``found_in_sql`` and ``declared`` are two independent signals, never merged
+(see ``knowledge_tags``): the text match below, and the model's own list of the
+offered tags it says it applied (``None`` when ``knowledge_applied_record_enabled``
+is off or the model returned no list). ``declared`` is the model's account, not
+proof; ``found_in_sql`` is a text match, not a cause.
 
 *Offered* means the entry was part of what the SQL generator was given (see
 ``_offered_*``). *Used* is a deterministic text heuristic on the final SQL, not
@@ -45,6 +53,11 @@ import logging
 import re
 
 from typing import Any, Callable
+
+from auto_ontology.retrieval.text_to_sql.knowledge_tags import (
+    declared_for,
+    tag_map,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -185,6 +198,14 @@ def build_knowledge_trace(
     db = path_state.get("target_db")
     entries: list[dict[str, Any]] = []
 
+    def add_signals(entry: dict[str, Any]) -> dict[str, Any]:
+        """The second signal beside ``used``; see ``knowledge_tags``."""
+        key = (entry["kind"], entry["id"])
+        entry["found_in_sql"] = entry["used"]
+        entry["declared"] = declared_for(record, tags, *key)
+        entry["tag"] = tag_of.get(key) if isinstance(record, dict) else None
+        return entry
+
     def used_for(state_fn: Callable[[], tuple[bool | None, list[str]]]):
         if not sql:
             return None, []
@@ -198,6 +219,9 @@ def build_knowledge_trace(
         if isinstance(c, dict) and c.get("name")
     }
     contexts = path_state.get("column_attribute_contexts") or {}
+    record = path_state.get("knowledge_declared")
+    tags = tag_map(path_state)
+    tag_of = {v: k for k, v in tags.items()}
     sa_used_terms: set[str] = set()
     retrieved_sa = list(path_state.get("retrieved_sql_attributes") or [])
     for a in path_state.get("sql_attributes") or []:
@@ -211,17 +235,19 @@ def build_knowledge_trace(
             sa_used_terms.add(str(a["term_name"]).strip().lower())
         term = (a.get("term_name") or "").strip()
         entries.append(
-            {
-                "kind": "sql_attribute",
-                "id": aid,
-                "name": a.get("name") or "",
-                "database": _hit_database(retrieved_sa, aid) or db,
-                "certified": lookup(aid),
-                "reason": "retrieved for the question"
-                + (f"; defines Term {term!r}" if term else ""),
-                "used": used,
-                "matched": matched,
-            }
+            add_signals(
+                {
+                    "kind": "sql_attribute",
+                    "id": aid,
+                    "name": a.get("name") or "",
+                    "database": _hit_database(retrieved_sa, aid) or db,
+                    "certified": lookup(aid),
+                    "reason": "retrieved for the question"
+                    + (f"; defines Term {term!r}" if term else ""),
+                    "used": used,
+                    "matched": matched,
+                }
+            )
         )
 
     retrieved_ca = list(path_state.get("retrieved_custom_analyses") or [])
@@ -230,16 +256,18 @@ def build_knowledge_trace(
             continue
         used, matched = used_for(lambda c=c: _snippet_state(c.get("sql") or "", sql))
         entries.append(
-            {
-                "kind": "custom_analysis",
-                "id": str(c["id"]),
-                "name": c.get("name") or "",
-                "database": _hit_database(retrieved_ca, str(c["id"])) or db,
-                "certified": None,
-                "reason": "retrieved for the question",
-                "used": used,
-                "matched": matched,
-            }
+            add_signals(
+                {
+                    "kind": "custom_analysis",
+                    "id": str(c["id"]),
+                    "name": c.get("name") or "",
+                    "database": _hit_database(retrieved_ca, str(c["id"])) or db,
+                    "certified": None,
+                    "reason": "retrieved for the question",
+                    "used": used,
+                    "matched": matched,
+                }
+            )
         )
 
     for h in path_state.get("retrieved_column_attributes") or []:
@@ -257,17 +285,19 @@ def build_knowledge_trace(
             elif col:
                 used = False
         entries.append(
-            {
-                "kind": "column_attribute",
-                "id": str(h["id"]),
-                "name": name,
-                "database": h.get("database_name") or db,
-                "certified": None,
-                "reason": "retrieved for the question; chooses tables and columns shown"
-                + (f"; column {col!r}" if col else ""),
-                "used": used,
-                "matched": matched,
-            }
+            add_signals(
+                {
+                    "kind": "column_attribute",
+                    "id": str(h["id"]),
+                    "name": name,
+                    "database": h.get("database_name") or db,
+                    "certified": None,
+                    "reason": "retrieved for the question; chooses tables and columns shown"
+                    + (f"; column {col!r}" if col else ""),
+                    "used": used,
+                    "matched": matched,
+                }
+            )
         )
 
     for t in path_state.get("offered_terms") or []:
@@ -285,16 +315,18 @@ def build_knowledge_trace(
             used = True
             matched = (matched + ["its sql_attribute is used"])[:_MAX_MATCHED]
         entries.append(
-            {
-                "kind": "term",
-                "id": str(t["id"]),
-                "name": t.get("name") or "",
-                "database": db,
-                "certified": t.get("certified"),
-                "reason": reason,
-                "used": used,
-                "matched": matched,
-            }
+            add_signals(
+                {
+                    "kind": "term",
+                    "id": str(t["id"]),
+                    "name": t.get("name") or "",
+                    "database": db,
+                    "certified": t.get("certified"),
+                    "reason": reason,
+                    "used": used,
+                    "matched": matched,
+                }
+            )
         )
     return entries
 
