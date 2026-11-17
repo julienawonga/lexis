@@ -54,6 +54,7 @@ from auto_ontology.retrieval.data_access.relevant_tables import (
     get_relevant_tables_from_candidates,
 )
 from auto_ontology.retrieval.data_access.semantic_search import search_semantic_index
+from auto_ontology.infra.feature_flags import is_soft_delete_hint_enabled
 from auto_ontology.retrieval.text_to_sql.base import BaseAgent, record_thought
 from auto_ontology.retrieval.text_to_sql.formatters_util import qualify_table
 from auto_ontology.retrieval.text_to_sql.models import (
@@ -65,6 +66,10 @@ from auto_ontology.retrieval.text_to_sql.prompts import (
     CUSTOM_ANALYSIS_RELEVANCE_FILTER_PROMPT,
     SQL_GEN_MAX_ENTITIES,
     TABLE_RELEVANCE_FILTER_PROMPT,
+)
+from auto_ontology.retrieval.text_to_sql.soft_delete import (
+    annotate_soft_deletes,
+    soft_delete_columns_applied,
 )
 from auto_ontology.retrieval.text_to_sql.state import (
     AgentState,
@@ -785,9 +790,18 @@ class CandidatePreparationAgent(BaseAgent):
                 ],
             )
 
+        # Flag off: no key is added anywhere and the prompts are unchanged.
+        soft_delete_state: Dict[str, Any] = {}
+        if is_soft_delete_hint_enabled():
+            relevant_tables = annotate_soft_deletes(relevant_tables)
+            soft_delete_state["soft_delete_columns_applied"] = (
+                soft_delete_columns_applied(relevant_tables)
+            )
+
         result: Dict[str, Any] = {
             "path_state": {
                 **path_state,
+                **soft_delete_state,
                 "relevant_tables": relevant_tables,
                 "relevant_queries": [
                     r["sql"] for r in relevant_queries if r.get("sql")

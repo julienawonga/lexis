@@ -4,6 +4,8 @@
 
 import os
 
+from auto_ontology.retrieval.text_to_sql.soft_delete import VALIDATOR_CARVE_OUT
+
 # Controls how many entity noun phrases are extracted for SQL generation.
 SQL_GEN_MAX_ENTITIES: int = int(os.environ.get("SQL_GEN_MAX_ENTITIES", "5"))
 
@@ -1027,6 +1029,9 @@ def create_intent_validation_prompt(
         if shorten_answer
         else ""
     )
+    soft_delete_carve_out = (
+        VALIDATOR_CARVE_OUT if "Soft delete:" in used_schema_context else ""
+    )
     parsed_usage_block = (
         "\nUSED SQL OBJECTS "
         "(catalog metadata only for tables and columns referenced by the query):\n"
@@ -1051,7 +1056,7 @@ Check for CRITICAL issues ONLY (be lenient):
 Only mark as invalid if there are SERIOUS problems. If the SQL could reasonably work, mark it as VALID.
 If DOMAIN-SPECIFIC CUSTOM ANALYSES are listed above, treat their SQL as intentional domain \
 definitions — do not flag the generated query as invalid merely for following those \
-patterns.{authoritative_note}
+patterns.{authoritative_note}{soft_delete_carve_out}
 
 Provide your analysis."""
 

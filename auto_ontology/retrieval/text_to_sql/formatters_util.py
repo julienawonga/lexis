@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from auto_ontology.retrieval.text_to_sql.soft_delete import soft_delete_note
 from auto_ontology.utils.sample_values import stringify_sample_values
 
 
@@ -387,6 +388,11 @@ def format_tables_for_prompt(
             )
         ]
 
+        # Only present when the soft-delete hint flag annotated the table.
+        markers = table.get("soft_delete_columns")
+        if markers:
+            blocks.append(soft_delete_note(markers))
+
         columns = table.get("columns")
         if not isinstance(columns, list):
             columns = []
@@ -448,6 +454,8 @@ def format_used_schema_for_prompt(
             line += f" | description: {table['description']}"
         if table.get("pk"):
             line += f" | primary key: {table['pk']}"
+        if table.get("soft_delete_columns"):
+            line += f" | {soft_delete_note(table['soft_delete_columns'])}"
         table_lines.append(line)
 
     column_lines: list[str] = []

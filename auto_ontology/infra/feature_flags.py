@@ -47,6 +47,13 @@ CLARIFICATION_ENABLED_KEY = "clarification_enabled"
 # settings control yet, so it is switched on by writing the row.
 SQL_ATTRIBUTE_SUGGESTION_ENABLED_KEY = "sql_attribute_suggestion_enabled"
 
+# Annotates each offered table that soft-deletes rows (a nullable ``deleted_at``
+# style column) so generated SQL excludes the deleted rows by default (see
+# ``retrieval/text_to_sql/soft_delete.py`` and ``docs/soft-deletes.md``). Opt-in
+# and OFF until the owner enables it after the evaluation gate: it changes what
+# the model sees. Switched on by writing the row.
+SOFT_DELETE_HINT_ENABLED_KEY = "soft_delete_hint_enabled"
+
 # Master switch for learned knowledge items (design `docs/design/self-improving-ontology.md`).
 # Opt-in and read per request: no route, capture or retrieval reads it yet, so
 # today it changes nothing. It exists so that the later slices ship behind it.
@@ -173,6 +180,16 @@ def is_sql_attribute_suggestion_enabled() -> bool:
     no attribute reaches the ontology unless an operator asked for it.
     """
     return read_configuration_flag(SQL_ATTRIBUTE_SUGGESTION_ENABLED_KEY, default=False)
+
+
+def is_soft_delete_hint_enabled() -> bool:
+    """Whether offered tables are annotated with their soft-delete columns.
+
+    Opt-in, read per request: a missing row or any DB error means off, in which
+    case the schema context is exactly the one that rendered before the hint
+    existed.
+    """
+    return read_configuration_flag(SOFT_DELETE_HINT_ENABLED_KEY, default=False)
 
 
 def is_knowledge_items_enabled() -> bool:
