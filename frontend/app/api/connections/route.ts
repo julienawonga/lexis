@@ -8,4 +8,6 @@ import { proxyToBackend } from '@/auth/proxy-backend';
 // connectionsApi.getAll — list connections (viewable by all).
 export const GET = withPermission({ connection: ['read'] })((req) => proxyToBackend(req));
 // connectionsApi.create — add a connection (admin only; carries credentials).
-export const POST = withPermission({ connection: ['manage'] })((req) => proxyToBackend(req));
+export const POST = withPermission({ connection: ['manage'] })((req, { user }) =>
+	proxyToBackend(req, { userId: user.id }),
+);

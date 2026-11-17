@@ -20,6 +20,10 @@
     "set_semantic_fk_join_default": "(source_table_id: 'str', target_attribute_id: 'str', selected_column_id: 'str') -> 'None'",
     "update_column_attribute": "(attr_id: 'str', term_id: 'str', *, name: 'str | None' = None, description: 'str | None' = None, certified: 'bool | None' = None, modified_by: 'str | None' = None, touch: 'bool' = False) -> 'dict[str, Any] | None'"
   },
+  "audit": {
+    "list_events": "(*, action_prefix: 'str | None' = None, actor_id: 'str | None' = None, target_kind: 'str | None' = None, target_id: 'str | None' = None, since: 'datetime | None' = None, until: 'datetime | None' = None, before_seq: 'int | None' = None, limit: 'int' = 50) -> 'dict[str, Any]'",
+    "record": "(action: 'str', *, actor_id: 'str | None' = None, actor_email: 'str | None' = None, actor_kind: 'str | None' = None, target_kind: 'str | None' = None, target_id: 'str | None' = None, target_name: 'str | None' = None, request_id: 'str | None' = None, details: 'dict[str, Any] | None' = None) -> 'str | None'"
+  },
   "candidates": {
     "expand_info": "(ids_and_labels: 'list | None') -> 'dict'"
   },

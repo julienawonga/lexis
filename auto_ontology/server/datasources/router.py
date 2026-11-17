@@ -9,6 +9,7 @@ from __future__ import annotations
 from fastapi import APIRouter, HTTPException, Path, Query, Request
 from pydantic import BaseModel, Field
 
+from auto_ontology.server.audit import audit
 from auto_ontology.server.custom_analyses import service as custom_analyses_dal
 from auto_ontology.server.datasources import service as dal
 from auto_ontology.server.pagination import LIMIT_QUERY, SKIP_QUERY
@@ -197,7 +198,7 @@ def validate_custom_analysis_sql(body: CustomAnalysisValidate) -> dict:
 
 
 @router.post("/custom-analyses", status_code=201, response_model=CustomAnalysisResponse)
-def create_custom_analysis(body: CustomAnalysisCreate) -> dict:
+def create_custom_analysis(request: Request, body: CustomAnalysisCreate) -> dict:
     """Create a new CustomAnalysis with its Sql node.
 
     Strict insert: input shape is enforced by :class:`CustomAnalysisCreate`
@@ -224,11 +225,20 @@ def create_custom_analysis(body: CustomAnalysisCreate) -> dict:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
     except custom_analyses_dal.CustomAnalysisSqlError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
+    # No target name: an analysis is titled by the question it answers.
+    audit(
+        request,
+        "custom_analysis.create",
+        target_kind="custom_analysis",
+        target_id=row.get("id"),
+    )
     return {"data": row}
 
 
 @router.put("/custom-analyses/{analysis_id}", response_model=CustomAnalysisResponse)
-def update_custom_analysis(analysis_id: str, body: CustomAnalysisCreate) -> dict:
+def update_custom_analysis(
+    request: Request, analysis_id: str, body: CustomAnalysisCreate
+) -> dict:
     """Replace a CustomAnalysis (matched by id) and re-link its Sql node.
 
     Returns 404 when no CustomAnalysis with ``analysis_id`` exists, 409
@@ -257,11 +267,17 @@ def update_custom_analysis(analysis_id: str, body: CustomAnalysisCreate) -> dict
             status_code=404,
             detail=f"CustomAnalysis {analysis_id!r} not found",
         )
+    audit(
+        request,
+        "custom_analysis.update",
+        target_kind="custom_analysis",
+        target_id=analysis_id,
+    )
     return {"data": row}
 
 
 @router.delete("/custom-analyses/{analysis_id}", response_model=IdResponse)
-def delete_custom_analysis(analysis_id: str) -> dict:
+def delete_custom_analysis(request: Request, analysis_id: str) -> dict:
     """Delete a CustomAnalysis (with its Sql node and VDB embedding).
 
     Returns 404 when no CustomAnalysis with ``analysis_id`` exists.
@@ -274,6 +290,12 @@ def delete_custom_analysis(analysis_id: str) -> dict:
             status_code=404,
             detail=f"CustomAnalysis {analysis_id!r} not found",
         )
+    audit(
+        request,
+        "custom_analysis.delete",
+        target_kind="custom_analysis",
+        target_id=analysis_id,
+    )
     return {"data": row}
 
 

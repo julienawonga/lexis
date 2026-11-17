@@ -14,6 +14,7 @@ from pydantic import BaseModel, Field, model_validator
 from auto_ontology.dal import sql_attributes as sql_attr_dal
 from auto_ontology.dal import terms as terms_dal
 from auto_ontology.dal.owners import CATALOG_EDIT, edit_subject
+from auto_ontology.server.audit import audit
 from auto_ontology.server.identity import resolve_internal_user
 from auto_ontology.server.owners import (
     enforce_edit,
@@ -292,6 +293,18 @@ def create_term(request: Request, body: TermCreate) -> dict:
         created["linked_by"],
         created["embedded"],
     )
+    audit(
+        request,
+        "term.create",
+        target_kind="term",
+        target_id=created["id"],
+        target_name=created["name"],
+        details={
+            "database": created["database_name"],
+            "table_count": len(created["table_ids"]),
+            "owner_id": owner_id,
+        },
+    )
     created["certification"] = terms_dal.get_term_certification(created["id"])
     return {"data": created}
 
@@ -326,6 +339,17 @@ def delete_term(request: Request, term_id: str) -> dict:
         user or "anonymous",
         len(removed["attribute_ids"]),
         removed["vector_rows_deleted"],
+    )
+    audit(
+        request,
+        "term.delete",
+        target_kind="term",
+        target_id=removed["id"],
+        target_name=removed["name"],
+        details={
+            "column_attributes": len(removed["attribute_ids"]),
+            "vector_rows": removed["vector_rows_deleted"],
+        },
     )
     return {
         "data": {
@@ -395,6 +419,14 @@ def update_term(request: Request, term_id: str, body: TermUpdate) -> dict:
         term_id,
         user or "anonymous",
         ",".join(sorted(patch)),
+    )
+    audit(
+        request,
+        "term.update",
+        target_kind="term",
+        target_id=term_id,
+        target_name=row["name"],
+        details={"fields": sorted(patch)},
     )
 
     # Certification flags carry no embedding content; only name/description

@@ -8,6 +8,6 @@ import { proxyToBackend } from '@/auth/proxy-backend';
 // semanticCompilationApi.reset — delete every database's compiled semantic
 // layer. Destructive, so it sits behind `manage` rather than the `read` tier
 // that may view the toggle.
-export const POST = withPermission({ semanticCompilation: ['manage'] })((req) =>
-	proxyToBackend(req),
+export const POST = withPermission({ semanticCompilation: ['manage'] })((req, { user }) =>
+	proxyToBackend(req, { userId: user.id }),
 );

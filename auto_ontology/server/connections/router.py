@@ -10,7 +10,7 @@ import logging
 import os
 from typing import Any, TypedDict
 
-from fastapi import APIRouter, HTTPException, Path
+from fastapi import APIRouter, HTTPException, Path, Request
 from pydantic import BaseModel, Field
 
 from auto_ontology.dal.connections import (
@@ -18,6 +18,7 @@ from auto_ontology.dal.connections import (
     list_connections as _list_connections,
     list_ontology_languages,
 )
+from auto_ontology.server.audit import audit
 from auto_ontology.server.connections import service
 from auto_ontology.server.responses import (
     ConnectionListResponse,
@@ -128,7 +129,7 @@ def test_connection(body: ConnectionTestBody) -> dict:
 
 
 @router.post("/connections", status_code=201, response_model=ConnectionResponse)
-def create_connection(body: ConnectionBody) -> dict:
+def create_connection(request: Request, body: ConnectionBody) -> dict:
     """Register a database connection and return it credential-free.
 
     The connection is validated on the way in; anything the driver rejects comes
@@ -148,11 +149,23 @@ def create_connection(body: ConnectionBody) -> dict:
             detail=f"Failed to create connection: {exc}",
         ) from exc
 
+    audit(
+        request,
+        "connection.create",
+        target_kind="connection",
+        target_id=str(row.get("database") or ""),
+        target_name=str(row.get("database") or ""),
+        details={
+            "type": row.get("type"),
+            "ontology_language": body.ontology_language,
+        },
+    )
     return {"data": _serialize_with_language(row)}
 
 
 @router.put("/connections/{database_name}", response_model=ConnectionResponse)
 def update_connection(
+    request: Request,
     body: ConnectionBody,
     database_name: str = Path(
         description=(
@@ -185,6 +198,17 @@ def update_connection(
             detail=f"Failed to update connection: {exc}",
         ) from exc
 
+    audit(
+        request,
+        "connection.update",
+        target_kind="connection",
+        target_id=database_name,
+        target_name=database_name,
+        details={
+            "type": row.get("type"),
+            "ontology_language": body.ontology_language,
+        },
+    )
     return {"data": _serialize_with_language(row)}
 
 
@@ -222,6 +246,7 @@ def set_sso_federation(
 
 @router.delete("/connections/{database_name}", response_model=ConnectionResponse)
 def delete_connection(
+    request: Request,
     database_name: str = Path(
         description=(
             "Catalog database name, which doubles as the connection's identity."
@@ -248,4 +273,11 @@ def delete_connection(
     if row is None:
         raise HTTPException(status_code=404, detail="Connection not found")
 
+    audit(
+        request,
+        "connection.delete",
+        target_kind="connection",
+        target_id=database_name,
+        target_name=database_name,
+    )
     return {"data": row}

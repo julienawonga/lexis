@@ -8,6 +8,6 @@ import { proxyToBackend } from '@/auth/proxy-backend';
 // ColumnAttributes into the semantic index (?database_name=). It rewrites
 // index rows rather than deleting any ontology data, but it runs the embedding
 // endpoint over the whole database, so it sits behind `manage` like the reset.
-export const POST = withPermission({ semanticCompilation: ['manage'] })((req) =>
-	proxyToBackend(req),
+export const POST = withPermission({ semanticCompilation: ['manage'] })((req, { user }) =>
+	proxyToBackend(req, { userId: user.id }),
 );

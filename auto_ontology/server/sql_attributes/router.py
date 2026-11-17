@@ -11,6 +11,7 @@ from pydantic import BaseModel, Field
 
 from auto_ontology.dal import terms as terms_dal
 from auto_ontology.dal.owners import CATALOG_EDIT, edit_subject
+from auto_ontology.server.audit import audit
 from auto_ontology.server.identity import resolve_internal_user
 from auto_ontology.server.owners import enforce_edit, owner_from_body
 from auto_ontology.server.sql_attributes import service as dal
@@ -147,6 +148,14 @@ def create_sql_attribute(request: Request, body: SqlAttributeCreate) -> dict:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     except (ValueError, dal.SqlAttributeSqlError) as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
+    audit(
+        request,
+        "sql_attribute.create",
+        target_kind="sql_attribute",
+        target_id=row.get("id"),
+        target_name=row.get("name"),
+        details={"term_id": body.term_id},
+    )
     return {"data": row}
 
 
@@ -187,6 +196,13 @@ def update_sql_attribute(
             status_code=404,
             detail=f"SqlAttribute {attr_id!r} not found",
         )
+    audit(
+        request,
+        "sql_attribute.update",
+        target_kind="sql_attribute",
+        target_id=attr_id,
+        target_name=row.get("name"),
+    )
     return {"data": row}
 
 
@@ -234,6 +250,14 @@ def patch_sql_attribute(
             status_code=404,
             detail=f"SqlAttribute {attr_id!r} not found",
         )
+    audit(
+        request,
+        "sql_attribute.update",
+        target_kind="sql_attribute",
+        target_id=attr_id,
+        target_name=row.get("name"),
+        details={"fields": sorted(patch)},
+    )
     term_id = row.get("term_id")
     return {
         "data": row,
@@ -258,4 +282,10 @@ def delete_sql_attribute(request: Request, attr_id: str) -> dict:
             status_code=404,
             detail=f"SqlAttribute {attr_id!r} not found",
         )
+    audit(
+        request,
+        "sql_attribute.delete",
+        target_kind="sql_attribute",
+        target_id=attr_id,
+    )
     return {"data": row}
