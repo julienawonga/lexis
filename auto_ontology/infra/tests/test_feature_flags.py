@@ -18,6 +18,8 @@ from auto_ontology.infra.feature_flags import (
     get_sql_result_max_rows,
     is_clarification_enabled,
     is_distinct_value_probing_enabled,
+    is_knowledge_admin_audit_enabled,
+    is_knowledge_items_enabled,
     is_pii_detection_enabled,
     read_configuration_flag,
     read_configuration_int,
@@ -256,3 +258,20 @@ def test_clarification_honours_an_explicit_true(
 ) -> None:
     with _patched(monkeypatch, ("true",)):
         assert is_clarification_enabled() is True
+
+
+def test_knowledge_flags_default_to_off_and_read_their_own_row(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Both are opt-in; the audit one fails closed so a draft stays private."""
+    with _patched(monkeypatch, None) as cursor:
+        assert is_knowledge_items_enabled() is False
+    assert cursor.executed[0][1] == ("knowledge_items_enabled",)
+    with _patched(monkeypatch, None) as cursor:
+        assert is_knowledge_admin_audit_enabled() is False
+    assert cursor.executed[0][1] == ("knowledge_admin_audit_enabled",)
+    with _patched(monkeypatch, ("true",)):
+        assert is_knowledge_items_enabled() is True
+        assert is_knowledge_admin_audit_enabled() is True
+    with _patched(monkeypatch, ("junk",)):
+        assert is_knowledge_admin_audit_enabled() is False

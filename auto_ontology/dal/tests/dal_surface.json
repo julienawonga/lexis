@@ -117,6 +117,34 @@
     "list_users_and_groups": "() -> 'dict[str, Any]'",
     "update_group": "(*, group_id: 'str', updates: 'dict[str, Any]', user_ids: 'list[str] | None') -> 'dict[str, Any] | None'"
   },
+  "knowledge": {
+    "InvalidDraft": "class(KnowledgeError)",
+    "InvalidTransition": "class(KnowledgeError)",
+    "ItemNotFound": "class(KnowledgeError)",
+    "KnowledgeError": "class(ValueError)",
+    "PermissionDenied": "class(KnowledgeError)",
+    "can_view": "(viewer: 'Actor', item: 'dict[str, Any]', *, audit: 'bool' = False) -> 'bool'",
+    "content_hash": "(content: 'dict[str, Any]') -> 'str'",
+    "create_draft": "(actor: 'Actor', *, kind: 'str', owner_id: 'str', content: 'dict[str, Any]', provenance: 'dict[str, Any]', database_id: 'str | None' = None, scope: 'str' = 'personal', item_id: 'str | None' = None, comment: 'str | None' = None) -> 'dict[str, Any]'",
+    "get_item": "(item_id: 'str') -> 'dict[str, Any] | None'",
+    "list_events": "(item_id: 'str') -> 'list[dict[str, Any]]'",
+    "list_items": "(viewer: 'Actor', *, database_id: 'str | None' = None, status: 'str | None' = None, kind: 'str | None' = None, scope: 'str | None' = None, limit: 'int' = 200) -> 'list[dict[str, Any]]'",
+    "rebuild_projection": "(item_id: 'str | None' = None) -> 'int'",
+    "replay_events": "(events: 'list[dict[str, Any]]') -> 'dict[str, Any] | None'",
+    "replay_item": "(item_id: 'str') -> 'dict[str, Any] | None'",
+    "resolve_actor": "(user_id: 'str') -> 'Actor'",
+    "transition": "(item_id: 'str', action: 'str', actor: 'Actor', *, comment: 'str | None' = None, content: 'dict[str, Any] | None' = None, request_id: 'str | None' = None) -> 'dict[str, Any]'"
+  },
+  "knowledge_rules": {
+    "Actor": "class(object)",
+    "ItemFacts": "class(object)",
+    "Transition": "class(object)",
+    "can_certify": "(actor: 'Actor', owner_ids: 'frozenset[str]') -> 'bool'",
+    "destination": "(action: 'str', item: 'ItemFacts') -> 'tuple[str, str]'",
+    "lifecycle_refusal": "(action: 'str', item: 'ItemFacts') -> 'str | None'",
+    "propose_refusal": "(actor: 'Actor', scope: 'str', owner_id: 'str', certifier_owner_ids: 'frozenset[str]') -> 'str | None'",
+    "refusal_reason": "(actor: 'Actor', action: 'str', item: 'ItemFacts', certifier_owner_ids: 'frozenset[str]') -> 'str | None'"
+  },
   "model_interchange": {
     "ModelImportValidationError": "class(ModelInterchangeError)",
     "ModelInterchangeError": "class(Exception)",

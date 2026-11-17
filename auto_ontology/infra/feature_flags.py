@@ -47,6 +47,16 @@ CLARIFICATION_ENABLED_KEY = "clarification_enabled"
 # settings control yet, so it is switched on by writing the row.
 SQL_ATTRIBUTE_SUGGESTION_ENABLED_KEY = "sql_attribute_suggestion_enabled"
 
+# Master switch for learned knowledge items (design `docs/design/self-improving-ontology.md`).
+# Opt-in and read per request: no route, capture or retrieval reads it yet, so
+# today it changes nothing. It exists so that the later slices ship behind it.
+KNOWLEDGE_ITEMS_ENABLED_KEY = "knowledge_items_enabled"
+
+# Lets an admin see other people's PERSONAL drafts (decision 3 of design section
+# 10.3), for organisations that must audit them. Opt-in: by default a personal
+# draft is visible to its owner only, admins included.
+KNOWLEDGE_ADMIN_AUDIT_ENABLED_KEY = "knowledge_admin_audit_enabled"
+
 # Written by the SQL Query Timeout field on Settings > Agent Settings: how long
 # a statement the text-to-SQL agent issues may run before it is cancelled. An
 # instance without the frontend never writes the row and gets the default.
@@ -163,6 +173,20 @@ def is_sql_attribute_suggestion_enabled() -> bool:
     no attribute reaches the ontology unless an operator asked for it.
     """
     return read_configuration_flag(SQL_ATTRIBUTE_SUGGESTION_ENABLED_KEY, default=False)
+
+
+def is_knowledge_items_enabled() -> bool:
+    """Whether learned knowledge items are switched on. Off when the row is missing."""
+    return read_configuration_flag(KNOWLEDGE_ITEMS_ENABLED_KEY, default=False)
+
+
+def is_knowledge_admin_audit_enabled() -> bool:
+    """Whether admins may read other people's personal knowledge drafts.
+
+    Opt-in, read per listing, and fails closed: a missing row or any database
+    error means a personal draft stays private to its owner.
+    """
+    return read_configuration_flag(KNOWLEDGE_ADMIN_AUDIT_ENABLED_KEY, default=False)
 
 
 def read_configuration_int(

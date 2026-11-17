@@ -48,6 +48,7 @@ from sqlalchemy import (
     Column,
     DateTime,
     ForeignKey,
+    Identity,
     Index,
     Integer,
     MetaData,
@@ -1266,6 +1267,182 @@ user_group__member = Table(
 
 
 # ---------------------------------------------------------------------------
+# Knowledge items -- learned and proposed knowledge, with its history
+# (docs/design/self-improving-ontology.md, sections 3.2 to 3.4)
+# ---------------------------------------------------------------------------
+
+#: The vocabularies of the two tables below. Defined here, as ``RUN_SUCCEEDED``
+#: is, because the CHECK constraints are built from them: the module that
+#: writes the values then cannot disagree with the constraint that allows them.
+KNOWLEDGE_KINDS = (
+    "term",
+    "synonym",
+    "column_attribute",
+    "sql_attribute",
+    "verified_query",
+    "relation",
+)
+KNOWLEDGE_STATUSES = (
+    "draft",
+    "in_review",
+    "certified",
+    "needs_revalidation",
+    "conflicted",
+    "deprecated",
+    "rejected",
+)
+#: Two scopes only (decision 5, design section 10.3): there is no team scope.
+KNOWLEDGE_SCOPES = ("personal", "shared")
+KNOWLEDGE_ACTIONS = (
+    "propose",
+    "edit",
+    "submit",
+    "approve",
+    "reject",
+    "request_changes",
+    "deprecate",
+    "promote_scope",
+    "mark_conflict",
+    "mark_revalidation",
+    "revalidate_ok",
+)
+KNOWLEDGE_ACTOR_TYPES = ("user", "agent", "job")
+
+
+def _sql_list(values: tuple[str, ...]) -> str:
+    return ", ".join(f"'{value}'" for value in values)
+
+
+# The CURRENT STATE of one piece of learned knowledge. It is a projection: the
+# rows of ``knowledge_event`` are the truth, and ``replay_item`` in
+# ``dal/knowledge.py`` rebuilds this table from them. Only the transition
+# function changes ``status`` and ``scope``, in the same transaction that
+# appends the event.
+#
+# * ``owner_id`` is the account the item was learned for. It is a personal
+#   item's scope owner, and it stays on the row after promotion to shared as
+#   the proposer of record (nobody may certify what they proposed). Like
+#   ``_owner_id`` it is not a foreign key: accounts live in a schema Alembic
+#   does not manage. The design called this ``scope_owner_id`` and left it null
+#   for shared items; one column serving both jobs is simpler and loses
+#   nothing, because the event log keeps who promoted it.
+# * ``database_id`` has NO foreign key, unlike every other table here. The
+#   audit trail must outlive the database it was about, and ``ON DELETE
+#   CASCADE`` would erase it with the database; a SET NULL would orphan a
+#   shared definition silently. Null only for a global glossary item.
+# * ``content`` is JSONB because its shape differs by kind; what must be
+#   queried (status, scope, owner, hash) is a real column.
+# * ``target_table`` and ``target_id`` name the live row (``term``,
+#   ``sql_attribute``) the item was materialised into on certification.
+#   Materialisation is not built yet, so they stay null.
+# * ``certified`` and its two relatives imply ``shared``: a personal item can
+#   never be served as vetted knowledge. The CHECK is the last line; the
+#   transition function refuses first.
+knowledge_item = Table(
+    "knowledge_item",
+    METADATA,
+    _id(),
+    Column("kind", Text, nullable=False),
+    Column("status", Text, nullable=False),
+    Column("scope", Text, nullable=False),
+    Column("owner_id", Text, nullable=False),
+    Column("database_id", Text, nullable=True),
+    Column("content", JSONB, nullable=False),
+    Column("content_hash", Text, nullable=False),
+    Column("provenance", JSONB, nullable=False),
+    Column("current_version", Integer, nullable=False, server_default=text("1")),
+    Column("target_table", Text, nullable=True),
+    Column("target_id", Text, nullable=True),
+    Column("created_by", Text, nullable=False),
+    Column(
+        "created",
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=func.now(),
+    ),
+    Column(
+        "modified",
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=func.now(),
+    ),
+    CheckConstraint(f"kind IN ({_sql_list(KNOWLEDGE_KINDS)})", name="kind_value"),
+    CheckConstraint(
+        f"status IN ({_sql_list(KNOWLEDGE_STATUSES)})", name="status_value"
+    ),
+    CheckConstraint(f"scope IN ({_sql_list(KNOWLEDGE_SCOPES)})", name="scope_value"),
+    CheckConstraint(
+        "status NOT IN ('certified', 'needs_revalidation', 'conflicted') "
+        "OR scope = 'shared'",
+        name="certified_is_shared",
+    ),
+)
+Index(
+    "ix_knowledge_item_database_status",
+    knowledge_item.c.database_id,
+    knowledge_item.c.status,
+)
+Index("ix_knowledge_item_owner_id", knowledge_item.c.owner_id)
+
+# Append-only: one row per transition, never updated or deleted by the service
+# layer. Nothing in the store enforces that yet (no trigger, no role without
+# UPDATE grants); it is a property of ``dal/knowledge.py``, not of Postgres.
+#
+# * ``item_id`` has no foreign key, because this table is the source of truth
+#   and ``knowledge_item`` is derived from it: a foreign key would make the
+#   projection a precondition of its own history, and would stop it being
+#   rebuilt from nothing.
+# * ``seq`` orders the replay. ``at`` cannot: every event of one transaction
+#   shares the transaction's clock.
+# * ``data`` carries what the event changed, so replay needs nothing else:
+#   the whole snapshot (kind, database, scope, owner, content, provenance)
+#   on ``propose``, the new content on ``edit``, nothing on the others.
+# * ``request_id`` is the caller's idempotency key. The partial unique index
+#   below makes a retry of the same request find its event instead of
+#   appending a second one.
+knowledge_event = Table(
+    "knowledge_event",
+    METADATA,
+    Column("seq", BigInteger, Identity(always=True), nullable=False, unique=True),
+    _id(),
+    Column("item_id", Text, nullable=False),
+    Column("at", DateTime(timezone=True), nullable=False),
+    Column("action", Text, nullable=False),
+    Column("actor_type", Text, nullable=False),
+    Column("actor_id", Text, nullable=False),
+    Column("from_status", Text, nullable=True),
+    Column("to_status", Text, nullable=False),
+    Column("from_scope", Text, nullable=True),
+    Column("to_scope", Text, nullable=False),
+    Column("version", Integer, nullable=False),
+    Column("comment", Text, nullable=True),
+    Column("activity", Text, nullable=True),
+    Column("request_id", Text, nullable=True),
+    Column("data", JSONB, nullable=False, server_default=text("'{}'::jsonb")),
+    CheckConstraint(f"action IN ({_sql_list(KNOWLEDGE_ACTIONS)})", name="action_value"),
+    CheckConstraint(
+        f"actor_type IN ({_sql_list(KNOWLEDGE_ACTOR_TYPES)})", name="actor_type_value"
+    ),
+    CheckConstraint(
+        f"to_status IN ({_sql_list(KNOWLEDGE_STATUSES)})", name="to_status_value"
+    ),
+    # An agent or a job can never be the one that makes knowledge certified:
+    # the rule of the design's principle table, kept in the store as well.
+    CheckConstraint(
+        "to_status <> 'certified' OR actor_type = 'user'",
+        name="certified_by_user",
+    ),
+)
+Index("ix_knowledge_event_item_seq", knowledge_event.c.item_id, knowledge_event.c.seq)
+Index(
+    "uq_knowledge_event_item_request",
+    knowledge_event.c.item_id,
+    knowledge_event.c.request_id,
+    unique=True,
+    postgresql_where=text("request_id IS NOT NULL"),
+)
+
+# ---------------------------------------------------------------------------
 # Indexes for the read paths
 # ---------------------------------------------------------------------------
 
@@ -1465,6 +1642,13 @@ __all__ = [
     "JOIN_PATH_EDGE_VIEW_SQL",
     "DROP_JOIN_PATH_EDGE_VIEW_SQL",
     "analysis",
+    "KNOWLEDGE_ACTIONS",
+    "KNOWLEDGE_ACTOR_TYPES",
+    "KNOWLEDGE_KINDS",
+    "KNOWLEDGE_SCOPES",
+    "KNOWLEDGE_STATUSES",
+    "knowledge_event",
+    "knowledge_item",
     "catalog_column",
     "catalog_database",
     "catalog_schema",
