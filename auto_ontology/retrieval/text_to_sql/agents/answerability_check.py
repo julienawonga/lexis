@@ -18,7 +18,7 @@ never block a question.
 
 from __future__ import annotations
 
-from typing import Any, Dict
+from typing import Any, Callable, Dict
 
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 
@@ -42,6 +42,16 @@ from auto_ontology.retrieval.text_to_sql.answerability import (
     refusal_required,
     verify_items,
 )
+from auto_ontology.retrieval.text_to_sql.answerability_escalation import (
+    ESCALATION_SYSTEM_PROMPT,
+    ESCALATION_USER_PROMPT,
+    EscalationModel,
+    EscalationResult,
+    Outline,
+    build_outline,
+    verify_escalation,
+)
+from auto_ontology.retrieval.text_to_sql.catalog_outline import load_catalog_tables
 from auto_ontology.retrieval.text_to_sql.base import (
     BaseAgent,
     add_caveat,
@@ -117,8 +127,103 @@ class AnswerabilityCheckAgent(BaseAgent):
     ends with ``path_state["final_response"]`` carrying the refusal).
     """
 
-    def __init__(self) -> None:
+    def __init__(self, catalog_loader: Callable[[str], list[dict]] | None = None):
         super().__init__("answerability_check", failure_decision=PROCEED)
+        # Every table and column of one database; replaceable in tests.
+        self.catalog_loader = catalog_loader or load_catalog_tables
+
+    def _escalate(
+        self,
+        state: AgentState,
+        columns: list,
+        absent: list,
+        question_block: str,
+    ) -> tuple[EscalationResult, Outline] | None:
+        """Re-check the absent items against the whole catalog, or ``None``.
+
+        ``None`` means "could not check": no database to read, a failed read or
+        call, an empty catalog, or a verdict missing for some item. The caller
+        then fails open.
+        """
+        path_state = state.get("path_state", {})
+        database = path_state.get("target_db") or next(
+            (
+                t.get("database_name")
+                for t in path_state.get("relevant_tables") or []
+                if isinstance(t, dict) and t.get("database_name")
+            ),
+            None,
+        )
+        llm = state.get("llm")
+        if not database or llm is None:
+            self.logger.warning("Escalation skipped: no database or no model client")
+            return None
+        try:
+            catalog = self.catalog_loader(str(database))
+        except Exception:  # noqa: BLE001 - fail open
+            self.logger.warning("Escalation: reading the catalog failed", exc_info=True)
+            return None
+        asked = [item.what for item in absent]
+        outline = build_outline(catalog, asked)
+        if not outline.tables:
+            self.logger.warning("Escalation: no catalog tables for %r", database)
+            return None
+        if outline.truncated:
+            self.logger.warning(
+                "Escalation outline truncated to %d of %d tables; it can rescue "
+                "an item but will not refuse on partial evidence",
+                len(outline.tables),
+                outline.total_tables,
+            )
+        messages = [
+            SystemMessage(content=ESCALATION_SYSTEM_PROMPT),
+            HumanMessage(
+                content=ESCALATION_USER_PROMPT.format(
+                    question_block=question_block,
+                    items=chr(10).join(f"- {what}" for what in asked),
+                    outline=outline.text,
+                )
+            ),
+        ]
+        reply = invoke_with_structured_output(llm, messages, EscalationModel)
+        if not isinstance(reply, EscalationModel) or not reply.items:
+            self.logger.warning("Escalation returned no usable items")
+            return None
+        result = verify_escalation(asked, reply, offered_columns(outline.tables))
+        if not result.complete:
+            self.logger.warning("Escalation did not cover every item")
+            return None
+        return result, outline
+
+    @staticmethod
+    def _add_cited_tables(
+        path_state: dict[str, Any], outline: Outline, cited: list[str]
+    ) -> list[str]:
+        """Append the catalog tables the second pass cited to the offered tables.
+
+        Same dict shape as ``relevant_tables`` entries (name, schema_name,
+        database_name, columns), so generation prints them like any other. Only
+        the cited tables are added, not the intermediate tables a join between
+        them may need; generation's own discovery handles those.
+        """
+        have = {
+            str(t.get("name") or "").casefold()
+            for t in path_state.get("relevant_tables") or []
+            if isinstance(t, dict)
+        }
+        wanted = {c.split(".")[0].casefold() for c in cited}
+        added = [
+            t
+            for t in outline.tables
+            if str(t.get("name")).casefold() in wanted
+            and str(t.get("name")).casefold() not in have
+        ]
+        if added:
+            path_state["relevant_tables"] = [
+                *(path_state.get("relevant_tables") or []),
+                *added,
+            ]
+        return [str(t["name"]) for t in added]
 
     def execute(self, state: AgentState) -> Dict[str, Any]:
         try:
@@ -179,6 +284,38 @@ class AnswerabilityCheckAgent(BaseAgent):
             return self._unchecked(state)
 
         checked = verify_items(result.items, columns, definitions)
+        if refusal_required(checked):
+            absent = [c for c in checked if c.status == "absent"]
+            escalation = self._escalate(state, columns, absent, question_block)
+            if escalation is None:
+                return self._unchecked(state)
+            second, outline = escalation
+            if second.still_absent and outline.truncated:
+                # Partial evidence can rescue an item but not condemn one.
+                return self._unchecked(state)
+            cited: list[str] = []
+            for item in absent:
+                if item.what in second.found:
+                    item.status = "in_schema"
+                    item.valid_columns = second.found[item.what]
+                    cited += second.found[item.what]
+                else:
+                    item.why_absent += (
+                        "; still not found in the outline of the whole catalog "
+                        f"({outline.total_tables} tables)"
+                    )
+            if not refusal_required(checked):
+                added = self._add_cited_tables(path_state, outline, cited)
+                record_thought(
+                    path_state,
+                    GRAPH_NODE_NAME,
+                    "Not in the first tables, found elsewhere in the catalog: "
+                    + "; ".join(
+                        f"{w} ({', '.join(c)})" for w, c in second.found.items()
+                    )
+                    + (f". Added tables: {', '.join(added)}." if added else "."),
+                )
+                return {"path_state": path_state, "decision": PROCEED}
         if not refusal_required(checked):
             record_thought(
                 path_state,

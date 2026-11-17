@@ -84,3 +84,51 @@ engine with the flag off, with a fixed false-refusal criterion written before
 the run. No constant of this mechanism may be tuned on those sets. Record the
 result in `experiments.md` and update the row in
 [`verification-status.md`](verification-status.md).
+
+## Version 2
+
+**Version 1 was rejected by its gate.** Measured on the local stack, it refused
+105 of 105 scored runs on the 36 unanswerable questions (baseline 13%), but it
+also refused 6 of 36 answerable control runs (baseline 0), so criterion C3
+failed. The backend log showed two causes:
+
+- a measure that has to be computed (a figure that exists only as payments joined
+  through other tables) was declared absent;
+- a table reached through several joins was not among the offered tables, because
+  the relevance filter had dropped it, so something it holds looked absent.
+
+Version 2 changes two things, in code and prompt. There is still no numeric
+threshold, and nothing was tuned on any evaluation set.
+
+1. **Computed measures are not absent.** The first-pass prompt now says that a
+   revenue, total, count, average, share, ratio, rate per group, rank or period
+   figure is a measure computed from columns, not a column, and is `derivable`
+   whenever the columns it needs exist (named, with the formula in one line),
+   even across a join. `absent` is only for a thing no offered column holds and
+   no offered column can compute. An item that only says how to group, order,
+   limit or present the result is not a separate item.
+2. **Escalation before refusing.** For every item the first pass marks `absent`,
+   one second call sees a compact outline of the whole catalog of the target
+   database (table name, column names and types, no descriptions; built from
+   existing DAL reads in `catalog_outline.py`). It answers `found` (with
+   `table.column` identifiers) or `still_absent` per item. Code checks that the
+   cited identifiers exist in the outline. The question is refused only if an item
+   is still absent; otherwise generation proceeds as if answerable and the tables
+   the second pass cited are appended to the offered tables (same dict shape as
+   the other relevant tables; intermediate tables a join needs are not added).
+
+The outline is capped at 60,000 characters (a documented size limit). A larger
+catalog is cut to the tables sharing the most words with the items. A truncated
+outline can rescue an item but never condemn one: if it is truncated and an item
+is still absent, the check logs that and fails open with
+`answerability_unchecked` instead of refusing. The same happens when there is no
+database to read, the read or the call fails, or the second pass skips an item.
+
+New risks. A catalog table matching the item only by name can now let a question
+through that should have been refused (a missed refusal), and the second call
+adds latency on every question that had an absent item. A very large catalog
+refuses less often because truncation fails open. False refusals remain possible
+when the second pass also misses a computed measure.
+
+**Version 2 must pass a new gate on fresh question sets before the flag is
+enabled.**

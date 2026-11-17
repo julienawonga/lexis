@@ -22,6 +22,9 @@ There is no score, no distance and no numeric threshold. The model never grades
 its own answer: it makes a checkable claim ("this is in ``t.c``") and the code
 checks it against the schema it was shown.
 
+Version 2 adds an escalation before any refusal (``answerability_escalation.py``)
+and a stricter first-pass rule that computed measures are not absent.
+
 This module is pure (no model or database access); the node is
 ``agents/answerability_check.py``.
 """
@@ -124,11 +127,13 @@ SYSTEM_PROMPT = """You decide whether a database can answer a question, BEFORE a
 
 List EVERY distinct thing the question asks for: each entity, attribute, measure, filter condition and time span. For each one give a `status`:
 - in_schema: an offered column or table holds it directly. Put the exact identifiers in `columns`, written table.column as in the list below.
-- derivable: it can be computed from offered columns (counts, sums, averages, ratios, differences, date arithmetic, comparisons, rankings). Put EVERY column used in `columns` and the formula, in one line, in `formula`.
+- derivable: it can be computed from offered columns (see the rule on computed measures below). Put EVERY column used in `columns` and the formula, in one line, in `formula`.
 - defined: the BUSINESS DEFINITIONS section below defines it (a term, a certified metric or attribute, or something the user stated). Put a short fragment copied WORD FOR WORD from that section in `quote`, and the columns it relies on in `columns` when it names any.
 - absent: nothing offered holds it and it cannot be computed from what is offered.
 
 Rules:
+- A revenue, total, count, average, share, ratio, rate per group, rank or period figure is a MEASURE COMPUTED from columns, not a column. It is `derivable` whenever the columns it needs exist among the offered ones, even when no column carries its name and even when it needs a join: name those columns and give the formula in one line. For instance, "total weight per crate", in an invented schema with items(weight, crate_id), is derivable: SUM(items.weight) grouped by items.crate_id. `absent` is ONLY for a thing that no offered column holds and that cannot be computed from any offered column.
+- An item that only describes how to group, order, limit or present the result (per group, top N, sorted by, descending) is not a separate item: the thing being grouped or ranked is the item.
 - A nearby but different column is NOT a match. A column that is merely related to what is asked does not hold it. Judge by what a column means (its name and description, in any language), never by how similar its name is to a word in the question. If a column's name or description states the same meaning as the thing asked for, it holds it.
 - Anything defined in the BUSINESS DEFINITIONS section is available, even when no column carries its name.
 - Wording that only frames the request (show, list, give me, top, sort, how many) is not an item. The counting, grouping or ranking itself is derivable from rows.
